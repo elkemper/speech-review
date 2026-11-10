@@ -1,0 +1,40 @@
+appId: com.speechreview.local
+productName: Speech Review
+copyright: Speech Review · локальная обработка
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+  - "!**/*.map"
+
+extraResources:
+  - from: resources/engine
+    to: engine
+  - from: resources/ffmpeg
+    to: ffmpeg
+
+asar: true
+afterPack: scripts/after-pack.cjs
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  category: public.app-category.productivity
+  darkModeSupport: true
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  extendInfo:
+    NSHumanReadableCopyright: "Локальная обработка. CrisperWhisper 2.0 — Nyra Health Non-Commercial Research License."
+
+dmg:
+  artifactName: Speech-Review-${version}-${arch}.${ext}
+  window:
+    width: 560
+    height: 380

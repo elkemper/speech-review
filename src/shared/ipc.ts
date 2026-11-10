@@ -1,0 +1,22 @@
+export const IPC = {
+  engineStatus: 'engine:status',
+  settingsGet: 'settings:get',
+  settingsSave: 'settings:save',
+  mediaOpen: 'media:open',
+  mediaOpenPath: 'media:open-path',
+  mediaRegister: 'media:register',
+  projectsList: 'projects:list',
+  projectsCreate: 'projects:create',
+  projectsLoad: 'projects:load',
+  projectsSave: 'projects:save',
+  projectsDelete: 'projects:delete',
+  transcribeStart: 'transcribe:start',
+  transcribeCancel: 'transcribe:cancel',
+  modelsDownload: 'models:download',
+  exportProject: 'export:project',
+  shellShowItem: 'shell:show-item',
+  transcribeProgress: 'transcribe:progress',
+  transcribeDone: 'transcribe:done',
+  transcribeError: 'transcribe:error',
+  modelProgress: 'models:progress'
+} as const

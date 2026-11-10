@@ -1,0 +1,135 @@
+import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import {
+  buildTranscript,
+  findActiveWord,
+  findSegmentIndexForWord,
+  parseRawWords,
+  stripTrailingCommas
+} from '../src/shared/transcript'
+import { DEFAULT_RULES, countDefects, detectDefects } from '../src/shared/defects'
+
+function fixture(name: string): string {
+  return readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf8')
+}
+
+const rawText = fixture('chunk.json')
+const expectedText = fixture('out.txt').trim()
+
+describe('transcript parser', () => {
+  it('tolerates a trailing comma before the closing bracket', () => {
+    expect(stripTrailingCommas('{"a":1,}')).toBe('{"a":1}')
+    expect(stripTrailingCommas('[{"a":1},]')).toBe('[{"a":1}]')
+    expect(stripTrailingCommas('{"a":",]"}')).toBe('{"a":",]"}')
+  })
+
+  it('parses the real audio.cpp words output', () => {
+    const raw = parseRawWords(rawText)
+    expect(raw).toHaveLength(80)
+    expect(raw[0]).toMatchObject({ start_sample: 21760, end_sample: 27200, word: '[UH]' })
+    expect(raw[raw.length - 1].word).toBe('бизнес-пуризнес')
+  })
+
+  it('builds seconds, words and segments', () => {
+    const transcript = buildTranscript(parseRawWords(rawText), {
+      language: 'ru',
+      sampleRate: 16000
+    })
+
+    expect(transcript.words).toHaveLength(80)
+    expect(transcript.words[0].start).toBeCloseTo(1.36, 3)
+    expect(transcript.words[transcript.words.length - 1].end).toBeCloseTo(39.54, 3)
+    expect(transcript.text).toBe(expectedText)
+
+    const covered = transcript.segments.flatMap((segment) => segment.wordIds)
+    expect(covered).toEqual(transcript.words.map((word) => word.id))
+    expect(transcript.segments.map((segment) => segment.text).join(' ')).toBe(expectedText)
+  })
+
+  it('marks unsupported confidence as null instead of zero', () => {
+    const transcript = buildTranscript(parseRawWords(rawText))
+    expect(transcript.words.every((word) => word.confidence === null)).toBe(true)
+  })
+
+  it('classifies event tokens', () => {
+    const transcript = buildTranscript(parseRawWords(rawText))
+    const events = transcript.words.filter((word) => word.kind !== 'word')
+    expect(events.map((word) => word.text)).toEqual([
+      '[UH]',
+      '[UM]',
+      '[UH]',
+      '[UH]',
+      '[UH]',
+      '[UH]'
+    ])
+    expect(events.every((word) => word.kind === 'filler')).toBe(true)
+  })
+
+  it('finds the active word and its segment', () => {
+    const transcript = buildTranscript(parseRawWords(rawText))
+    const active = findActiveWord(transcript.words, 2.7)
+    expect(active?.text).toBe('три')
+    const segmentIndex = findSegmentIndexForWord(transcript.segments, active!.id)
+    expect(segmentIndex).toBeGreaterThanOrEqual(0)
+    expect(transcript.segments[segmentIndex].wordIds).toContain(active!.id)
+  })
+})
+
+describe('defect rules', () => {
+  const transcript = buildTranscript(parseRawWords(rawText))
+  const defects = detectDefects(transcript, DEFAULT_RULES)
+
+  it('finds fillers, pauses and the false start', () => {
+    const counts = countDefects(defects)
+    expect(counts.filler).toBe(6)
+    expect(counts.pause).toBe(3)
+    expect(counts.false_start).toBe(1)
+    expect(defects).toHaveLength(10)
+  })
+
+  it('does not flag the sentence-boundary pause after "пользу."', () => {
+    const pauseAfterSentence = defects.find(
+      (defect) => defect.type === 'pause' && Math.abs(defect.start - 32.96) < 0.01
+    )
+    expect(pauseAfterSentence).toBeUndefined()
+  })
+
+  it('places the detected pauses at the real gaps', () => {
+    const pauses = defects
+      .filter((defect) => defect.type === 'pause')
+      .map((defect) => Number(defect.start.toFixed(2)))
+    expect(pauses).toEqual([7.48, 20.96, 34.3])
+  })
+
+  it('finds the cut-off word', () => {
+    const falseStart = defects.find((defect) => defect.type === 'false_start')
+    expect(falseStart?.text).toBe('Вит-')
+    expect(falseStart?.start).toBeCloseTo(36.25, 2)
+  })
+
+  it('does not invent repetition, elongation or vocal sound defects', () => {
+    const counts = countDefects(defects)
+    expect(counts.repetition).toBe(0)
+    expect(counts.elongation).toBe(0)
+    expect(counts.vocal_sound).toBe(0)
+    expect(counts.unclear).toBe(0)
+  })
+
+  it('keeps manual marks separate from automatic defects', () => {
+    const withMark = detectDefects(transcript, DEFAULT_RULES, [
+      {
+        id: 'mark-1',
+        type: 'manual',
+        start: 10,
+        end: 11,
+        note: 'Проверить',
+        createdAt: new Date(0).toISOString()
+      }
+    ])
+    const manual = withMark.filter((defect) => defect.source === 'manual')
+    expect(manual).toHaveLength(1)
+    expect(manual[0].text).toBe('Проверить')
+    expect(manual[0].wordIds.length).toBeGreaterThan(0)
+  })
+})

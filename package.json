@@ -1,0 +1,37 @@
+{
+  "name": "webinar-speech-review",
+  "productName": "Speech Review",
+  "version": "0.1.0",
+  "description": "Local webinar speech defect review with CrisperWhisper",
+  "main": "./out/main/index.js",
+  "author": "",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "fetch:engine": "node scripts/fetch-engine.mjs",
+    "check:resources": "node scripts/check-resources.mjs",
+    "package:mac": "node scripts/check-resources.mjs && npm run build && electron-builder --mac --arm64"
+  },
+  "devDependencies": {
+    "@tanstack/react-virtual": "^3.14.26",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.7",
+    "vitest": "^5.1.0",
+    "zustand": "^5.1.0"
+  }
+}

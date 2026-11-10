@@ -1,0 +1,482 @@
+[
+  {
+    "start_sample": 21760,
+    "end_sample": 27200,
+    "word": "[UH]",
+    "confidence": 0
+  },
+  {
+    "start_sample": 42560,
+    "end_sample": 45120,
+    "word": "три",
+    "confidence": 0
+  },
+  {
+    "start_sample": 45120,
+    "end_sample": 48960,
+    "word": "минутки",
+    "confidence": 0
+  },
+  {
+    "start_sample": 48960,
+    "end_sample": 57280,
+    "word": "прошло,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 60800,
+    "end_sample": 66560,
+    "word": "надеюсь,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 66560,
+    "end_sample": 68800,
+    "word": "вы",
+    "confidence": 0
+  },
+  {
+    "start_sample": 68800,
+    "end_sample": 84480,
+    "word": "готовы,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 84480,
+    "end_sample": 85120,
+    "word": "у",
+    "confidence": 0
+  },
+  {
+    "start_sample": 85120,
+    "end_sample": 85760,
+    "word": "вас",
+    "confidence": 0
+  },
+  {
+    "start_sample": 85760,
+    "end_sample": 93440,
+    "word": "налиты",
+    "confidence": 0
+  },
+  {
+    "start_sample": 97600,
+    "end_sample": 104000,
+    "word": "пельмешки",
+    "confidence": 0
+  },
+  {
+    "start_sample": 117440,
+    "end_sample": 119680,
+    "word": "[UM]",
+    "confidence": 0
+  },
+  {
+    "start_sample": 154880,
+    "end_sample": 157760,
+    "word": "у",
+    "confidence": 0
+  },
+  {
+    "start_sample": 157760,
+    "end_sample": 158880,
+    "word": "нас",
+    "confidence": 0
+  },
+  {
+    "start_sample": 158880,
+    "end_sample": 163520,
+    "word": "собралось",
+    "confidence": 0
+  },
+  {
+    "start_sample": 163520,
+    "end_sample": 171520,
+    "word": "достаточно,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 171520,
+    "end_sample": 177920,
+    "word": "переходим",
+    "confidence": 0
+  },
+  {
+    "start_sample": 177920,
+    "end_sample": 185600,
+    "word": "непосредственно",
+    "confidence": 0
+  },
+  {
+    "start_sample": 185600,
+    "end_sample": 187200,
+    "word": "к",
+    "confidence": 0
+  },
+  {
+    "start_sample": 187200,
+    "end_sample": 193760,
+    "word": "нашему",
+    "confidence": 0
+  },
+  {
+    "start_sample": 193760,
+    "end_sample": 204480,
+    "word": "пуску.",
+    "confidence": 0
+  },
+  {
+    "start_sample": 212480,
+    "end_sample": 215680,
+    "word": "Сегодня",
+    "confidence": 0
+  },
+  {
+    "start_sample": 215680,
+    "end_sample": 218880,
+    "word": "мы",
+    "confidence": 0
+  },
+  {
+    "start_sample": 218880,
+    "end_sample": 226240,
+    "word": "обсудим,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 226240,
+    "end_sample": 227840,
+    "word": "что",
+    "confidence": 0
+  },
+  {
+    "start_sample": 227840,
+    "end_sample": 228800,
+    "word": "такое",
+    "confidence": 0
+  },
+  {
+    "start_sample": 238720,
+    "end_sample": 243840,
+    "word": "про-ММ",
+    "confidence": 0
+  },
+  {
+    "start_sample": 243840,
+    "end_sample": 245760,
+    "word": "в",
+    "confidence": 0
+  },
+  {
+    "start_sample": 245760,
+    "end_sample": 256320,
+    "word": "категории,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 256320,
+    "end_sample": 259200,
+    "word": "как",
+    "confidence": 0
+  },
+  {
+    "start_sample": 259200,
+    "end_sample": 266080,
+    "word": "перейти",
+    "confidence": 0
+  },
+  {
+    "start_sample": 266080,
+    "end_sample": 269440,
+    "word": "от",
+    "confidence": 0
+  },
+  {
+    "start_sample": 272960,
+    "end_sample": 282880,
+    "word": "критериев",
+    "confidence": 0
+  },
+  {
+    "start_sample": 285120,
+    "end_sample": 285440,
+    "word": "к",
+    "confidence": 0
+  },
+  {
+    "start_sample": 285440,
+    "end_sample": 294080,
+    "word": "патеррну",
+    "confidence": 0
+  },
+  {
+    "start_sample": 294080,
+    "end_sample": 302880,
+    "word": "поиска",
+    "confidence": 0
+  },
+  {
+    "start_sample": 302880,
+    "end_sample": 305280,
+    "word": "с",
+    "confidence": 0
+  },
+  {
+    "start_sample": 305280,
+    "end_sample": 307520,
+    "word": "ПК",
+    "confidence": 0
+  },
+  {
+    "start_sample": 307520,
+    "end_sample": 310720,
+    "word": "и",
+    "confidence": 0
+  },
+  {
+    "start_sample": 310720,
+    "end_sample": 312320,
+    "word": "продуктив",
+    "confidence": 0
+  },
+  {
+    "start_sample": 313920,
+    "end_sample": 321920,
+    "word": "SLC,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 331200,
+    "end_sample": 335360,
+    "word": "что",
+    "confidence": 0
+  },
+  {
+    "start_sample": 357760,
+    "end_sample": 360640,
+    "word": "[UH]",
+    "confidence": 0
+  },
+  {
+    "start_sample": 363200,
+    "end_sample": 368640,
+    "word": "происходит",
+    "confidence": 0
+  },
+  {
+    "start_sample": 368640,
+    "end_sample": 369920,
+    "word": "в",
+    "confidence": 0
+  },
+  {
+    "start_sample": 369920,
+    "end_sample": 374720,
+    "word": "момент,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 374720,
+    "end_sample": 380160,
+    "word": "когда",
+    "confidence": 0
+  },
+  {
+    "start_sample": 382720,
+    "end_sample": 385920,
+    "word": "после",
+    "confidence": 0
+  },
+  {
+    "start_sample": 385920,
+    "end_sample": 389760,
+    "word": "того,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 389760,
+    "end_sample": 391840,
+    "word": "как",
+    "confidence": 0
+  },
+  {
+    "start_sample": 391840,
+    "end_sample": 393920,
+    "word": "мы",
+    "confidence": 0
+  },
+  {
+    "start_sample": 405760,
+    "end_sample": 409280,
+    "word": "как-то",
+    "confidence": 0
+  },
+  {
+    "start_sample": 409280,
+    "end_sample": 418240,
+    "word": "нашли,",
+    "confidence": 0
+  },
+  {
+    "start_sample": 427520,
+    "end_sample": 432960,
+    "word": "дали",
+    "confidence": 0
+  },
+  {
+    "start_sample": 432960,
+    "end_sample": 436800,
+    "word": "нашим",
+    "confidence": 0
+  },
+  {
+    "start_sample": 436800,
+    "end_sample": 447360,
+    "word": "мечтам",
+    "confidence": 0
+  },
+  {
+    "start_sample": 449600,
+    "end_sample": 452800,
+    "word": "[UH]",
+    "confidence": 0
+  },
+  {
+    "start_sample": 452800,
+    "end_sample": 462720,
+    "word": "путь",
+    "confidence": 0
+  },
+  {
+    "start_sample": 471360,
+    "end_sample": 472640,
+    "word": "[UH]",
+    "confidence": 0
+  },
+  {
+    "start_sample": 478720,
+    "end_sample": 480640,
+    "word": "как",
+    "confidence": 0
+  },
+  {
+    "start_sample": 480640,
+    "end_sample": 482240,
+    "word": "это",
+    "confidence": 0
+  },
+  {
+    "start_sample": 482240,
+    "end_sample": 494400,
+    "word": "долить",
+    "confidence": 0
+  },
+  {
+    "start_sample": 494400,
+    "end_sample": 495680,
+    "word": "и",
+    "confidence": 0
+  },
+  {
+    "start_sample": 495680,
+    "end_sample": 500800,
+    "word": "начать",
+    "confidence": 0
+  },
+  {
+    "start_sample": 502720,
+    "end_sample": 508480,
+    "word": "получать",
+    "confidence": 0
+  },
+  {
+    "start_sample": 508480,
+    "end_sample": 515520,
+    "word": "дарость",
+    "confidence": 0
+  },
+  {
+    "start_sample": 515520,
+    "end_sample": 516480,
+    "word": "из",
+    "confidence": 0
+  },
+  {
+    "start_sample": 516480,
+    "end_sample": 519040,
+    "word": "этого",
+    "confidence": 0
+  },
+  {
+    "start_sample": 522560,
+    "end_sample": 527360,
+    "word": "всего.",
+    "confidence": 0
+  },
+  {
+    "start_sample": 547200,
+    "end_sample": 548800,
+    "word": "Так",
+    "confidence": 0
+  },
+  {
+    "start_sample": 572800,
+    "end_sample": 575360,
+    "word": "[UH]",
+    "confidence": 0
+  },
+  {
+    "start_sample": 575360,
+    "end_sample": 577600,
+    "word": "меня",
+    "confidence": 0
+  },
+  {
+    "start_sample": 577600,
+    "end_sample": 580000,
+    "word": "зовут",
+    "confidence": 0
+  },
+  {
+    "start_sample": 580000,
+    "end_sample": 582080,
+    "word": "Вит-",
+    "confidence": 0
+  },
+  {
+    "start_sample": 582080,
+    "end_sample": 583360,
+    "word": "меня",
+    "confidence": 0
+  },
+  {
+    "start_sample": 585280,
+    "end_sample": 590400,
+    "word": "зовут",
+    "confidence": 0
+  },
+  {
+    "start_sample": 603200,
+    "end_sample": 605120,
+    "word": "я",
+    "confidence": 0
+  },
+  {
+    "start_sample": 605120,
+    "end_sample": 612160,
+    "word": "работаю",
+    "confidence": 0
+  },
+  {
+    "start_sample": 617600,
+    "end_sample": 618240,
+    "word": "в",
+    "confidence": 0
+  },
+  {
+    "start_sample": 618240,
+    "end_sample": 632640,
+    "word": "бизнес-пуризнес",
+    "confidence": 0
+  },
+]

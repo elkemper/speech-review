@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+resources/engine/
+resources/ffmpeg/
+*.log
+.DS_Store
+samples/
+test/fixtures/*.wav
+*.mp4
+*.wav
+*.avi
+*.mp3
+*.mkv
