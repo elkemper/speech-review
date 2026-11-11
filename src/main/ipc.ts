@@ -76,6 +76,7 @@ export function registerIpc(dependencies: IpcDependencies): TranscriptionManager
 
   const manager = new TranscriptionManager({
     progress: (progress) => send(IPC.transcribeProgress, progress),
+    partial: (partial) => send(IPC.transcribePartial, partial),
     done: (done) => send(IPC.transcribeDone, done),
     error: (error) => send(IPC.transcribeError, error)
   })

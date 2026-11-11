@@ -147,7 +147,7 @@ function moveDefect(defects: Defect[], direction: 1 | -1): void {
   if (!defect) return
   state.setActiveDefect(defect.id)
   state.setFollow(true)
-  seekTo(Math.max(0, defect.start - 0.25))
+  seekTo(defect.type === 'pause' ? defect.start : Math.max(0, defect.start + 0.01))
 }
 
 export function useHotkeys(defects: Defect[]): void {
@@ -233,7 +233,7 @@ export function useHotkeys(defects: Defect[]): void {
         case 'escape':
           if (state.loop) state.setLoop(null)
           else if (state.activeDefectId) state.setActiveDefect(null)
-          else if (state.selectedWordId !== null) state.selectWord(null)
+          else if (state.selection) state.clearSelection()
           break
         default: {
           const index = Number(action.slice(4)) - 1

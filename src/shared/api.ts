@@ -14,6 +14,7 @@ import type {
   StartTranscriptionResult,
   TranscribeDone,
   TranscribeError,
+  TranscribePartial,
   TranscribeProgress,
   TranscribeRequest
 } from './types'
@@ -40,6 +41,7 @@ export interface AppApi {
   downloadModel(modelId: ModelId): Promise<{ path: string }>
 
   onProgress(callback: (progress: TranscribeProgress) => void): () => void
+  onPartial(callback: (partial: TranscribePartial) => void): () => void
   onDone(callback: (done: TranscribeDone) => void): () => void
   onError(callback: (error: TranscribeError) => void): () => void
   onModelProgress(callback: (progress: ModelDownloadProgress) => void): () => void

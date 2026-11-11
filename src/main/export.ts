@@ -1,30 +1,8 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { formatTimecode } from '@shared/format'
+import { buildCsv } from '@shared/exportCsv'
 import type { ExportRequest } from '@shared/types'
-
-const TYPE_LABEL: Record<string, string> = {
-  filler: 'филлер',
-  pause: 'пауза',
-  repetition: 'повтор',
-  elongation: 'растяжка',
-  false_start: 'обрыв',
-  vocal_sound: 'звук',
-  unclear: 'неразборчиво',
-  manual: 'ручная метка'
-}
-
-const SEVERITY_LABEL: Record<string, string> = {
-  low: 'низкая',
-  medium: 'средняя',
-  high: 'высокая'
-}
-
-function csvCell(value: string | number | boolean): string {
-  const text = String(value)
-  return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
 
 function safeName(name: string): string {
   return name.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'webinar'
@@ -34,7 +12,7 @@ export async function exportProject(
   window: BrowserWindow | null,
   request: ExportRequest
 ): Promise<string | null> {
-  const { project, defects, marks, format } = request
+  const { project, defects, marks, format, exportSettings } = request
   const filename = `${safeName(project.name)}-defects.${format}`
   const options = {
     title: 'Экспорт дефектов',
@@ -51,40 +29,7 @@ export async function exportProject(
   if (result.canceled || !result.filePath) return null
 
   if (format === 'csv') {
-    const header = [
-      'start_tc',
-      'end_tc',
-      'start_sec',
-      'end_sec',
-      'duration_sec',
-      'type',
-      'severity',
-      'source',
-      'reviewed',
-      'text',
-      'note'
-    ]
-    const lines = [header.join(';')]
-    for (const defect of defects) {
-      lines.push(
-        [
-          formatTimecode(defect.start, true),
-          formatTimecode(defect.end, true),
-          defect.start.toFixed(3),
-          defect.end.toFixed(3),
-          (defect.end - defect.start).toFixed(3),
-          TYPE_LABEL[defect.type] ?? defect.type,
-          SEVERITY_LABEL[defect.severity] ?? defect.severity,
-          defect.source,
-          defect.reviewed ? 'да' : 'нет',
-          defect.text,
-          defect.note
-        ]
-          .map(csvCell)
-          .join(';')
-      )
-    }
-    await writeFile(result.filePath, `\uFEFF${lines.join('\r\n')}\r\n`, 'utf8')
+    await writeFile(result.filePath, buildCsv(defects, exportSettings), 'utf8')
   } else {
     const payload = {
       exportedAt: new Date().toISOString(),

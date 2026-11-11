@@ -16,6 +16,7 @@ export const IPC = {
   exportProject: 'export:project',
   shellShowItem: 'shell:show-item',
   transcribeProgress: 'transcribe:progress',
+  transcribePartial: 'transcribe:partial',
   transcribeDone: 'transcribe:done',
   transcribeError: 'transcribe:error',
   modelProgress: 'models:progress'

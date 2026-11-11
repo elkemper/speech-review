@@ -16,7 +16,9 @@
     "test:watch": "vitest",
     "fetch:engine": "node scripts/fetch-engine.mjs",
     "check:resources": "node scripts/check-resources.mjs",
-    "package:mac": "node scripts/check-resources.mjs && npm run build && electron-builder --mac --arm64"
+    "package:mac": "node scripts/check-platform.mjs && node scripts/check-resources.mjs && npm run build && electron-builder --mac --arm64",
+    "predev": "node scripts/check-platform.mjs",
+    "check:platform": "node scripts/check-platform.mjs"
   },
   "devDependencies": {
     "@tanstack/react-virtual": "^3.14.26",

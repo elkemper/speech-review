@@ -115,7 +115,8 @@ export async function saveProject(project: Project): Promise<void> {
 export async function writeTranscript(
   id: string,
   transcript: Transcript,
-  complete: boolean
+  complete: boolean,
+  resetReview = true
 ): Promise<void> {
   await mkdir(projectDir(id), { recursive: true })
   await writeJson(transcriptFile(id), transcript)
@@ -123,9 +124,12 @@ export async function writeTranscript(
   meta.transcriptComplete = complete
   meta.updatedAt = new Date().toISOString()
   // Defect ids are derived from the transcript order, so old review state
-  // would silently point at different defects after re-recognition.
-  meta.reviewedDefectIds = []
-  meta.defectNotes = {}
+  // would silently point at different defects after re-recognition. Partial
+  // writes keep the state of the already visible prefix.
+  if (resetReview) {
+    meta.reviewedDefectIds = []
+    meta.defectNotes = {}
+  }
   await writeJson(projectFile(id), meta)
 }
 

@@ -70,6 +70,8 @@ export interface ManualMark {
   type: DefectType
   start: number
   end: number
+  /** Exact selected words. Older marks do not have this field. */
+  wordIds?: number[]
   note: string
   createdAt: string
 }
@@ -142,11 +144,42 @@ export interface EngineStatus {
   appVersion: string
 }
 
+export type ExportField =
+  | 'start_tc'
+  | 'end_tc'
+  | 'start_sec'
+  | 'end_sec'
+  | 'duration_sec'
+  | 'type'
+  | 'severity'
+  | 'source'
+  | 'reviewed'
+  | 'text'
+  | 'note'
+
+export interface ExportSettings {
+  fields: ExportField[]
+  delimiter: ';' | ','
+  includeHeader: boolean
+}
+
+export type SkipScope = 'marks' | 'all'
+
+export interface PlaybackSettings {
+  skipEnabled: boolean
+  skipScope: SkipScope
+  skipBeforeSec: number
+  skipAfterSec: number
+}
+
 export interface Settings {
   language: string
   modelId: ModelId
   backend: Backend
   rules: DefectRules
+  chunkTargetSec: number
+  export: ExportSettings
+  playback: PlaybackSettings
 }
 
 export type TranscribePhase =
@@ -166,6 +199,20 @@ export interface TranscribeProgress {
   message: string
   chunk?: number
   chunks?: number
+  /** Only the `transcribe` phase has a meaningful percentage. */
+  indeterminate?: boolean
+  processedSec?: number
+  totalSec?: number
+  etaSec?: number
+}
+
+export interface TranscribePartial {
+  jobId: string
+  projectId: string
+  project: Project
+  peaks: Peaks | null
+  chunk: number
+  chunks: number
 }
 
 export interface TranscribeDone {
@@ -194,6 +241,7 @@ export interface TranscribeRequest {
   modelId: ModelId
   backend: Backend
   rules: DefectRules
+  chunkTargetSec?: number
   force?: boolean
 }
 
@@ -211,4 +259,5 @@ export interface ExportRequest {
   defects: Defect[]
   marks: ManualMark[]
   format: 'csv' | 'json'
+  exportSettings: ExportSettings
 }

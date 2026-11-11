@@ -9,6 +9,7 @@ import {
   stripTrailingCommas
 } from '../src/shared/transcript'
 import { DEFAULT_RULES, countDefects, detectDefects } from '../src/shared/defects'
+import type { Transcript, Word } from '../src/shared/types'
 
 function fixture(name: string): string {
   return readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf8')
@@ -131,5 +132,67 @@ describe('defect rules', () => {
     expect(manual).toHaveLength(1)
     expect(manual[0].text).toBe('Проверить')
     expect(manual[0].wordIds.length).toBeGreaterThan(0)
+  })
+})
+
+describe('manual mark boundaries', () => {
+  function word(id: number, start: number, end: number, text: string): Word {
+    return {
+      id,
+      index: id,
+      text,
+      normalized: text,
+      start,
+      end,
+      duration: end - start,
+      kind: 'word',
+      confidence: null
+    }
+  }
+
+  const words = [
+    word(0, 1, 1.5, 'ну'),
+    word(1, 1.5, 2, 'да'),
+    word(2, 2, 2.5, 'вот')
+  ]
+  const transcript: Transcript = {
+    version: 1,
+    language: 'ru',
+    sampleRate: 16000,
+    duration: 10,
+    words,
+    segments: [],
+    text: 'ну да вот'
+  }
+
+  it('uses stored word ids and does not pull in touching neighbours', () => {
+    const mark = {
+      id: 'm',
+      type: 'manual' as const,
+      start: 1.5,
+      end: 2,
+      wordIds: [1],
+      note: '',
+      createdAt: new Date(0).toISOString()
+    }
+    const manual = detectDefects(transcript, DEFAULT_RULES, [mark]).find(
+      (defect) => defect.source === 'manual'
+    )
+    expect(manual?.wordIds).toEqual([1])
+  })
+
+  it('falls back to strict overlap for old marks without word ids', () => {
+    const mark = {
+      id: 'm',
+      type: 'manual' as const,
+      start: 1.5,
+      end: 2,
+      note: '',
+      createdAt: new Date(0).toISOString()
+    }
+    const manual = detectDefects(transcript, DEFAULT_RULES, [mark]).find(
+      (defect) => defect.source === 'manual'
+    )
+    expect(manual?.wordIds).toEqual([1])
   })
 })

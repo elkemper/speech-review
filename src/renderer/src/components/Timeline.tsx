@@ -1,25 +1,65 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { clamp, formatTimecode } from '@shared/format'
 import type { Defect } from '@shared/types'
 import { DEFECT_COLORS } from '../defectsUi'
 import { seekTo } from '../player'
+import { nearestWord, rangeForSelection } from '../selection'
+import { buildSkipIntervals } from '../skip'
 import { useApp } from '../store'
+import {
+  chooseTickStep,
+  firstVisibleWord,
+  fitView,
+  panView,
+  pixelsPerSecond,
+  wordDetail,
+  zoomView,
+  type TimeView
+} from '../timelineView'
 
-const HEIGHT = 94
+const HEIGHT = 120
 
 export default function Timeline({ defects }: { defects: Defect[] }) {
   const project = useApp((state) => state.project)
   const peaks = useApp((state) => state.peaks)
   const currentTime = useApp((state) => state.currentTime)
+  const follow = useApp((state) => state.follow)
   const loop = useApp((state) => state.loop)
   const activeDefectId = useApp((state) => state.activeDefectId)
+  const selection = useApp((state) => state.selection)
+  const playback = useApp((state) => state.settings.playback)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
+  const selectRange = useApp((state) => state.selectRange)
+  const setFollow = useApp((state) => state.setFollow)
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [width, setWidth] = useState(0)
   const [hover, setHover] = useState<{ x: number; time: number } | null>(null)
+  const [view, setView] = useState<TimeView>(() => fitView(project?.duration ?? 0))
+  const viewRef = useRef(view)
+  viewRef.current = view
+
+  const duration = Math.max(0.1, project?.duration ?? 0)
+  const words = project?.transcript?.words ?? []
+  const selectedRange = useMemo(() => rangeForSelection(words, selection), [words, selection])
+  const skipIntervals = useMemo(
+    () =>
+      buildSkipIntervals(
+        defects,
+        project?.marks ?? [],
+        playback,
+        project?.duration ?? 0
+      ),
+    [defects, project?.marks, project?.duration, playback]
+  )
+
   const draggingRef = useRef(false)
+  const selectingRef = useRef<{ anchorId: number } | null>(null)
+
+  useEffect(() => {
+    setView(fitView(project?.duration ?? 0))
+  }, [project?.id, project?.duration])
 
   useEffect(() => {
     const wrap = wrapRef.current
@@ -30,6 +70,43 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
     observer.observe(wrap)
     return () => observer.disconnect()
   }, [])
+
+  useEffect(() => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const onWheel = (event: WheelEvent): void => {
+      const rect = wrap.getBoundingClientRect()
+      if (rect.width <= 0) return
+      event.preventDefault()
+      const current = viewRef.current
+      const span = current.end - current.start
+      if (event.ctrlKey || event.metaKey) {
+        const anchor =
+          current.start +
+          clamp((event.clientX - rect.left) / rect.width, 0, 1) * span
+        const factor = Math.exp(-event.deltaY * 0.0025)
+        setView(zoomView(current, anchor, factor, duration))
+      } else {
+        const delta =
+          Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+        setView(panView(current, (delta / rect.width) * span, duration))
+      }
+      setFollow(false)
+    }
+    wrap.addEventListener('wheel', onWheel, { passive: false })
+    return () => wrap.removeEventListener('wheel', onWheel)
+  }, [duration, setFollow])
+
+  // Keep the playhead in view only while "follow" is on; manual panning turns
+  // it off so the timeline does not fight the user.
+  useEffect(() => {
+    if (!follow || !project) return
+    const current = viewRef.current
+    if (currentTime >= current.start && currentTime <= current.end) return
+    const span = current.end - current.start
+    const start = clamp(currentTime - span * 0.35, 0, Math.max(0, duration - span))
+    setView({ start, end: start + span })
+  }, [currentTime, follow, project, duration])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -45,41 +122,49 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, width, HEIGHT)
 
-    const duration = Math.max(0.1, project.duration)
+    const span = Math.max(0.001, view.end - view.start)
+    const pps = pixelsPerSecond(view, width)
+    const toX = (time: number): number => ((time - view.start) / span) * width
 
-    ctx.fillStyle = '#0c111a'
+    ctx.fillStyle = '#141619'
     ctx.fillRect(0, 0, width, HEIGHT)
 
-    const step = duration <= 120 ? 10 : duration <= 900 ? 60 : 300
+    // Time ruler
+    const step = chooseTickStep(pps)
     ctx.font = '10px "SF Mono", ui-monospace, monospace'
     ctx.textBaseline = 'top'
-    for (let time = 0; time <= duration + 0.01; time += step) {
-      const x = (time / duration) * width
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.10)'
+    const firstTick = Math.ceil(view.start / step) * step
+    for (let time = firstTick; time <= view.end + 0.001; time += step) {
+      const x = Math.round(toX(time)) + 0.5
+      ctx.strokeStyle = 'rgba(170, 178, 190, 0.13)'
       ctx.lineWidth = 1
       ctx.beginPath()
-      ctx.moveTo(Math.round(x) + 0.5, 0)
-      ctx.lineTo(Math.round(x) + 0.5, HEIGHT)
+      ctx.moveTo(x, 16)
+      ctx.lineTo(x, HEIGHT)
       ctx.stroke()
-      if (x < width - 26) {
-        ctx.fillStyle = 'rgba(148, 163, 184, 0.55)'
-        ctx.fillText(formatTimecode(time), x + 4, 4)
+      if (x < width - 32) {
+        ctx.fillStyle = 'rgba(190, 198, 210, 0.62)'
+        ctx.fillText(formatTimecode(time), x + 3, 3)
       }
     }
 
+    // Waveform
     if (peaks && peaks.max.length > 0) {
-      const mid = HEIGHT / 2 + 6
-      const amp = HEIGHT * 0.34
+      const mid = 54
+      const amp = 30
       const count = peaks.max.length
-      ctx.strokeStyle = 'rgba(110, 168, 254, 0.6)'
+      const peakPps = peaks.peaksPerSecond > 0 ? peaks.peaksPerSecond : count / Math.max(0.1, peaks.duration)
+      ctx.strokeStyle = 'rgba(120, 176, 240, 0.72)'
       ctx.lineWidth = 1
       ctx.beginPath()
       for (let x = 0; x < width; x++) {
-        const from = Math.floor((x / width) * count)
-        const to = Math.max(from + 1, Math.floor(((x + 1) / width) * count))
+        const t0 = view.start + (x / width) * span
+        const t1 = view.start + ((x + 1) / width) * span
+        const from = Math.max(0, Math.floor(t0 * peakPps))
+        const to = Math.min(count, Math.max(from + 1, Math.ceil(t1 * peakPps)))
         let low = 0
         let high = 0
-        for (let i = from; i < to && i < count; i++) {
+        for (let i = from; i < to; i++) {
           if (peaks.min[i] < low) low = peaks.min[i]
           if (peaks.max[i] > high) high = peaks.max[i]
         }
@@ -89,82 +174,179 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
       ctx.stroke()
     }
 
-    for (const defect of defects) {
-      const x = (defect.start / duration) * width
-      const color = DEFECT_COLORS[defect.type]
-      const active = defect.id === activeDefectId
-      ctx.globalAlpha = defect.reviewed ? 0.16 : active ? 0.95 : 0.55
-      ctx.fillStyle = color
-      if (defect.type === 'pause') {
-        const endX = (Math.min(duration, defect.end) / duration) * width
-        ctx.fillRect(x, 0, Math.max(1.5, endX - x), HEIGHT)
-      } else {
-        ctx.fillRect(x - 1, 0, active ? 2.5 : 1.5, HEIGHT)
-        ctx.beginPath()
-        ctx.moveTo(x - 3.5, 0)
-        ctx.lineTo(x + 3.5, 0)
-        ctx.lineTo(x, 5)
-        ctx.closePath()
-        ctx.fill()
+    // Word strip: small marks first, readable labels later. Both are gated per
+    // word by pixel width, so zooming reveals detail gradually.
+    if (words.length > 0) {
+      const from = firstVisibleWord(words, view.start)
+      const lastRight = [-Infinity, -Infinity]
+      ctx.font = '9px -apple-system, "SF Pro Text", sans-serif'
+      for (let i = from; i < words.length && words[i].start <= view.end; i++) {
+        const word = words[i]
+        const x1 = toX(word.start)
+        const x2 = toX(word.end)
+        const wordWidth = Math.max(1, x2 - x1)
+        const detail = wordDetail(pps, wordWidth)
+        if (detail === 'none') continue
+
+        ctx.fillStyle = 'rgba(150, 160, 175, 0.22)'
+        ctx.fillRect(x1, 91, Math.max(1, wordWidth - 1), 3)
+
+        if (detail !== 'label') continue
+        const row = lastRight[0] + 4 <= x1 ? 0 : lastRight[1] + 4 <= x1 ? 1 : -1
+        if (row < 0) continue
+        lastRight[row] = x2
+        const y = 96 + row * 12
+        ctx.fillStyle = 'rgba(150, 160, 175, 0.12)'
+        ctx.fillRect(x1, y, wordWidth - 1, 11)
+        ctx.fillStyle = 'rgba(225, 230, 238, 0.82)'
+        ctx.fillText(word.text, x1 + 1, y + 1, Math.max(1, wordWidth - 3))
       }
     }
-    ctx.globalAlpha = 1
 
-    if (loop) {
-      const x1 = (clamp(loop.start, 0, duration) / duration) * width
-      const x2 = (clamp(loop.end, 0, duration) / duration) * width
-      ctx.fillStyle = 'rgba(139, 92, 246, 0.16)'
-      ctx.fillRect(x1, 0, Math.max(1, x2 - x1), HEIGHT)
-      ctx.strokeStyle = 'rgba(167, 139, 250, 0.7)'
-      ctx.lineWidth = 1
-      ctx.strokeRect(x1 + 0.5, 0.5, Math.max(1, x2 - x1 - 1), HEIGHT - 1)
+    // Defect markers are the first layer of detail: show them even when the
+    // whole recording is zoomed out, before word boundaries appear.
+    {
+      for (const defect of defects) {
+        if (defect.end < view.start || defect.start > view.end) continue
+        const x = toX(defect.start)
+        const color = DEFECT_COLORS[defect.type]
+        const active = defect.id === activeDefectId
+        ctx.globalAlpha = defect.reviewed ? 0.18 : active ? 0.95 : 0.6
+        ctx.fillStyle = color
+        if (defect.type === 'pause') {
+          const endX = toX(Math.min(view.end, defect.end))
+          ctx.fillRect(x, 16, Math.max(1.5, endX - x), HEIGHT - 16)
+        } else {
+          ctx.fillRect(x - 1, 16, active ? 2.5 : 1.5, HEIGHT - 16)
+          ctx.beginPath()
+          ctx.moveTo(x - 3.5, 14)
+          ctx.lineTo(x + 3.5, 14)
+          ctx.lineTo(x, 19)
+          ctx.closePath()
+          ctx.fill()
+        }
+      }
+      ctx.globalAlpha = 1
     }
 
-    const playhead = (clamp(currentTime, 0, duration) / duration) * width
-    ctx.strokeStyle = 'rgba(248, 250, 252, 0.95)'
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.moveTo(playhead, 0)
-    ctx.lineTo(playhead, HEIGHT)
-    ctx.stroke()
-    ctx.fillStyle = '#f8fafc'
-    ctx.beginPath()
-    ctx.arc(playhead, 3, 3, 0, Math.PI * 2)
-    ctx.fill()
-  }, [width, peaks, defects, currentTime, loop, activeDefectId, project])
+    // Skip-mode ranges
+    if (skipIntervals.length > 0) {
+      ctx.fillStyle = 'rgba(250, 204, 21, 0.07)'
+      for (const interval of skipIntervals) {
+        if (interval.end < view.start || interval.start > view.end) continue
+        const x1 = clamp(toX(interval.start), 0, width)
+        const x2 = clamp(toX(interval.end), 0, width)
+        ctx.fillRect(x1, 16, Math.max(1, x2 - x1), HEIGHT - 16)
+      }
+    }
 
-  const timeFromEvent = (clientX: number): number => {
+    // Selected word range
+    if (selectedRange) {
+      const x1 = clamp(toX(selectedRange.start), 0, width)
+      const x2 = clamp(toX(selectedRange.end), 0, width)
+      if (x2 > x1) {
+        ctx.fillStyle = 'rgba(55, 148, 255, 0.16)'
+        ctx.fillRect(x1, 16, x2 - x1, HEIGHT - 16)
+        ctx.strokeStyle = 'rgba(90, 170, 255, 0.75)'
+        ctx.lineWidth = 1
+        ctx.strokeRect(x1 + 0.5, 16.5, Math.max(1, x2 - x1 - 1), HEIGHT - 18)
+      }
+    }
+
+    if (loop) {
+      const x1 = toX(clamp(loop.start, 0, duration))
+      const x2 = toX(clamp(loop.end, 0, duration))
+      ctx.fillStyle = 'rgba(139, 92, 246, 0.14)'
+      ctx.fillRect(x1, 16, Math.max(1, x2 - x1), HEIGHT - 16)
+      ctx.strokeStyle = 'rgba(167, 139, 250, 0.7)'
+      ctx.strokeRect(x1 + 0.5, 16.5, Math.max(1, x2 - x1 - 1), HEIGHT - 17)
+    }
+
+    // Playhead
+    if (currentTime >= view.start && currentTime <= view.end) {
+      const playhead = toX(currentTime)
+      ctx.strokeStyle = 'rgba(248, 250, 252, 0.95)'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(playhead, 0)
+      ctx.lineTo(playhead, HEIGHT)
+      ctx.stroke()
+      ctx.fillStyle = '#f8fafc'
+      ctx.beginPath()
+      ctx.arc(playhead, 3, 3, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }, [
+    width,
+    peaks,
+    defects,
+    currentTime,
+    loop,
+    activeDefectId,
+    project,
+    view,
+    duration,
+    words,
+    selectedRange,
+    skipIntervals
+  ])
+
+  const timeFromClientX = (clientX: number): number => {
     const wrap = wrapRef.current
-    if (!wrap || !project) return 0
+    if (!wrap) return 0
     const rect = wrap.getBoundingClientRect()
     const ratio = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1)
-    return ratio * project.duration
+    return viewRef.current.start + ratio * (viewRef.current.end - viewRef.current.start)
   }
 
-  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (!project) return
+  const findDefectAt = (clientX: number): Defect | null => {
     const wrap = wrapRef.current
-    if (!wrap) return
+    if (!wrap || !project) return null
     const rect = wrap.getBoundingClientRect()
-    const px = event.clientX - rect.left
-
+    const span = Math.max(0.001, viewRef.current.end - viewRef.current.start)
+    const px = clientX - rect.left
     let nearest: Defect | null = null
     let best = 7
     for (const defect of defects) {
-      const x = (defect.start / Math.max(0.1, project.duration)) * rect.width
+      const x = ((defect.start - viewRef.current.start) / span) * rect.width
       const distance = Math.abs(x - px)
       if (distance < best) {
         best = distance
         nearest = defect
       }
     }
+    return nearest
+  }
 
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (!project) return
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const time = timeFromClientX(event.clientX)
+
+    if (event.shiftKey && words.length > 0) {
+      const focus = nearestWord(words, time)
+      const anchor = selection
+        ? words.find((word) => word.id === selection.anchorId) ?? focus
+        : focus
+      if (anchor && focus) {
+        event.preventDefault()
+        selectRange(anchor.id, focus.id)
+        selectingRef.current = { anchorId: anchor.id }
+        setActiveDefect(null)
+        setFollow(false)
+        event.currentTarget.setPointerCapture(event.pointerId)
+      }
+      return
+    }
+
+    const nearest = findDefectAt(event.clientX)
     if (nearest) {
       setActiveDefect(nearest.id)
-      seekTo(Math.max(0, nearest.start - 0.2))
+      seekTo(nearest.type === 'pause' ? nearest.start : Math.max(0, nearest.start + 0.01))
     } else {
       setActiveDefect(null)
-      seekTo(timeFromEvent(event.clientX))
+      seekTo(time)
     }
 
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -176,16 +358,32 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
     if (!wrap) return
     const rect = wrap.getBoundingClientRect()
     const x = clamp(event.clientX - rect.left, 0, rect.width)
-    setHover({ x, time: timeFromEvent(event.clientX) })
-    if (draggingRef.current) seekTo(timeFromEvent(event.clientX))
+    setHover({ x, time: timeFromClientX(event.clientX) })
+
+    if (selectingRef.current) {
+      const focus = nearestWord(words, timeFromClientX(event.clientX))
+      if (focus) selectRange(selectingRef.current.anchorId, focus.id)
+      return
+    }
+    if (draggingRef.current) seekTo(timeFromClientX(event.clientX))
   }
 
   const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>): void => {
     draggingRef.current = false
+    selectingRef.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
   }
+
+  const zoomBy = (factor: number): void => {
+    setView((current) =>
+      zoomView(current, (current.start + current.end) / 2, factor, duration)
+    )
+    setFollow(false)
+  }
+
+  const selectedCount = selectedRange?.wordIds.length ?? 0
 
   return (
     <div
@@ -196,9 +394,28 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onPointerLeave={() => setHover(null)}
-      title="Клик — перемотка. Треугольники — дефекты."
+      title="Клик — перемотка, Shift+драг — выделение слов, Ctrl/⌘+колесо — зум, прокрутка — панорама."
     >
       <canvas ref={canvasRef} />
+      <div
+        className="timeline-tools"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <button onClick={() => zoomBy(1.8)} title="Приблизить">
+          +
+        </button>
+        <button onClick={() => zoomBy(1 / 1.8)} title="Отдалить">
+          −
+        </button>
+        <button onClick={() => setView(fitView(duration))} title="Вся запись">
+          ⤢
+        </button>
+        <span className="timeline-scale">
+          {selectedCount > 0
+            ? `выделено ${selectedCount} слов`
+            : `${formatTimecode(view.start)}–${formatTimecode(view.end)}`}
+        </span>
+      </div>
       {hover ? (
         <div className="timeline-hover" style={{ left: hover.x }}>
           {formatTimecode(hover.time, true)}

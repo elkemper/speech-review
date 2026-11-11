@@ -9,9 +9,11 @@ import type {
   StartTranscriptionResult,
   TranscribeDone,
   TranscribeError,
+  TranscribePartial,
   TranscribeProgress,
   TranscribeRequest
 } from '@shared/types'
+import { normalizeChunkTarget } from '@shared/settings'
 import { engineBinary, ffmpegBinary, tempDir } from './paths'
 import { detectSilences, extractAudio, probeMedia } from './engine/ffmpeg'
 import { computePeaks, readWavInfo, sliceWav } from './engine/wav'
@@ -22,6 +24,7 @@ import { loadProject, savePeaks, saveProject, writeTranscript } from './projects
 
 export interface TranscriptionEvents {
   progress: (progress: TranscribeProgress) => void
+  partial: (partial: TranscribePartial) => void
   done: (done: TranscribeDone) => void
   error: (error: TranscribeError) => void
 }
@@ -87,7 +90,11 @@ export class TranscriptionManager {
     percent: number,
     message: string,
     chunk?: number,
-    chunks?: number
+    chunks?: number,
+    extra: Pick<
+      TranscribeProgress,
+      'indeterminate' | 'processedSec' | 'totalSec' | 'etaSec'
+    > = {}
   ): void {
     this.events.progress({
       jobId,
@@ -96,7 +103,8 @@ export class TranscriptionManager {
       percent: Math.max(0, Math.min(100, Math.round(percent))),
       message,
       chunk,
-      chunks
+      chunks,
+      ...extra
     })
   }
 
@@ -154,21 +162,27 @@ export class TranscriptionManager {
       const info = await readWavInfo(audioPath)
       if (info.duration <= 0.1) throw new Error('Аудиодорожка пустая')
 
-      this.progress(job.id, 'silence', 31, 'Ищу паузы для нарезки…')
+      this.progress(job.id, 'silence', 31, 'Ищу паузы для нарезки…', undefined, undefined, {
+        indeterminate: true
+      })
       const silences = await detectSilences(ffmpeg, audioPath, info.duration, {
         signal,
         noiseDb: -38,
         minSilenceSec: 0.45
       })
 
-      this.progress(job.id, 'peaks', 33, 'Строю осциллограмму…')
+      this.progress(job.id, 'peaks', 33, 'Строю осциллограмму…', undefined, undefined, {
+        indeterminate: true
+      })
       let peaks: Peaks | null = null
       try {
         peaks = await computePeaks(info, {
           peaksPerSecond: 20,
           signal,
           onProgress: (fraction) => {
-            this.progress(job.id, 'peaks', 33 + fraction * 11, 'Строю осциллограмму…')
+            this.progress(job.id, 'peaks', 33 + fraction * 11, 'Строю осциллограмму…', undefined, undefined, {
+              indeterminate: true
+            })
           }
         })
         await savePeaks(project.id, peaks)
@@ -177,14 +191,32 @@ export class TranscriptionManager {
         peaks = null
       }
 
+      const targetSec = normalizeChunkTarget(request.chunkTargetSec)
+      const minSec = Math.max(60, Math.round(targetSec * 0.5))
+      const maxSec = Math.min(1200, Math.round(targetSec * 1.5))
+      const firstChunkSec = Math.min(180, Math.max(90, Math.round(targetSec * 0.3)))
       const chunks = planChunks(info.duration, silences, {
-        targetSec: 600,
-        minSec: 300,
-        maxSec: 900
+        targetSec,
+        minSec,
+        maxSec,
+        firstChunkSec
       })
       if (chunks.length === 0) throw new Error('Не удалось разбить запись на фрагменты')
 
+      const totalSec = chunks.reduce((sum, chunk) => sum + chunk.duration, 0)
+      let processedSec = 0
+      const transcribeStarted = Date.now()
+      let firstPartial = true
       const allWords: RawWord[] = []
+
+      const transcribePercent = (): number =>
+        totalSec > 0 ? (processedSec / totalSec) * 100 : 0
+      const etaSec = (): number | undefined => {
+        if (processedSec <= 0 || totalSec <= 0) return undefined
+        const elapsed = (Date.now() - transcribeStarted) / 1000
+        return Math.max(0, Math.round((elapsed * (totalSec - processedSec)) / processedSec))
+      }
+
       for (let i = 0; i < chunks.length; i++) {
         if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
         const chunk = chunks[i]
@@ -195,10 +227,16 @@ export class TranscriptionManager {
         this.progress(
           job.id,
           'transcribe',
-          45 + (i / chunks.length) * 52,
+          transcribePercent(),
           `Распознаю фрагмент ${i + 1} из ${chunks.length}…`,
           i + 1,
-          chunks.length
+          chunks.length,
+          {
+            indeterminate: false,
+            processedSec: Math.round(processedSec),
+            totalSec: Math.round(totalSec),
+            etaSec: etaSec()
+          }
         )
 
         await sliceWav(info, chunk.start, chunk.end, chunkAudio, signal)
@@ -218,17 +256,51 @@ export class TranscriptionManager {
         })
 
         allWords.push(...result.words)
+        processedSec += chunk.duration
+
         this.progress(
           job.id,
           'transcribe',
-          45 + ((i + 1) / chunks.length) * 52,
+          transcribePercent(),
           `Распознан фрагмент ${i + 1} из ${chunks.length}`,
           i + 1,
-          chunks.length
+          chunks.length,
+          {
+            indeterminate: false,
+            processedSec: Math.round(processedSec),
+            totalSec: Math.round(totalSec),
+            etaSec: etaSec()
+          }
         )
+
+        // Publish the prefix that is already recognized. Word ids stay stable
+        // while later chunks are appended, so review marks do not jump.
+        try {
+          const partialTranscript = buildTranscript(allWords, {
+            language: request.language,
+            sampleRate: 16000,
+            duration: info.duration
+          })
+          await writeTranscript(project.id, partialTranscript, false, firstPartial)
+          firstPartial = false
+          const partial = await loadProject(project.id)
+          this.events.partial({
+            jobId: job.id,
+            projectId: project.id,
+            project: partial.project,
+            peaks: partial.peaks,
+            chunk: i + 1,
+            chunks: chunks.length
+          })
+        } catch (error) {
+          if (signal.aborted) throw error
+          console.warn('Не удалось сохранить промежуточный транскрипт', error)
+        }
       }
 
-      this.progress(job.id, 'merge', 98, 'Собираю транскрипт…')
+      this.progress(job.id, 'merge', 98, 'Собираю транскрипт…', undefined, undefined, {
+        indeterminate: true
+      })
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
       allWords.sort((a, b) => a.start_sample - b.start_sample)
 
@@ -238,7 +310,7 @@ export class TranscriptionManager {
         duration: info.duration
       })
 
-      await writeTranscript(project.id, transcript, true)
+      await writeTranscript(project.id, transcript, true, false)
       const updated = await loadProject(project.id)
       this.progress(job.id, 'done', 100, 'Готово')
 

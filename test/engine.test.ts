@@ -75,6 +75,26 @@ describe('chunk planner', () => {
     expect(chunks[0].start).toBe(0)
     expect(chunks[chunks.length - 1].end).toBe(2500)
   })
+
+  it('makes the first chunk shorter for quicker partial results', () => {
+    const chunks = planChunks(2500, [silence(179, 181)], { firstChunkSec: 180 })
+    expect(chunks[0].duration).toBeCloseTo(180, 3)
+    expect(chunks[1].start).toBeCloseTo(180, 3)
+    expect(chunks[chunks.length - 1].end).toBe(2500)
+  })
+
+  it('honours a shorter target chunk size', () => {
+    const chunks = planChunks(900, [], { targetSec: 180, minSec: 90, maxSec: 270 })
+    expect(chunks.length).toBeGreaterThan(3)
+    for (const chunk of chunks) {
+      expect(chunk.duration).toBeLessThanOrEqual(270.0001)
+    }
+  })
+
+  it('does not split a recording that is too short for a useful first chunk', () => {
+    const chunks = planChunks(300, [], { firstChunkSec: 180 })
+    expect(chunks).toHaveLength(1)
+  })
 })
 
 describe('wav helpers', () => {

@@ -6,5 +6,9 @@ export default defineConfig({
     alias: {
       '@shared': resolve('src/shared')
     }
+  },
+  test: {
+    include: ['test/**/*.test.ts'],
+    exclude: ['**/node_modules/**', '**/node_modules_linux/**', '**/dist/**', '**/out/**']
   }
 })

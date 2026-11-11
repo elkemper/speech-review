@@ -10,14 +10,31 @@ import Timeline from './Timeline'
 import Transcript from './Transcript'
 import DefectPanel from './DefectPanel'
 
-const PHASE_LABELS: Record<TranscribeProgress['phase'], string> = {
-  prepare: 'Подготовка',
-  audio: 'Извлечение аудио',
-  silence: 'Поиск пауз',
-  peaks: 'Осциллограмма',
-  transcribe: 'Распознавание',
-  merge: 'Сборка транскрипта',
-  done: 'Готово'
+const STEPS: Array<{ phase: TranscribeProgress['phase']; label: string }> = [
+  { phase: 'prepare', label: 'Подготовка' },
+  { phase: 'audio', label: 'Аудио' },
+  { phase: 'silence', label: 'Паузы' },
+  { phase: 'peaks', label: 'Осциллограмма' },
+  { phase: 'transcribe', label: 'Распознавание' },
+  { phase: 'merge', label: 'Сборка' },
+  { phase: 'done', label: 'Готово' }
+]
+
+const PHASE_LABELS = Object.fromEntries(
+  STEPS.map((step) => [step.phase, step.label])
+) as Record<TranscribeProgress['phase'], string>
+
+function phaseIndex(phase: TranscribeProgress['phase']): number {
+  const index = STEPS.findIndex((step) => step.phase === phase)
+  return index < 0 ? STEPS.length : index
+}
+
+function formatEta(seconds: number | undefined): string {
+  if (seconds === undefined || !Number.isFinite(seconds)) return ''
+  if (seconds < 60) return `~${Math.max(1, Math.round(seconds))} c`
+  const minutes = Math.floor(seconds / 60)
+  const rest = Math.round(seconds % 60)
+  return `~${minutes} мин${rest > 0 ? ` ${rest} c` : ''}`
 }
 
 export default function Workspace() {
@@ -78,6 +95,9 @@ export default function Workspace() {
           <div className="workspace-meta">
             {formatDuration(project.duration)} · {project.transcript ? `${words} слов` : 'без транскрипта'}
             {project.transcript ? ` · ${unreviewed} непроверенных` : ''}
+            {project.transcript && !project.transcriptComplete ? (
+              <span className="badge live small-badge">частичный</span>
+            ) : null}
           </div>
         </div>
         <div className="workspace-actions">
@@ -85,7 +105,8 @@ export default function Workspace() {
           <span className="badge">{settings.language.toUpperCase()}</span>
           {progress ? (
             <span className="badge live">
-              {PHASE_LABELS[progress.phase]} · {progress.percent}%
+              {PHASE_LABELS[progress.phase]}
+              {progress.phase === 'transcribe' ? ` · ${progress.percent}%` : '…'}
             </span>
           ) : null}
           <button className="btn ghost small" onClick={() => setShowSettings(true)}>
@@ -106,10 +127,23 @@ export default function Workspace() {
             <div className="progress-banner">
               <div className="progress-banner-top">
                 <span>{progress.message}</span>
-                <span>{progress.percent}%</span>
+                <span>
+                  {progress.phase === 'transcribe'
+                    ? `${progress.percent}%${
+                        progress.etaSec !== undefined
+                          ? ` · осталось ${formatEta(progress.etaSec)}`
+                          : ''
+                      }`
+                    : PHASE_LABELS[progress.phase]}
+                </span>
               </div>
-              <div className="progress-track">
-                <div style={{ width: `${progress.percent}%` }} />
+              <div className={`progress-track ${progress.phase === 'transcribe' ? '' : 'indeterminate'}`}>
+                <div
+                  style={{
+                    width:
+                      progress.phase === 'transcribe' ? `${progress.percent}%` : '35%'
+                  }}
+                />
               </div>
               <button className="btn ghost small" onClick={() => void cancelTranscription()}>
                 Отменить
@@ -157,20 +191,50 @@ function ProgressCard({
   progress: TranscribeProgress
   onCancel: () => void
 }) {
+  const current = phaseIndex(progress.phase)
+  const isTranscribe = progress.phase === 'transcribe'
   return (
     <div className="start-panel">
       <div className="start-card">
         <div className="start-eyebrow">Идёт обработка</div>
         <h2>{PHASE_LABELS[progress.phase]}</h2>
         <p className="muted">{progress.message}</p>
-        <div className="big-progress">
-          <div style={{ width: `${progress.percent}%` }} />
-        </div>
+
+        <ol className="progress-steps">
+          {STEPS.map((step, index) => (
+            <li
+              key={step.phase}
+              className={index < current ? 'done' : index === current ? 'active' : ''}
+            >
+              <span className="step-dot" />
+              {step.label}
+            </li>
+          ))}
+        </ol>
+
+        {isTranscribe ? (
+          <div className="big-progress">
+            <div style={{ width: `${progress.percent}%` }} />
+          </div>
+        ) : (
+          <div className="big-progress indeterminate">
+            <div style={{ width: '35%' }} />
+          </div>
+        )}
+
         <div className="progress-meta">
-          <span>{progress.percent}%</span>
+          {isTranscribe ? <span>{progress.percent}%</span> : <span>этап без процента</span>}
           {progress.chunks ? (
             <span>
               фрагмент {progress.chunk ?? 0} из {progress.chunks}
+            </span>
+          ) : null}
+          {isTranscribe && progress.etaSec !== undefined ? (
+            <span>осталось {formatEta(progress.etaSec)}</span>
+          ) : null}
+          {isTranscribe && progress.totalSec ? (
+            <span>
+              {Math.round(progress.processedSec ?? 0)} / {Math.round(progress.totalSec)} c
             </span>
           ) : null}
         </div>
@@ -180,8 +244,8 @@ function ProgressCard({
           </button>
         </div>
         <p className="hint">
-          Можно переключиться в другое окно: обработка идёт в фоне. Не закрывайте приложение до
-          завершения.
+          Готовые фрагменты появляются в транскрипте сразу. Можно переключиться в другое окно:
+          обработка идёт в фоне. Не закрывайте приложение до завершения.
         </p>
       </div>
     </div>

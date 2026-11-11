@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { formatTimecode } from '@shared/format'
 import type { Defect, DefectType } from '@shared/types'
 import { DEFECT_COLORS, DEFECT_LABELS, SEVERITY_LABELS, TYPE_ORDER } from '../defectsUi'
-import { seekTo, toggleLoopForDefect } from '../player'
+import { playFrom, seekTo, toggleLoopForDefect } from '../player'
+import { buildSkipIntervals } from '../skip'
 import { useApp, type DefectFilter } from '../store'
 
 export default function DefectPanel({ defects }: { defects: Defect[] }) {
@@ -20,6 +21,26 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
   const removeMark = useApp((state) => state.removeMark)
   const setFollow = useApp((state) => state.setFollow)
   const notify = useApp((state) => state.notify)
+  const exportSettings = useApp((state) => state.settings.export)
+  const playback = useApp((state) => state.settings.playback)
+
+  const itemRefs = useRef(new Map<string, HTMLDivElement>())
+
+  const skipIntervals = useMemo(
+    () =>
+      buildSkipIntervals(
+        defects,
+        project?.marks ?? [],
+        playback,
+        project?.duration ?? 0
+      ),
+    [defects, project?.marks, project?.duration, playback]
+  )
+
+  const isSkipped = (defect: Defect): boolean =>
+    skipIntervals.some(
+      (interval) => interval.start < defect.end && interval.end > defect.start
+    )
 
   const reviewedCount = defects.filter((defect) => defect.reviewed).length
   const unreviewedCount = defects.length - reviewedCount
@@ -40,10 +61,17 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
     [defects, filter, onlyUnreviewed]
   )
 
+  useEffect(() => {
+    if (!activeDefectId) return
+    itemRefs.current.get(activeDefectId)?.scrollIntoView({ block: 'nearest' })
+  }, [activeDefectId, filtered])
+
   const selectDefect = (defect: Defect): void => {
     setActiveDefect(defect.id)
     setFollow(true)
-    seekTo(Math.max(0, defect.start - (defect.type === 'pause' ? 0.15 : 0.3)))
+    // Seek to the defect itself, not before it: a pre-roll made the previous
+    // word active in the transcript and looked like an off-by-one.
+    seekTo(defect.type === 'pause' ? defect.start : Math.max(0, defect.start + 0.01))
   }
 
   const goNextUnreviewed = (): void => {
@@ -62,7 +90,8 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
         project,
         defects,
         marks: project.marks,
-        format
+        format,
+        exportSettings
       })
       if (path) notify(`Экспортировано: ${path}`, 'success')
     } catch (error) {
@@ -137,14 +166,20 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
         ) : (
           filtered.map((defect) => {
             const active = defect.id === activeDefectId
+            const skipped = isSkipped(defect)
             const isLooping =
               active && loop !== null && Math.abs(loop.start - Math.max(0, defect.start - 0.25)) < 0.05
             return (
               <div
                 key={defect.id}
+                ref={(element) => {
+                  if (element) itemRefs.current.set(defect.id, element)
+                  else itemRefs.current.delete(defect.id)
+                }}
                 className={`defect-item ${active ? 'active' : ''} severity-${defect.severity} ${
                   defect.reviewed ? 'reviewed' : ''
-                }`}
+                } ${skipped ? 'skipped' : ''}`}
+                title={skipped ? 'Пропускается в режиме быстрого просмотра' : undefined}
                 onClick={() => selectDefect(defect)}
               >
                 <button
@@ -171,6 +206,11 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
                       {SEVERITY_LABELS[defect.severity]}
                     </span>
                     {defect.source === 'manual' ? <span className="badge">ручная</span> : null}
+                    {skipped ? (
+                      <span className="skip-mark" title="Пропускается в режиме быстрого просмотра">
+                        ⏭
+                      </span>
+                    ) : null}
                   </div>
 
                   <div className="defect-text">{defect.text}</div>
@@ -193,7 +233,12 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
                         className="link-btn"
                         onClick={(event) => {
                           event.stopPropagation()
-                          selectDefect(defect)
+                          setActiveDefect(defect.id)
+                          setFollow(true)
+                          playFrom(
+                            Math.max(0, defect.start - (defect.type === 'pause' ? 0.15 : 0.3)),
+                            defect.end + 0.35
+                          )
                         }}
                       >
                         ▶ прослушать

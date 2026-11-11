@@ -1,18 +1,20 @@
 import { create } from 'zustand'
-import { DEFAULT_RULES } from '@shared/defects'
+import { DEFAULT_SETTINGS } from '@shared/settings'
 import type {
   DefectRules,
   EngineStatus,
+  ExportSettings,
   ManualMark,
   ModelDownloadProgress,
   ModelId,
   Peaks,
+  PlaybackSettings,
   Project,
   ProjectSummary,
   Settings,
   TranscribeProgress
 } from '@shared/types'
-import { clamp } from '@shared/format'
+import { markRangeForSelection, type WordSelection } from './selection'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let settingsTimer: ReturnType<typeof setTimeout> | null = null
@@ -26,6 +28,13 @@ export interface Toast {
 }
 
 export type DefectFilter = 'all' | 'filler' | 'pause' | 'repetition' | 'elongation' | 'false_start' | 'vocal_sound' | 'unclear' | 'manual'
+
+/** Nested settings objects accept partial patches; the store merges them. */
+export type SettingsPatch = Partial<Omit<Settings, 'rules' | 'export' | 'playback'>> & {
+  rules?: Partial<DefectRules>
+  export?: Partial<ExportSettings>
+  playback?: Partial<PlaybackSettings>
+}
 
 interface AppStore {
   initialized: boolean
@@ -46,6 +55,7 @@ interface AppStore {
   loop: { start: number; end: number } | null
   activeDefectId: string | null
   selectedWordId: number | null
+  selection: WordSelection | null
   follow: boolean
 
   jobId: string | null
@@ -68,7 +78,7 @@ interface AppStore {
   startTranscription: () => Promise<void>
   cancelTranscription: () => Promise<void>
   downloadModel: (id: ModelId) => Promise<void>
-  updateSettings: (patch: Partial<Settings>) => void
+  updateSettings: (patch: SettingsPatch) => void
   setRules: (patch: Partial<DefectRules>) => void
   toggleReviewed: (defectId: string) => void
   setNote: (defectId: string, note: string) => void
@@ -80,7 +90,9 @@ interface AppStore {
   setRate: (rate: number) => void
   setLoop: (loop: { start: number; end: number } | null) => void
   setActiveDefect: (id: string | null) => void
-  selectWord: (id: number | null) => void
+  selectWord: (id: number | null, extend?: boolean) => void
+  selectRange: (anchorId: number, focusId: number) => void
+  clearSelection: () => void
   setFollow: (follow: boolean) => void
   setFilter: (filter: DefectFilter) => void
   setOnlyUnreviewed: (value: boolean) => void
@@ -90,10 +102,10 @@ interface AppStore {
 }
 
 const FALLBACK_SETTINGS: Settings = {
-  language: 'ru',
-  modelId: 'q8_0',
-  backend: 'metal',
-  rules: DEFAULT_RULES
+  ...DEFAULT_SETTINGS,
+  rules: { ...DEFAULT_SETTINGS.rules },
+  export: { ...DEFAULT_SETTINGS.export, fields: [...DEFAULT_SETTINGS.export.fields] },
+  playback: { ...DEFAULT_SETTINGS.playback }
 }
 
 function cleanError(error: unknown): string {
@@ -120,6 +132,7 @@ export const useApp = create<AppStore>((set, get) => ({
   loop: null,
   activeDefectId: null,
   selectedWordId: null,
+  selection: null,
   follow: true,
 
   jobId: null,
@@ -216,6 +229,7 @@ export const useApp = create<AppStore>((set, get) => ({
         loop: null,
         activeDefectId: null,
         selectedWordId: null,
+        selection: null,
         filter: 'all',
         onlyUnreviewed: false,
         progress: null,
@@ -244,6 +258,7 @@ export const useApp = create<AppStore>((set, get) => ({
       loop: null,
       activeDefectId: null,
       selectedWordId: null,
+      selection: null,
       jobId: null,
       progress: null
     })
@@ -262,6 +277,7 @@ export const useApp = create<AppStore>((set, get) => ({
           loop: null,
           activeDefectId: null,
           selectedWordId: null,
+          selection: null,
           jobId: null,
           progress: null
         })
@@ -301,6 +317,7 @@ export const useApp = create<AppStore>((set, get) => ({
         modelId: settings.modelId,
         backend: settings.backend,
         rules: settings.rules,
+        chunkTargetSec: settings.chunkTargetSec,
         force: true
       })
 
@@ -352,10 +369,13 @@ export const useApp = create<AppStore>((set, get) => ({
   },
 
   updateSettings: (patch) => {
+    const current = get().settings
     const settings: Settings = {
-      ...get().settings,
+      ...current,
       ...patch,
-      rules: patch.rules ?? get().settings.rules
+      rules: { ...current.rules, ...patch.rules },
+      export: { ...current.export, ...patch.export },
+      playback: { ...current.playback, ...patch.playback }
     }
     set({ settings })
 
@@ -419,23 +439,36 @@ export const useApp = create<AppStore>((set, get) => ({
   addMark: () => {
     const project = get().project
     if (!project) return
-    const start = clamp(get().currentTime, 0, Math.max(0, project.duration - 0.2))
-    const end = Math.min(project.duration, start + 1.5)
+    const words = project.transcript?.words ?? []
+    const range = markRangeForSelection(
+      words,
+      get().selection,
+      get().currentTime,
+      project.duration
+    )
     const mark: ManualMark = {
       id: crypto.randomUUID(),
       type: 'manual',
-      start,
-      end,
+      start: range.start,
+      end: range.end,
+      wordIds: range.wordIds,
       note: '',
       createdAt: new Date().toISOString()
     }
     set({
       project: { ...project, marks: [...project.marks, mark] },
       activeDefectId: `manual-${mark.id}`,
-      filter: 'all'
+      filter: 'all',
+      selection: null,
+      selectedWordId: null
     })
     get().scheduleSave()
-    get().notify('Метка добавлена — введите заметку в панели справа')
+    const count = range.wordIds.length
+    get().notify(
+      count > 1
+        ? `Метка на ${count} слов — введите заметку в панели справа`
+        : 'Метка добавлена — введите заметку в панели справа'
+    )
   },
 
   removeMark: (markId) => {
@@ -462,7 +495,21 @@ export const useApp = create<AppStore>((set, get) => ({
   setRate: (rate) => set({ rate }),
   setLoop: (loop) => set({ loop }),
   setActiveDefect: (id) => set({ activeDefectId: id }),
-  selectWord: (id) => set({ selectedWordId: id }),
+  selectWord: (id, extend = false) => {
+    if (id === null) {
+      set({ selectedWordId: null, selection: null })
+      return
+    }
+    const current = get().selection
+    if (extend && current) {
+      set({ selectedWordId: id, selection: { anchorId: current.anchorId, focusId: id } })
+    } else {
+      set({ selectedWordId: id, selection: { anchorId: id, focusId: id } })
+    }
+  },
+  selectRange: (anchorId, focusId) =>
+    set({ selectedWordId: focusId, selection: { anchorId, focusId } }),
+  clearSelection: () => set({ selectedWordId: null, selection: null }),
   setFollow: (follow) => set({ follow }),
   setFilter: (filter) => set({ filter }),
   setOnlyUnreviewed: (value) => set({ onlyUnreviewed: value }),
@@ -558,13 +605,40 @@ function attachListeners(
     set({ progress })
   })
 
+  window.api.onPartial((partial) => {
+    const state = get()
+    if (!state.project || partial.projectId !== state.project.id) return
+    if (state.jobId && partial.jobId !== state.jobId) return
+    // The first partial resets review state on disk because defect ids change
+    // after re-recognition. Later partials keep the user's unsaved edits to
+    // the already visible prefix.
+    const keepReview = partial.chunk > 1
+    set({
+      project: {
+        ...partial.project,
+        marks: state.project.marks,
+        reviewedDefectIds: keepReview
+          ? state.project.reviewedDefectIds
+          : partial.project.reviewedDefectIds,
+        defectNotes: keepReview ? state.project.defectNotes : partial.project.defectNotes
+      },
+      peaks: partial.peaks ?? state.peaks,
+      jobId: partial.jobId
+    })
+  })
+
   window.api.onDone((done) => {
     const state = get()
     const isCurrentJob = state.jobId === done.jobId
 
     if (state.project && state.project.id === done.projectId) {
       set({
-        project: done.project,
+        project: {
+          ...done.project,
+          marks: state.project.marks,
+          reviewedDefectIds: state.project.reviewedDefectIds,
+          defectNotes: state.project.defectNotes
+        },
         peaks: done.peaks ?? state.peaks,
         ...(isCurrentJob ? { progress: null, jobId: null } : {}),
         activeDefectId: null

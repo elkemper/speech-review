@@ -15,6 +15,7 @@ import type {
   StartTranscriptionResult,
   TranscribeDone,
   TranscribeError,
+  TranscribePartial,
   TranscribeProgress,
   TranscribeRequest
 } from '@shared/types'
@@ -58,6 +59,8 @@ const api: AppApi = {
 
   onProgress: (callback: (progress: TranscribeProgress) => void): (() => void) =>
     subscribe(IPC.transcribeProgress, callback),
+  onPartial: (callback: (partial: TranscribePartial) => void): (() => void) =>
+    subscribe(IPC.transcribePartial, callback),
   onDone: (callback: (done: TranscribeDone) => void): (() => void) =>
     subscribe(IPC.transcribeDone, callback),
   onError: (callback: (error: TranscribeError) => void): (() => void) =>

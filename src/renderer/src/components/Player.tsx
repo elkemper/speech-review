@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatTimecode } from '@shared/format'
 import type { Defect } from '@shared/types'
 import { useApp } from '../store'
+import { intervalAt, buildSkipIntervals } from '../skip'
 import {
   attachVideo,
   nudge,
   playPause,
   setPlaybackRate,
+  skipBypassActive,
   toggleLoopForDefect
 } from '../player'
 
@@ -24,6 +26,26 @@ export default function Player({ defects }: { defects: Defect[] }) {
   const setPlaying = useApp((state) => state.setPlaying)
   const addMark = useApp((state) => state.addMark)
   const setError = useApp((state) => state.setError)
+  const playback = useApp((state) => state.settings.playback)
+  const updateSettings = useApp((state) => state.updateSettings)
+
+  const skipIntervals = useMemo(
+    () =>
+      buildSkipIntervals(
+        defects,
+        project?.marks ?? [],
+        playback,
+        project?.duration ?? 0
+      ),
+    [defects, project?.marks, project?.duration, playback]
+  )
+  const skipRef = useRef(skipIntervals)
+  skipRef.current = skipIntervals
+  const skipStateRef = useRef<{ target: number; at: number } | null>(null)
+
+  useEffect(() => {
+    skipStateRef.current = null
+  }, [skipIntervals])
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -55,8 +77,34 @@ export default function Player({ defects }: { defects: Defect[] }) {
     const tick = (): void => {
       const video = videoRef.current
       if (video) {
+        const now = performance.now()
+        const inLoop =
+          loop !== null &&
+          video.currentTime >= loop.start - 0.05 &&
+          video.currentTime <= loop.end + 0.05
+
         if (loop && video.currentTime >= loop.end - 0.02) {
+          skipStateRef.current = null
           video.currentTime = loop.start
+        } else if (!video.paused && !inLoop && !skipBypassActive(video.currentTime)) {
+          // One jump per interval. Re-assigning currentTime every animation
+          // frame while the media element is still seeking made playback stall
+          // on overlapping or adjacent ranges.
+          const pending = skipStateRef.current
+          if (pending) {
+            if (
+              video.currentTime >= pending.target - 0.05 ||
+              now - pending.at > 500
+            ) {
+              skipStateRef.current = null
+            }
+          } else {
+            const skipped = intervalAt(skipRef.current, video.currentTime)
+            if (skipped && skipped.end > video.currentTime + 0.001) {
+              skipStateRef.current = { target: skipped.end, at: now }
+              video.currentTime = skipped.end
+            }
+          }
         }
         if (Math.abs(video.currentTime - last) >= 0.04) {
           last = video.currentTime
@@ -121,6 +169,12 @@ export default function Player({ defects }: { defects: Defect[] }) {
           </div>
         ) : null}
 
+        {playback.skipEnabled ? (
+          <div className="skip-badge">
+            ⏭ пропуск {playback.skipScope === 'marks' ? 'меток' : 'дефектов'}
+          </div>
+        ) : null}
+
         <div className="video-badges">
           <span>{project?.name}</span>
         </div>
@@ -180,6 +234,15 @@ export default function Player({ defects }: { defects: Defect[] }) {
           title="Цикл по активному дефекту (L)"
         >
           ⟲ цикл
+        </button>
+        <button
+          className={`ctrl ${playback.skipEnabled ? 'active' : ''}`}
+          onClick={() =>
+            updateSettings({ playback: { skipEnabled: !playback.skipEnabled } })
+          }
+          title="Пропускать помеченные места при проигрывании"
+        >
+          ⏭
         </button>
         <button className="ctrl" onClick={addMark} title="Добавить ручную метку (M)">
           ＋ метка

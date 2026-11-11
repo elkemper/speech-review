@@ -3,6 +3,12 @@ import type { Defect } from '@shared/types'
 import { useApp } from './store'
 
 let element: HTMLVideoElement | null = null
+/**
+ * While reviewing a single defect with skip mode enabled, jumping over that
+ * same defect would make "прослушать" useless. The bypass expires by time, so
+ * ordinary playback resumes skipping afterwards.
+ */
+let skipBypassUntil = -1
 
 export function attachVideo(video: HTMLVideoElement | null): void {
   element = video
@@ -14,6 +20,7 @@ export function videoElement(): HTMLVideoElement | null {
 }
 
 export function seekTo(time: number): void {
+  skipBypassUntil = -1
   const state = useApp.getState()
   const limit = state.project?.duration ?? element?.duration ?? 0
   const value = clamp(time, 0, Math.max(0, limit))
@@ -24,6 +31,7 @@ export function seekTo(time: number): void {
 }
 
 export function playPause(): void {
+  skipBypassUntil = -1
   const state = useApp.getState()
   if (!element) return
   if (element.paused) {
@@ -34,6 +42,18 @@ export function playPause(): void {
   } else {
     element.pause()
   }
+}
+
+/** Seek and start playback. The defect panel's "прослушать" used to only seek. */
+export function playFrom(time: number, until?: number): void {
+  seekTo(time)
+  skipBypassUntil = until ?? -1
+  if (!element) return
+  void element.play().catch(() => undefined)
+}
+
+export function skipBypassActive(time: number): boolean {
+  return time <= skipBypassUntil
 }
 
 export function nudge(delta: number): void {

@@ -68,7 +68,12 @@ function isFalseStart(text: string): boolean {
 }
 
 function findWordIdsInRange(words: Word[], start: number, end: number): number[] {
-  return words.filter((word) => word.end >= start && word.start <= end).map((word) => word.id)
+  // Strict overlap: a word that only touches the mark boundary is not part of
+  // it. Inclusive comparisons used to pull the previous/next word into marks.
+  const epsilon = 1e-6
+  return words
+    .filter((word) => word.end > start + epsilon && word.start < end - epsilon)
+    .map((word) => word.id)
 }
 
 export function detectDefects(
@@ -210,18 +215,29 @@ export function detectDefects(
     }
   }
 
-  const manual: Defect[] = marks.map((mark) => ({
-    id: `manual-${mark.id}`,
-    type: mark.type,
-    start: mark.start,
-    end: Math.max(mark.start, mark.end),
-    wordIds: findWordIdsInRange(words, mark.start, mark.end),
-    text: mark.note.trim() || 'Ручная метка',
-    severity: 'medium',
-    source: 'manual',
-    reviewed: false,
-    note: mark.note
-  }))
+  const wordById = new Map(words.map((word) => [word.id, word]))
+  const manual: Defect[] = marks.map((mark) => {
+    const stored = Array.isArray(mark.wordIds)
+      ? mark.wordIds.filter((id) => wordById.has(id))
+      : null
+    const wordIds = stored && stored.length > 0 ? stored : findWordIdsInRange(words, mark.start, mark.end)
+    const selectedText = wordIds
+      .map((id) => wordById.get(id)?.text ?? '')
+      .filter(Boolean)
+      .join(' ')
+    return {
+      id: `manual-${mark.id}`,
+      type: mark.type,
+      start: mark.start,
+      end: Math.max(mark.start, mark.end),
+      wordIds,
+      text: mark.note.trim() || selectedText || 'Ручная метка',
+      severity: 'medium',
+      source: 'manual',
+      reviewed: false,
+      note: mark.note
+    }
+  })
 
   const seen = new Set<string>()
   return [...auto, ...manual]
