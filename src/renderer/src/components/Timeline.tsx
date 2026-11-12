@@ -8,12 +8,14 @@ import { buildSkipIntervals } from '../skip'
 import { useApp } from '../store'
 import {
   chooseTickStep,
+  clampDefectEdge,
   firstVisibleWord,
   fitView,
   panView,
   pixelsPerSecond,
   wordDetail,
   zoomView,
+  type DefectEdge,
   type TimeView
 } from '../timelineView'
 
@@ -29,6 +31,7 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
   const selection = useApp((state) => state.selection)
   const playback = useApp((state) => state.settings.playback)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
+  const setDefectBounds = useApp((state) => state.setDefectBounds)
   const selectRange = useApp((state) => state.selectRange)
   const setFollow = useApp((state) => state.setFollow)
 
@@ -36,26 +39,27 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [width, setWidth] = useState(0)
   const [hover, setHover] = useState<{ x: number; time: number } | null>(null)
+  const [handleHover, setHandleHover] = useState<DefectEdge | null>(null)
   const [view, setView] = useState<TimeView>(() => fitView(project?.duration ?? 0))
   const viewRef = useRef(view)
   viewRef.current = view
 
   const duration = Math.max(0.1, project?.duration ?? 0)
   const words = project?.transcript?.words ?? []
+  const activeDefect = useMemo(
+    () => defects.find((defect) => defect.id === activeDefectId) ?? null,
+    [defects, activeDefectId]
+  )
   const selectedRange = useMemo(() => rangeForSelection(words, selection), [words, selection])
   const skipIntervals = useMemo(
     () =>
-      buildSkipIntervals(
-        defects,
-        project?.marks ?? [],
-        playback,
-        project?.duration ?? 0
-      ),
+      buildSkipIntervals(defects, playback, project?.duration ?? 0),
     [defects, project?.marks, project?.duration, playback]
   )
 
   const draggingRef = useRef(false)
   const selectingRef = useRef<{ anchorId: number } | null>(null)
+  const boundaryRef = useRef<{ defectId: string; edge: DefectEdge } | null>(null)
 
   useEffect(() => {
     setView(fitView(project?.duration ?? 0))
@@ -262,6 +266,26 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
       ctx.strokeRect(x1 + 0.5, 16.5, Math.max(1, x2 - x1 - 1), HEIGHT - 17)
     }
 
+    // Active defect boundaries: both edges are draggable on the timeline.
+    if (activeDefect) {
+      ctx.save()
+      ctx.strokeStyle = 'rgba(244, 193, 105, 0.9)'
+      ctx.fillStyle = 'rgba(244, 193, 105, 0.95)'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([4, 3])
+      for (const time of [activeDefect.start, activeDefect.end]) {
+        if (time < view.start - 0.5 || time > view.end + 0.5) continue
+        const x = toX(time)
+        ctx.beginPath()
+        ctx.moveTo(x, 16)
+        ctx.lineTo(x, HEIGHT - 2)
+        ctx.stroke()
+        ctx.fillRect(x - 3.5, 14, 7, 6)
+        ctx.fillRect(x - 3.5, HEIGHT - 9, 7, 6)
+      }
+      ctx.restore()
+    }
+
     // Playhead
     if (currentTime >= view.start && currentTime <= view.end) {
       const playhead = toX(currentTime)
@@ -288,7 +312,8 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
     duration,
     words,
     selectedRange,
-    skipIntervals
+    skipIntervals,
+    activeDefect
   ])
 
   const timeFromClientX = (clientX: number): number => {
@@ -318,10 +343,38 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
     return nearest
   }
 
+  const handleAt = (clientX: number): DefectEdge | null => {
+    if (!activeDefect) return null
+    const wrap = wrapRef.current
+    if (!wrap) return null
+    const rect = wrap.getBoundingClientRect()
+    const span = Math.max(0.001, viewRef.current.end - viewRef.current.start)
+    const px = clientX - rect.left
+    const startX = ((activeDefect.start - viewRef.current.start) / span) * rect.width
+    const endX = ((activeDefect.end - viewRef.current.start) / span) * rect.width
+    const startDistance = Math.abs(px - startX)
+    const endDistance = Math.abs(px - endX)
+    const best = Math.min(startDistance, endDistance)
+    if (best > 7) return null
+    return startDistance <= endDistance ? 'start' : 'end'
+  }
+
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (!project) return
+    if (event.button !== 0) return
     const wrap = wrapRef.current
     if (!wrap) return
+
+    const edge = handleAt(event.clientX)
+    if (activeDefect && edge) {
+      event.preventDefault()
+      boundaryRef.current = { defectId: activeDefect.id, edge }
+      setHandleHover(edge)
+      setFollow(false)
+      event.currentTarget.setPointerCapture(event.pointerId)
+      return
+    }
+
     const time = timeFromClientX(event.clientX)
 
     if (event.shiftKey && words.length > 0) {
@@ -360,17 +413,41 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
     const x = clamp(event.clientX - rect.left, 0, rect.width)
     setHover({ x, time: timeFromClientX(event.clientX) })
 
+    if (boundaryRef.current) {
+      const current =
+        defects.find((defect) => defect.id === boundaryRef.current?.defectId) ?? activeDefect
+      if (!current) {
+        boundaryRef.current = null
+        return
+      }
+      boundaryRef.current.defectId = current.id
+      const time = timeFromClientX(event.clientX)
+      const bounds = clampDefectEdge(
+        { start: current.start, end: current.end },
+        boundaryRef.current.edge,
+        time,
+        duration
+      )
+      setDefectBounds(current.id, bounds.start, bounds.end)
+      return
+    }
+
     if (selectingRef.current) {
       const focus = nearestWord(words, timeFromClientX(event.clientX))
       if (focus) selectRange(selectingRef.current.anchorId, focus.id)
       return
     }
-    if (draggingRef.current) seekTo(timeFromClientX(event.clientX))
+    if (draggingRef.current) {
+      seekTo(timeFromClientX(event.clientX))
+      return
+    }
+    setHandleHover(handleAt(event.clientX))
   }
 
   const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>): void => {
     draggingRef.current = false
     selectingRef.current = null
+    boundaryRef.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
@@ -387,14 +464,17 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
 
   return (
     <div
-      className="timeline"
+      className={`timeline ${handleHover ? 'handle-hover' : ''}`}
       ref={wrapRef}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      onPointerLeave={() => setHover(null)}
-      title="Клик — перемотка, Shift+драг — выделение слов, Ctrl/⌘+колесо — зум, прокрутка — панорама."
+      onPointerLeave={() => {
+        setHover(null)
+        if (!boundaryRef.current) setHandleHover(null)
+      }}
+      title="Клик — перемотка, Shift+драг — выделение слов, Ctrl/⌘+колесо — зум, прокрутка — панорама. Границы выбранного дефекта можно двигать мышкой."
     >
       <canvas ref={canvasRef} />
       <div

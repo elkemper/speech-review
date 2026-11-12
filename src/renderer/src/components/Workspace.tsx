@@ -1,9 +1,16 @@
-import { useMemo } from 'react'
-import { detectDefects } from '@shared/defects'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent
+} from 'react'
+import { applyDefectOverrides, detectDefects } from '@shared/defects'
 import { formatDuration, formatTimecode } from '@shared/format'
 import { MODEL_SPECS } from '@shared/models'
 import type { Defect, TranscribeProgress } from '@shared/types'
 import { useApp } from '../store'
+import { canRedo, canUndo } from '../history'
 import { useHotkeys } from '../hooks/useHotkeys'
 import Player from './Player'
 import Timeline from './Timeline'
@@ -46,22 +53,63 @@ export default function Workspace() {
   const startTranscription = useApp((state) => state.startTranscription)
   const cancelTranscription = useApp((state) => state.cancelTranscription)
   const setShowSettings = useApp((state) => state.setShowSettings)
+  const setShowHistory = useApp((state) => state.setShowHistory)
   const settings = useApp((state) => state.settings)
+  const history = useApp((state) => state.history)
+  const undo = useApp((state) => state.undo)
+  const redo = useApp((state) => state.redo)
+
+  const [panelWidth, setPanelWidth] = useState(() => {
+    const stored = Number(window.localStorage.getItem('sr.panelWidth'))
+    return Number.isFinite(stored) && stored >= 280 ? stored : 430
+  })
+  const [panelVisible, setPanelVisible] = useState(
+    () => window.localStorage.getItem('sr.panelVisible') !== '0'
+  )
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
+
+  useEffect(() => {
+    window.localStorage.setItem('sr.panelWidth', String(Math.round(panelWidth)))
+  }, [panelWidth])
+
+  useEffect(() => {
+    window.localStorage.setItem('sr.panelVisible', panelVisible ? '1' : '0')
+  }, [panelVisible])
+
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    resizeRef.current = { startX: event.clientX, startWidth: panelWidth }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const moveResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const start = resizeRef.current
+    if (!start) return
+    const max = Math.max(320, Math.min(760, window.innerWidth - 420))
+    const next = Math.min(max, Math.max(280, start.startWidth + start.startX - event.clientX))
+    setPanelWidth(next)
+  }
+
+  const endResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    resizeRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  const baseDefects = useMemo<Defect[]>(() => {
+    if (!project?.transcript) return []
+    return detectDefects(project.transcript, project.rules, project.marks)
+  }, [project?.transcript, project?.rules, project?.marks])
 
   const defects = useMemo<Defect[]>(() => {
-    if (!project?.transcript) return []
-    return detectDefects(project.transcript, project.rules, project.marks).map((defect) => ({
+    if (!project) return []
+    return applyDefectOverrides(baseDefects, project.defectOverrides).map((defect) => ({
       ...defect,
       reviewed: project.reviewedDefectIds.includes(defect.id),
-      note: project.defectNotes[defect.id] ?? ''
+      note: project.defectNotes[defect.id] ?? defect.note
     }))
-  }, [
-    project?.transcript,
-    project?.rules,
-    project?.marks,
-    project?.reviewedDefectIds,
-    project?.defectNotes
-  ])
+  }, [baseDefects, project?.defectOverrides, project?.reviewedDefectIds, project?.defectNotes])
 
   useHotkeys(defects)
 
@@ -109,6 +157,34 @@ export default function Workspace() {
               {progress.phase === 'transcribe' ? ` · ${progress.percent}%` : '…'}
             </span>
           ) : null}
+          <button
+            className="btn ghost small"
+            onClick={undo}
+            disabled={!canUndo(history)}
+            title="Отменить (⌘Z / Ctrl+Z)"
+          >
+            ↶
+          </button>
+          <button
+            className="btn ghost small"
+            onClick={redo}
+            disabled={!canRedo(history)}
+            title="Повторить (⇧⌘Z / Ctrl+Y)"
+          >
+            ↷
+          </button>
+          <button
+            className="btn ghost small"
+            onClick={() => setShowHistory(true)}
+            title="История действий"
+          >
+            История
+          </button>
+          {!panelVisible ? (
+            <button className="btn ghost small" onClick={() => setPanelVisible(true)}>
+              Дефекты
+            </button>
+          ) : null}
           <button className="btn ghost small" onClick={() => setShowSettings(true)}>
             Настройки
           </button>
@@ -118,7 +194,14 @@ export default function Workspace() {
         </div>
       </header>
 
-      <div className="workspace-body">
+      <div
+        className="workspace-body"
+        style={{
+          gridTemplateColumns: panelVisible
+            ? `minmax(0, 1fr) 6px ${Math.round(panelWidth)}px`
+            : 'minmax(0, 1fr)'
+        }}
+      >
         <main className="workspace-main">
           <Player defects={defects} />
           <Timeline defects={defects} />
@@ -166,7 +249,19 @@ export default function Workspace() {
           )}
         </main>
 
-        <DefectPanel defects={defects} />
+        {panelVisible ? (
+          <>
+            <div
+              className="panel-splitter"
+              onPointerDown={startResize}
+              onPointerMove={moveResize}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+              title="Перетащите, чтобы изменить ширину панели"
+            />
+            <DefectPanel defects={defects} onHide={() => setPanelVisible(false)} />
+          </>
+        ) : null}
       </div>
 
       <footer className="hotkeys-bar">

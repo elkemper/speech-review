@@ -46,12 +46,7 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
 
   const skipIntervals = useMemo(
     () =>
-      buildSkipIntervals(
-        defects,
-        project?.marks ?? [],
-        playback,
-        project?.duration ?? 0
-      ),
+      buildSkipIntervals(defects, playback, project?.duration ?? 0),
     [defects, project?.marks, project?.duration, playback]
   )
 

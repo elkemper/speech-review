@@ -13,6 +13,8 @@ export const IPC = {
   transcribeStart: 'transcribe:start',
   transcribeCancel: 'transcribe:cancel',
   modelsDownload: 'models:download',
+  modelsState: 'models:state',
+  modelsDelete: 'models:delete',
   exportProject: 'export:project',
   shellShowItem: 'shell:show-item',
   transcribeProgress: 'transcribe:progress',

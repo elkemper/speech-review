@@ -58,6 +58,8 @@ export interface Defect {
   start: number
   end: number
   wordIds: number[]
+  /** Manual logical marks: ids of the underlying marks. */
+  markIds?: string[]
   text: string
   severity: Severity
   source: 'auto' | 'manual'
@@ -72,8 +74,15 @@ export interface ManualMark {
   end: number
   /** Exact selected words. Older marks do not have this field. */
   wordIds?: number[]
+  /** Adjacent marks with the same id form one logical mark. */
+  groupId?: string
   note: string
   createdAt: string
+}
+
+export interface DefectBoundsOverride {
+  start: number
+  end: number
 }
 
 export interface DefectRules {
@@ -114,6 +123,8 @@ export interface Project {
   updatedAt: string
   marks: ManualMark[]
   rules: DefectRules
+  /** User-adjusted boundaries for automatically detected defects, keyed by defect id. */
+  defectOverrides: Record<string, DefectBoundsOverride>
   reviewedDefectIds: string[]
   defectNotes: Record<string, string>
   transcriptComplete: boolean
@@ -142,6 +153,13 @@ export interface EngineStatus {
   backend: Backend
   platform: string
   appVersion: string
+}
+
+export interface ModelStateInfo {
+  modelId: ModelId
+  path: string
+  ready: boolean
+  bytes: number
 }
 
 export type ExportField =

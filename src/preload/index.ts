@@ -8,6 +8,7 @@ import type {
   MediaRegistration,
   ModelDownloadProgress,
   ModelId,
+  ModelStateInfo,
   Peaks,
   Project,
   ProjectSummary,
@@ -56,6 +57,9 @@ const api: AppApi = {
 
   downloadModel: (modelId: ModelId): Promise<{ path: string }> =>
     ipcRenderer.invoke(IPC.modelsDownload, modelId),
+  getModelStates: (): Promise<ModelStateInfo[]> => ipcRenderer.invoke(IPC.modelsState),
+  deleteModel: (modelId: ModelId): Promise<void> =>
+    ipcRenderer.invoke(IPC.modelsDelete, modelId),
 
   onProgress: (callback: (progress: TranscribeProgress) => void): (() => void) =>
     subscribe(IPC.transcribeProgress, callback),

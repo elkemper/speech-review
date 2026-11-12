@@ -67,6 +67,7 @@ export async function createProject(
     updatedAt: now,
     marks: [],
     rules: settings.rules,
+    defectOverrides: {},
     reviewedDefectIds: [],
     defectNotes: {},
     transcriptComplete: false
@@ -84,6 +85,7 @@ export async function loadProject(id: string): Promise<LoadedProject> {
     marks: meta.marks ?? [],
     // Projects created by older builds may not contain every rule field.
     rules: { ...DEFAULT_RULES, ...(meta.rules ?? {}) },
+    defectOverrides: meta.defectOverrides ?? {},
     reviewedDefectIds: meta.reviewedDefectIds ?? [],
     defectNotes: meta.defectNotes ?? {},
     transcriptComplete: meta.transcriptComplete ?? false
@@ -129,6 +131,7 @@ export async function writeTranscript(
   if (resetReview) {
     meta.reviewedDefectIds = []
     meta.defectNotes = {}
+    meta.defectOverrides = {}
   }
   await writeJson(projectFile(id), meta)
 }

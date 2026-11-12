@@ -8,14 +8,14 @@ import {
   MAX_CHUNK_TARGET_SEC,
   MIN_CHUNK_TARGET_SEC
 } from '@shared/settings'
-import type { ExportField, SkipScope } from '@shared/types'
+import type { ExportField, ModelId, ModelStateInfo, SkipScope } from '@shared/types'
 import { useApp } from '../store'
 
-type SettingsTab = 'general' | 'recognition' | 'export'
+type SettingsTab = 'general' | 'defects' | 'export'
 
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'general', label: 'Общие' },
-  { id: 'recognition', label: 'Распознавание' },
+  { id: 'defects', label: 'Дефекты' },
   { id: 'export', label: 'Экспорт' }
 ]
 
@@ -48,6 +48,7 @@ export default function SettingsDialog() {
   const show = useApp((state) => state.showSettings)
   const settings = useApp((state) => state.settings)
   const status = useApp((state) => state.status)
+  const jobId = useApp((state) => state.jobId)
   const downloadingModel = useApp((state) => state.downloadingModel)
   const modelDownload = useApp((state) => state.modelDownload)
   const setShowSettings = useApp((state) => state.setShowSettings)
@@ -55,8 +56,11 @@ export default function SettingsDialog() {
   const setRules = useApp((state) => state.setRules)
   const downloadModel = useApp((state) => state.downloadModel)
   const refreshStatus = useApp((state) => state.refreshStatus)
+  const notify = useApp((state) => state.notify)
 
   const [tab, setTab] = useState<SettingsTab>('general')
+  const [modelStates, setModelStates] = useState<ModelStateInfo[]>([])
+  const [deletingModel, setDeletingModel] = useState<ModelId | null>(null)
 
   useEffect(() => {
     if (!show) return
@@ -67,14 +71,33 @@ export default function SettingsDialog() {
     return () => window.removeEventListener('keydown', onKey)
   }, [show, setShowSettings])
 
+  useEffect(() => {
+    if (!show) return
+    let cancelled = false
+    void window.api
+      .getModelStates()
+      .then((states) => {
+        if (!cancelled) setModelStates(states)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [show, status?.modelId, status?.modelReady, downloadingModel, deletingModel])
+
   if (!show) return null
 
   const spec = MODEL_SPECS[settings.modelId]
-  const selectedReady = status?.modelId === settings.modelId && status?.modelReady
+  const stateById = new Map(modelStates.map((state) => [state.modelId, state]))
+  const selectedState = stateById.get(settings.modelId)
+  const selectedReady =
+    selectedState?.ready ??
+    Boolean(status?.modelId === settings.modelId && status?.modelReady)
   const downloadingThis = downloadingModel && modelDownload?.modelId === settings.modelId
   const rules = settings.rules
   const exportSettings = settings.export
   const playback = settings.playback
+  const busy = downloadingModel || deletingModel !== null || Boolean(jobId)
 
   const toggleField = (field: ExportField): void => {
     const selected = new Set(exportSettings.fields)
@@ -84,6 +107,26 @@ export default function SettingsDialog() {
     updateSettings({
       export: { fields: EXPORT_FIELDS.filter((item) => selected.has(item)) }
     })
+  }
+
+  const removeModel = async (id: ModelId): Promise<void> => {
+    if (busy) return
+    const model = MODEL_SPECS[id]
+    const confirmed = window.confirm(
+      `Удалить модель ${model.shortLabel}? Файл будет удалён с диска. При необходимости её можно скачать заново.`
+    )
+    if (!confirmed) return
+    setDeletingModel(id)
+    try {
+      await window.api.deleteModel(id)
+      setModelStates(await window.api.getModelStates())
+      await refreshStatus()
+      notify('Модель удалена', 'success')
+    } catch (error) {
+      notify(error instanceof Error ? error.message : String(error), 'error')
+    } finally {
+      setDeletingModel(null)
+    }
   }
 
   return (
@@ -97,7 +140,7 @@ export default function SettingsDialog() {
         <header className="modal-head">
           <div>
             <h2>Настройки</h2>
-            <div className="muted small">Движок, распознавание, просмотр и экспорт</div>
+            <div className="muted small">Движок, модель, распознавание, дефекты и экспорт</div>
           </div>
           <button className="icon-btn" onClick={() => setShowSettings(false)} title="Закрыть">
             ×
@@ -153,104 +196,29 @@ export default function SettingsDialog() {
               </section>
 
               <section className="settings-section">
-                <h3>Просмотр</h3>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={playback.skipEnabled}
-                    onChange={(event) =>
-                      updateSettings({ playback: { skipEnabled: event.target.checked } })
-                    }
-                  />
-                  Пропускать помеченные места при проигрывании
-                </label>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Что пропускать</span>
-                    <select
-                      value={playback.skipScope}
-                      disabled={!playback.skipEnabled}
-                      onChange={(event) =>
-                        updateSettings({
-                          playback: { skipScope: event.target.value as SkipScope }
-                        })
-                      }
-                    >
-                      <option value="all">Все дефекты и метки</option>
-                      <option value="marks">Только ручные метки</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Отступ до, сек</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={5}
-                      step={0.05}
-                      value={playback.skipBeforeSec}
-                      disabled={!playback.skipEnabled}
-                      onChange={(event) =>
-                        updateSettings({
-                          playback: {
-                            skipBeforeSec: Math.max(0, Number(event.target.value) || 0)
-                          }
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Отступ после, сек</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={5}
-                      step={0.05}
-                      value={playback.skipAfterSec}
-                      disabled={!playback.skipEnabled}
-                      onChange={(event) =>
-                        updateSettings({
-                          playback: {
-                            skipAfterSec: Math.max(0, Number(event.target.value) || 0)
-                          }
-                        })
-                      }
-                    />
-                  </label>
+                <div className="section-title-row">
+                  <h3>Модель распознавания</h3>
+                  <span className="muted small">скачанные модели можно удалять</span>
                 </div>
-                <div className="hint">
-                  Отступы оставляют базовую паузу по краям, чтобы вырезанное место не склеивалось
-                  вплотную. Видео не перекодируется — переходы выполняются на лету.
-                </div>
-              </section>
-
-              <section className="settings-section">
-                <h3>Данные и лицензии</h3>
-                <div className="hint">
-                  Запись и транскрипт остаются на этом компьютере. В сеть уходит только загрузка
-                  модели с Hugging Face.
-                </div>
-                <div className="hint">
-                  CrisperWhisper 2.0 распространяется по Nyra Health Non-Commercial Research
-                  License. audio.cpp — Apache-2.0. ffmpeg — GPL-3.0.
-                </div>
-              </section>
-            </>
-          ) : null}
-
-          {tab === 'recognition' ? (
-            <>
-              <section className="settings-section">
-                <h3>Модель распознавания</h3>
                 <div className="model-options">
                   {MODEL_ORDER.map((id) => {
                     const model = MODEL_SPECS[id]
+                    const state = stateById.get(id)
                     const selected = settings.modelId === id
                     return (
-                      <button
+                      <div
                         key={id}
+                        role="button"
+                        tabIndex={0}
                         className={`model-option ${selected ? 'selected' : ''}`}
-                        disabled={downloadingModel}
-                        onClick={() => updateSettings({ modelId: id })}
+                        onClick={() => {
+                          if (!busy) updateSettings({ modelId: id })
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          if (!busy) updateSettings({ modelId: id })
+                        }}
                       >
                         <div className="model-option-top">
                           <span>{model.shortLabel}</span>
@@ -258,7 +226,24 @@ export default function SettingsDialog() {
                         </div>
                         <div className="model-option-label">{model.label}</div>
                         <div className="model-option-note">{model.note}</div>
-                      </button>
+                        <div className="model-option-foot">
+                          <span className={`badge ${state?.ready ? 'ok' : ''}`}>
+                            {state?.ready ? 'скачана' : 'не скачана'}
+                          </span>
+                          {state?.ready ? (
+                            <button
+                              className="link-btn danger"
+                              disabled={busy}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void removeModel(id)
+                              }}
+                            >
+                              удалить
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
                     )
                   })}
                 </div>
@@ -268,21 +253,31 @@ export default function SettingsDialog() {
                     <div className="model-current-label">{spec.label}</div>
                     <div className="muted small">
                       {selectedReady
-                        ? `Скачана · ${formatBytes(status?.modelBytes ?? spec.size)} · SHA-256 проверен`
+                        ? `Скачана · ${formatBytes(
+                            selectedState?.bytes ?? status?.modelBytes ?? spec.size
+                          )} · SHA-256 проверен`
                         : `Не скачана · нужно ${formatBytes(spec.size)}`}
                     </div>
                   </div>
-                  {selectedReady ? (
-                    <span className="badge ok">готова</span>
-                  ) : (
-                    <button
-                      className="btn primary"
-                      disabled={downloadingThis}
-                      onClick={() => void downloadModel(settings.modelId)}
-                    >
-                      {downloadingThis ? 'Скачиваю…' : 'Скачать модель'}
-                    </button>
-                  )}
+                  <div className="row-actions">
+                    {selectedReady ? (
+                      <button
+                        className="btn ghost small danger"
+                        disabled={busy}
+                        onClick={() => void removeModel(settings.modelId)}
+                      >
+                        {deletingModel === settings.modelId ? 'Удаляю…' : 'Удалить модель'}
+                      </button>
+                    ) : (
+                      <button
+                        className="btn primary"
+                        disabled={busy}
+                        onClick={() => void downloadModel(settings.modelId)}
+                      >
+                        {downloadingThis ? 'Скачиваю…' : 'Скачать модель'}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {downloadingThis && modelDownload ? (
@@ -296,7 +291,8 @@ export default function SettingsDialog() {
 
                 <div className="hint">
                   Модель хранится в папке приложения и скачивается один раз. Файл проверяется по
-                  SHA-256.
+                  SHA-256. Удаление освобождает место; перед распознаванием модель нужно будет
+                  скачать снова.
                 </div>
               </section>
 
@@ -353,6 +349,93 @@ export default function SettingsDialog() {
                   Смена языка или модели применяется при следующем распознавании. Первый фрагмент
                   всегда короче (до 3 минут), поэтому первые слова появляются раньше. Меньший
                   фрагмент даёт более быстрый отклик, но модель загружается чаще.
+                </div>
+              </section>
+
+              <section className="settings-section">
+                <h3>Данные и лицензии</h3>
+                <div className="hint">
+                  Запись и транскрипт остаются на этом компьютере. В сеть уходит только загрузка
+                  модели с Hugging Face.
+                </div>
+                <div className="hint">
+                  CrisperWhisper 2.0 распространяется по Nyra Health Non-Commercial Research
+                  License. audio.cpp — Apache-2.0. ffmpeg — GPL-3.0.
+                </div>
+              </section>
+            </>
+          ) : null}
+
+          {tab === 'defects' ? (
+            <>
+              <section className="settings-section">
+                <h3>Просмотр</h3>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={playback.skipEnabled}
+                    onChange={(event) =>
+                      updateSettings({ playback: { skipEnabled: event.target.checked } })
+                    }
+                  />
+                  Пропускать непроверенные дефекты при проигрывании
+                </label>
+                <div className="form-grid">
+                  <label className="field">
+                    <span>Что пропускать</span>
+                    <select
+                      value={playback.skipScope}
+                      disabled={!playback.skipEnabled}
+                      onChange={(event) =>
+                        updateSettings({
+                          playback: { skipScope: event.target.value as SkipScope }
+                        })
+                      }
+                    >
+                      <option value="all">Все дефекты и метки</option>
+                      <option value="marks">Только ручные метки</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Отступ до, сек</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={5}
+                      step={0.05}
+                      value={playback.skipBeforeSec}
+                      disabled={!playback.skipEnabled}
+                      onChange={(event) =>
+                        updateSettings({
+                          playback: {
+                            skipBeforeSec: Math.max(0, Number(event.target.value) || 0)
+                          }
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Отступ после, сек</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={5}
+                      step={0.05}
+                      value={playback.skipAfterSec}
+                      disabled={!playback.skipEnabled}
+                      onChange={(event) =>
+                        updateSettings({
+                          playback: {
+                            skipAfterSec: Math.max(0, Number(event.target.value) || 0)
+                          }
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="hint">
+                  Проверенные дефекты и метки не пропускаются. Отступы оставляют базовую паузу по
+                  краям, чтобы вырезанное место не склеивалось вплотную. Видео не перекодируется.
                 </div>
               </section>
 
@@ -444,6 +527,7 @@ export default function SettingsDialog() {
                 </label>
                 <div className="hint">
                   Правила применяются к открытому проекту сразу, пересчитывать транскрипт не нужно.
+                  Границы выбранного дефекта можно двигать мышкой на таймлайне.
                 </div>
               </section>
             </>

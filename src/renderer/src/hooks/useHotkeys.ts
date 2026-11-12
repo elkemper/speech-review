@@ -163,15 +163,34 @@ export function useHotkeys(defects: Defect[]): void {
         return
       }
 
+      if (state.showHistory) {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          state.setShowHistory(false)
+        }
+        return
+      }
+
       if (isTyping(event.target)) return
       if (!state.project) return
 
       const meta = event.metaKey || event.ctrlKey
       if (meta) {
-        if (event.code === 'KeyO' || event.key.toLowerCase() === 'o') {
+        const key = event.key.toLowerCase()
+        if ((event.code === 'KeyZ' || key === 'z') && !event.shiftKey) {
+          event.preventDefault()
+          state.undo()
+        } else if (
+          ((event.code === 'KeyZ' || key === 'z') && event.shiftKey) ||
+          event.code === 'KeyY' ||
+          key === 'y'
+        ) {
+          event.preventDefault()
+          state.redo()
+        } else if (event.code === 'KeyO' || key === 'o') {
           event.preventDefault()
           void state.openVideo()
-        } else if (event.code === 'Comma' || event.key === ',') {
+        } else if (event.code === 'Comma' || key === ',') {
           event.preventDefault()
           state.setShowSettings(true)
         }
@@ -215,7 +234,12 @@ export function useHotkeys(defects: Defect[]): void {
           break
         case 'review':
           event.preventDefault()
-          if (active) state.toggleReviewed(active.id)
+          if (active) {
+            state.toggleReviewed(
+              active.id,
+              `${active.reviewed ? 'Снята отметка' : 'Проверено'}: ${active.text}`
+            )
+          }
           break
         case 'mark':
           event.preventDefault()

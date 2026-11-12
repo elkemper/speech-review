@@ -7,6 +7,7 @@ import type {
   MediaRegistration,
   ModelDownloadProgress,
   ModelId,
+  ModelStateInfo,
   Peaks,
   Project,
   ProjectSummary,
@@ -39,6 +40,8 @@ export interface AppApi {
   cancelTranscription(jobId: string): Promise<void>
 
   downloadModel(modelId: ModelId): Promise<{ path: string }>
+  getModelStates(): Promise<ModelStateInfo[]>
+  deleteModel(modelId: ModelId): Promise<void>
 
   onProgress(callback: (progress: TranscribeProgress) => void): () => void
   onPartial(callback: (partial: TranscribePartial) => void): () => void

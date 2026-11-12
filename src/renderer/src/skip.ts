@@ -1,4 +1,4 @@
-import type { Defect, ManualMark, PlaybackSettings } from '@shared/types'
+import type { Defect, PlaybackSettings } from '@shared/types'
 
 export interface SkipInterval {
   start: number
@@ -9,23 +9,26 @@ export interface SkipInterval {
  * Build playback-skip ranges. Padding keeps a little of the original pause on
  * both sides so cuts do not glue words together; overlapping ranges are merged
  * so a single jump never lands inside the next cut.
+ *
+ * Reviewed items are never skipped: once the user has approved a defect or a
+ * manual mark, fast-forward should play through it normally.
  */
 export function buildSkipIntervals(
   defects: Defect[],
-  marks: ManualMark[],
   settings: PlaybackSettings,
   duration: number
 ): SkipInterval[] {
   if (!settings.skipEnabled || duration <= 0) return []
   const source =
     settings.skipScope === 'marks'
-      ? marks.map((mark) => ({ start: mark.start, end: mark.end }))
-      : defects.map((defect) => ({ start: defect.start, end: defect.end }))
+      ? defects.filter((defect) => defect.source === 'manual')
+      : defects
 
   const padded = source
-    .map((item) => ({
-      start: Math.max(0, item.start - settings.skipBeforeSec),
-      end: Math.min(duration, item.end + settings.skipAfterSec)
+    .filter((defect) => !defect.reviewed)
+    .map((defect) => ({
+      start: Math.max(0, defect.start - settings.skipBeforeSec),
+      end: Math.min(duration, defect.end + settings.skipAfterSec)
     }))
     .filter((item) => item.end > item.start)
     .sort((a, b) => a.start - b.start)

@@ -6,7 +6,13 @@ import { playFrom, seekTo, toggleLoopForDefect } from '../player'
 import { buildSkipIntervals } from '../skip'
 import { useApp, type DefectFilter } from '../store'
 
-export default function DefectPanel({ defects }: { defects: Defect[] }) {
+export default function DefectPanel({
+  defects,
+  onHide
+}: {
+  defects: Defect[]
+  onHide: () => void
+}) {
   const project = useApp((state) => state.project)
   const filter = useApp((state) => state.filter)
   const onlyUnreviewed = useApp((state) => state.onlyUnreviewed)
@@ -18,7 +24,8 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
   const toggleReviewed = useApp((state) => state.toggleReviewed)
   const setNote = useApp((state) => state.setNote)
   const addMark = useApp((state) => state.addMark)
-  const removeMark = useApp((state) => state.removeMark)
+  const removeDefect = useApp((state) => state.removeDefect)
+  const splitManualGroup = useApp((state) => state.splitManualGroup)
   const setFollow = useApp((state) => state.setFollow)
   const notify = useApp((state) => state.notify)
   const exportSettings = useApp((state) => state.settings.export)
@@ -28,12 +35,7 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
 
   const skipIntervals = useMemo(
     () =>
-      buildSkipIntervals(
-        defects,
-        project?.marks ?? [],
-        playback,
-        project?.duration ?? 0
-      ),
+      buildSkipIntervals(defects, playback, project?.duration ?? 0),
     [defects, project?.marks, project?.duration, playback]
   )
 
@@ -117,9 +119,14 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
             {reviewedCount} из {defects.length} проверено
           </div>
         </div>
-        <button className="btn small" onClick={addMark} title="Добавить ручную метку (M)">
-          ＋ метка
-        </button>
+        <div className="panel-head-actions">
+          <button className="btn small" onClick={addMark} title="Добавить ручную метку (M)">
+            ＋ метка
+          </button>
+          <button className="icon-btn" onClick={onHide} title="Скрыть панель дефектов">
+            ⟩
+          </button>
+        </div>
       </div>
 
       <div className="panel-progress">
@@ -187,7 +194,12 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
                   title={defect.reviewed ? 'Снять отметку (R)' : 'Отметить проверенным (R)'}
                   onClick={(event) => {
                     event.stopPropagation()
-                    toggleReviewed(defect.id)
+                    toggleReviewed(
+                      defect.id,
+                      `${defect.reviewed ? 'Снята отметка' : 'Проверено'}: ${
+                        DEFECT_LABELS[defect.type]
+                      } · ${defect.text}`
+                    )
                   }}
                 >
                   {defect.reviewed ? '✓' : ''}
@@ -206,6 +218,11 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
                       {SEVERITY_LABELS[defect.severity]}
                     </span>
                     {defect.source === 'manual' ? <span className="badge">ручная</span> : null}
+                    {defect.markIds && defect.markIds.length > 1 ? (
+                      <span className="badge logical" title="Несколько соседних меток объединены">
+                        логическая · {defect.markIds.length}
+                      </span>
+                    ) : null}
                     {skipped ? (
                       <span className="skip-mark" title="Пропускается в режиме быстрого просмотра">
                         ⏭
@@ -253,16 +270,30 @@ export default function DefectPanel({ defects }: { defects: Defect[] }) {
                         {isLooping ? 'выключить цикл' : 'цикл'}
                       </button>
                       {defect.source === 'manual' ? (
-                        <button
-                          className="link-btn danger"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            removeMark(defect.id.replace(/^manual-/, ''))
-                          }}
-                        >
-                          удалить
-                        </button>
+                        <>
+                          {defect.markIds && defect.markIds.length > 1 ? (
+                            <button
+                              className="link-btn"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                splitManualGroup(defect.id)
+                              }}
+                            >
+                              разъединить
+                            </button>
+                          ) : null}
+                          <button
+                            className="link-btn danger"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              removeDefect(defect.id)
+                            }}
+                          >
+                            удалить
+                          </button>
+                        </>
                       ) : null}
+                      <span className="defect-hint">границы — на таймлайне</span>
                     </div>
                   ) : null}
                 </div>

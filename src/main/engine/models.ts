@@ -4,8 +4,8 @@ import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promis
 import { get } from 'node:https'
 import type { IncomingMessage } from 'node:http'
 import { dirname } from 'node:path'
-import { getModelSpec } from '@shared/models'
-import type { ModelId } from '@shared/types'
+import { getModelSpec, MODEL_ORDER } from '@shared/models'
+import type { ModelId, ModelStateInfo } from '@shared/types'
 import { modelPath } from '../paths'
 
 export interface ModelDownloadOptions {
@@ -32,6 +32,24 @@ export async function modelState(id: ModelId): Promise<ModelState> {
   } catch {
     return { path, ready: false, bytes: 0 }
   }
+}
+
+export async function modelStates(): Promise<ModelStateInfo[]> {
+  return Promise.all(
+    MODEL_ORDER.map(async (modelId) => {
+      const state = await modelState(modelId)
+      return { modelId, ...state }
+    })
+  )
+}
+
+export async function deleteModel(id: ModelId): Promise<void> {
+  const path = modelPath(id)
+  await Promise.all([
+    unlink(path).catch(() => undefined),
+    unlink(markerPath(id)).catch(() => undefined),
+    unlink(`${path}.part`).catch(() => undefined)
+  ])
 }
 
 async function hashFile(path: string): Promise<string> {

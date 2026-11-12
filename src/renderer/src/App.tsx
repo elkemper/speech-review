@@ -3,6 +3,7 @@ import { useApp } from './store'
 import Welcome from './components/Welcome'
 import Workspace from './components/Workspace'
 import SettingsDialog from './components/SettingsDialog'
+import HistoryDialog from './components/HistoryDialog'
 
 export default function App() {
   const loading = useApp((state) => state.loading)
@@ -12,7 +13,6 @@ export default function App() {
   const toast = useApp((state) => state.toast)
   const init = useApp((state) => state.init)
   const openVideoPath = useApp((state) => state.openVideoPath)
-  const setShowSettings = useApp((state) => state.setShowSettings)
   const setError = useApp((state) => state.setError)
   const [dragging, setDragging] = useState(false)
 
@@ -83,6 +83,7 @@ export default function App() {
     <div className="app-shell">
       {project ? <Workspace /> : <Welcome />}
       <SettingsDialog />
+      <HistoryDialog />
 
       {error ? (
         <div className="error-banner" role="alert">

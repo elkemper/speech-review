@@ -691,6 +691,7 @@ body[data-platform^="darwin"] .titlebar {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 430px;
+  overflow: hidden;
 }
 
 .workspace-main {
@@ -2334,4 +2335,165 @@ kbd {
   color: #f4c169;
   font-size: 11px;
   line-height: 1;
+}
+
+/* ---------- resizable / collapsible panels ---------- */
+
+.panel-splitter {
+  width: 6px;
+  cursor: col-resize;
+  position: relative;
+  background: transparent;
+  touch-action: none;
+}
+
+.panel-splitter::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  transition: background 0.12s;
+}
+
+.panel-splitter:hover::after,
+.panel-splitter:active::after {
+  background: var(--accent);
+}
+
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- logical marks ---------- */
+
+.badge.logical {
+  color: #f4c169;
+  border-color: rgba(244, 193, 105, 0.35);
+  background: rgba(244, 193, 105, 0.08);
+}
+
+.defect-hint {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+/* ---------- model management ---------- */
+
+.model-option-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.model-option-foot .link-btn {
+  font-size: 10.5px;
+}
+
+.btn.ghost.danger {
+  color: var(--danger);
+  border-color: rgba(251, 113, 133, 0.32);
+}
+
+.btn.ghost.danger:hover:not(:disabled) {
+  background: rgba(251, 113, 133, 0.1);
+  border-color: rgba(251, 113, 133, 0.55);
+}
+
+/* ---------- timeline defect boundaries ---------- */
+
+.timeline.handle-hover {
+  cursor: ew-resize;
+}
+
+/* ---------- action history ---------- */
+
+.history-modal {
+  width: min(640px, 100%);
+}
+
+.history-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-toolbar .muted {
+  margin-left: auto;
+}
+
+.history-body {
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-item:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.history-item.current {
+  border-color: rgba(110, 168, 254, 0.35);
+  background: rgba(110, 168, 254, 0.08);
+}
+
+.history-item.undone {
+  opacity: 0.45;
+}
+
+.history-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.history-item.current .history-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(110, 168, 254, 0.16);
+}
+
+.history-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.history-time {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
 }

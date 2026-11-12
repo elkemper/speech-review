@@ -13,7 +13,7 @@ import type {
 } from '@shared/types'
 import { engineBinary, ffmpegBinary } from './paths'
 import { probeMedia } from './engine/ffmpeg'
-import { downloadModel, modelState } from './engine/models'
+import { downloadModel, deleteModel, modelState, modelStates } from './engine/models'
 import { registerMedia } from './mediaServer'
 import { TranscriptionManager } from './jobs'
 import {
@@ -164,6 +164,10 @@ export function registerIpc(dependencies: IpcDependencies): TranscriptionManager
       onProgress: (percent, message) => send(IPC.modelProgress, { modelId: id, percent, message })
     })
     return { path }
+  })
+  ipcMain.handle(IPC.modelsState, async () => modelStates())
+  ipcMain.handle(IPC.modelsDelete, async (_event, id: ModelId) => {
+    await deleteModel(id)
   })
 
   ipcMain.handle(IPC.exportProject, async (_event, request: ExportRequest) => {

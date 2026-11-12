@@ -8,8 +8,8 @@ import {
   parseRawWords,
   stripTrailingCommas
 } from '../src/shared/transcript'
-import { DEFAULT_RULES, countDefects, detectDefects } from '../src/shared/defects'
-import type { Transcript, Word } from '../src/shared/types'
+import { DEFAULT_RULES, applyDefectOverrides, countDefects, detectDefects } from '../src/shared/defects'
+import type { Defect, Transcript, Word } from '../src/shared/types'
 
 function fixture(name: string): string {
   return readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf8')
@@ -194,5 +194,120 @@ describe('manual mark boundaries', () => {
       (defect) => defect.source === 'manual'
     )
     expect(manual?.wordIds).toEqual([1])
+  })
+})
+
+describe('automatic defect boundary overrides', () => {
+  const base: Defect[] = [
+    {
+      id: 'defect-1',
+      type: 'pause',
+      start: 4,
+      end: 6,
+      wordIds: [],
+      text: '',
+      severity: 'medium',
+      source: 'auto',
+      reviewed: false,
+      note: ''
+    },
+    {
+      id: 'defect-2',
+      type: 'filler',
+      start: 10,
+      end: 11,
+      wordIds: [3],
+      text: 'ну',
+      severity: 'medium',
+      source: 'auto',
+      reviewed: false,
+      note: ''
+    }
+  ]
+
+  it('returns the original array when there are no overrides', () => {
+    expect(applyDefectOverrides(base, undefined)).toBe(base)
+    expect(applyDefectOverrides(base, {})).toBe(base)
+  })
+
+  it('replaces only the edited defect bounds', () => {
+    const result = applyDefectOverrides(base, { 'defect-1': { start: 4.5, end: 5.2 } })
+    expect(result[0]).toMatchObject({ id: 'defect-1', start: 4.5, end: 5.2 })
+    expect(result[1]).toBe(base[1])
+  })
+
+  it('normalizes reversed override bounds', () => {
+    const result = applyDefectOverrides(base, { 'defect-2': { start: 12, end: 9 } })
+    expect(result[1]).toMatchObject({ start: 9, end: 12 })
+  })
+})
+
+describe('logical manual marks in defect detection', () => {
+  it('combines marks with the same group id into one manual defect', () => {
+    const transcript: Transcript = {
+      version: 1,
+      language: 'ru',
+      sampleRate: 16000,
+      duration: 10,
+      words: [
+        {
+          id: 0,
+          index: 0,
+          text: 'ну',
+          normalized: 'ну',
+          start: 1,
+          end: 1.5,
+          duration: 0.5,
+          kind: 'word',
+          confidence: null
+        },
+        {
+          id: 1,
+          index: 1,
+          text: 'вот',
+          normalized: 'вот',
+          start: 1.7,
+          end: 2.2,
+          duration: 0.5,
+          kind: 'word',
+          confidence: null
+        }
+      ],
+      segments: [],
+      text: 'ну вот'
+    }
+
+    const manual = detectDefects(transcript, DEFAULT_RULES, [
+      {
+        id: 'a',
+        type: 'manual',
+        start: 1,
+        end: 1.5,
+        wordIds: [0],
+        groupId: 'g',
+        note: 'первая',
+        createdAt: new Date(0).toISOString()
+      },
+      {
+        id: 'b',
+        type: 'manual',
+        start: 1.7,
+        end: 2.2,
+        wordIds: [1],
+        groupId: 'g',
+        note: 'вторая',
+        createdAt: new Date(0).toISOString()
+      }
+    ]).filter((defect) => defect.source === 'manual')
+
+    expect(manual).toHaveLength(1)
+    expect(manual[0]).toMatchObject({
+      id: 'manual-group-g',
+      start: 1,
+      end: 2.2,
+      wordIds: [0, 1],
+      markIds: ['a', 'b'],
+      note: 'первая · вторая'
+    })
   })
 })

@@ -121,6 +121,27 @@ export function wordDetail(pps: number, wordWidth: number): WordDetail {
   return canDrawWordLabel(pps, wordWidth) ? 'label' : 'mark'
 }
 
+export type DefectEdge = 'start' | 'end'
+
+export const MIN_DEFECT_LENGTH_SEC = 0.05
+
+/** Clamp one dragged boundary without letting it cross the other one. */
+export function clampDefectEdge(
+  bounds: { start: number; end: number },
+  edge: DefectEdge,
+  time: number,
+  duration: number,
+  minLength = MIN_DEFECT_LENGTH_SEC
+): { start: number; end: number } {
+  const total = Math.max(minLength, duration)
+  const start = clamp(bounds.start, 0, total - minLength)
+  const end = clamp(bounds.end, start + minLength, total)
+  if (edge === 'start') {
+    return { start: clamp(time, 0, end - minLength), end }
+  }
+  return { start, end: clamp(time, start + minLength, total) }
+}
+
 /** Words are sorted by start; find the first visible index with binary search. */
 export function firstVisibleWord(
   words: Array<{ start: number }>,

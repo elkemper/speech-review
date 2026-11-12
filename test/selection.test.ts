@@ -4,6 +4,7 @@ import {
   canDrawWordLabel,
   canDrawWordMark,
   chooseTickStep,
+  clampDefectEdge,
   clampView,
   fitView,
   lodFor,
@@ -142,5 +143,36 @@ describe('timeline view', () => {
         if (canDrawWordLabel(pps, width)) expect(canDrawWordMark(width)).toBe(true)
       }
     }
+  })
+})
+
+describe('defect boundary dragging', () => {
+  const bounds = { start: 10, end: 20 }
+
+  it('moves the start edge and keeps a minimum length', () => {
+    expect(clampDefectEdge(bounds, 'start', 12, 60)).toEqual({ start: 12, end: 20 })
+    expect(clampDefectEdge(bounds, 'start', 0, 60)).toEqual({ start: 0, end: 20 })
+    // Cannot cross the end edge; the defect keeps its minimum length.
+    expect(clampDefectEdge(bounds, 'start', 30, 60)).toEqual({
+      start: 20 - 0.05,
+      end: 20
+    })
+  })
+
+  it('moves the end edge and clamps to the recording duration', () => {
+    expect(clampDefectEdge(bounds, 'end', 25, 60)).toEqual({ start: 10, end: 25 })
+    expect(clampDefectEdge(bounds, 'end', 120, 60)).toEqual({ start: 10, end: 60 })
+    // Cannot cross the start edge.
+    expect(clampDefectEdge(bounds, 'end', 5, 60)).toEqual({
+      start: 10,
+      end: 10 + 0.05
+    })
+  })
+
+  it('handles a zero-length recording without producing negative times', () => {
+    expect(clampDefectEdge({ start: 0, end: 0 }, 'end', 5, 0)).toEqual({
+      start: 0,
+      end: 0.05
+    })
   })
 })

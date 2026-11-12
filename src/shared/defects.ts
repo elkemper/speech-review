@@ -1,5 +1,6 @@
 import type {
   Defect,
+  DefectBoundsOverride,
   DefectRules,
   DefectType,
   ManualMark,
@@ -8,6 +9,7 @@ import type {
   Word
 } from './types'
 import { endsSentence, normalizeWord } from './transcript'
+import { groupManualMarks } from './marks'
 
 export const DEFAULT_RULES: DefectRules = {
   fillerWords: [
@@ -67,7 +69,7 @@ function isFalseStart(text: string): boolean {
   return value.length > 2 && /^[\p{L}\p{N}]+-$/u.test(value)
 }
 
-function findWordIdsInRange(words: Word[], start: number, end: number): number[] {
+export function findWordIdsInRange(words: Word[], start: number, end: number): number[] {
   // Strict overlap: a word that only touches the mark boundary is not part of
   // it. Inclusive comparisons used to pull the previous/next word into marks.
   const epsilon = 1e-6
@@ -216,26 +218,35 @@ export function detectDefects(
   }
 
   const wordById = new Map(words.map((word) => [word.id, word]))
-  const manual: Defect[] = marks.map((mark) => {
-    const stored = Array.isArray(mark.wordIds)
-      ? mark.wordIds.filter((id) => wordById.has(id))
-      : null
-    const wordIds = stored && stored.length > 0 ? stored : findWordIdsInRange(words, mark.start, mark.end)
+  const manual: Defect[] = groupManualMarks(marks).map((group) => {
+    const wordIds = [
+      ...new Set(
+        group.marks.flatMap((mark) => {
+          const stored = Array.isArray(mark.wordIds)
+            ? mark.wordIds.filter((id) => wordById.has(id))
+            : []
+          return stored.length > 0 ? stored : findWordIdsInRange(words, mark.start, mark.end)
+        })
+      )
+    ]
     const selectedText = wordIds
       .map((id) => wordById.get(id)?.text ?? '')
       .filter(Boolean)
       .join(' ')
     return {
-      id: `manual-${mark.id}`,
-      type: mark.type,
-      start: mark.start,
-      end: Math.max(mark.start, mark.end),
+      id: group.groupId
+        ? `manual-group-${group.groupId}`
+        : `manual-${group.marks[0].id}`,
+      type: group.marks[0].type,
+      start: group.start,
+      end: Math.max(group.start, group.end),
       wordIds,
-      text: mark.note.trim() || selectedText || 'Ручная метка',
+      markIds: group.marks.map((mark) => mark.id),
+      text: group.note.trim() || selectedText || 'Ручная метка',
       severity: 'medium',
       source: 'manual',
       reviewed: false,
-      note: mark.note
+      note: group.note
     }
   })
 
@@ -256,6 +267,22 @@ export function detectDefects(
       if (typeDelta !== 0) return typeDelta
       return severityRank(a.severity) - severityRank(b.severity)
     })
+}
+
+export function applyDefectOverrides(
+  defects: Defect[],
+  overrides: Record<string, DefectBoundsOverride> | undefined
+): Defect[] {
+  if (!overrides || Object.keys(overrides).length === 0) return defects
+  return defects.map((defect) => {
+    const override = overrides[defect.id]
+    if (!override) return defect
+    return {
+      ...defect,
+      start: Math.min(override.start, override.end),
+      end: Math.max(override.start, override.end)
+    }
+  })
 }
 
 export function countDefects(defects: Defect[]): Record<DefectType, number> {

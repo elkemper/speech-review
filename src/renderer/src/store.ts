@@ -1,5 +1,12 @@
 import { create } from 'zustand'
 import { DEFAULT_SETTINGS } from '@shared/settings'
+import { findWordIdsInRange } from '@shared/defects'
+import {
+  markIdsForDefectId,
+  manualDefectIdForMark,
+  mergeMarkNeighbours,
+  reconcileReviewedIds
+} from '@shared/marks'
 import type {
   DefectRules,
   EngineStatus,
@@ -15,6 +22,19 @@ import type {
   TranscribeProgress
 } from '@shared/types'
 import { markRangeForSelection, type WordSelection } from './selection'
+import {
+  applyEditable,
+  canRedo,
+  canUndo,
+  createHistoryState,
+  editableEquals,
+  makeHistoryEntry,
+  recordHistory,
+  snapshotEditable,
+  stateForHistoryIndex,
+  withHistoryIndex,
+  type HistoryState
+} from './history'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let settingsTimer: ReturnType<typeof setTimeout> | null = null
@@ -64,8 +84,10 @@ interface AppStore {
   downloadingModel: boolean
 
   showSettings: boolean
+  showHistory: boolean
   filter: DefectFilter
   onlyUnreviewed: boolean
+  history: HistoryState
 
   init: () => Promise<void>
   refreshStatus: () => Promise<void>
@@ -80,10 +102,15 @@ interface AppStore {
   downloadModel: (id: ModelId) => Promise<void>
   updateSettings: (patch: SettingsPatch) => void
   setRules: (patch: Partial<DefectRules>) => void
-  toggleReviewed: (defectId: string) => void
+  toggleReviewed: (defectId: string, label?: string) => void
   setNote: (defectId: string, note: string) => void
   addMark: () => void
-  removeMark: (markId: string) => void
+  removeDefect: (defectId: string) => void
+  splitManualGroup: (defectId: string) => void
+  setDefectBounds: (defectId: string, start: number, end: number) => void
+  undo: () => void
+  redo: () => void
+  jumpHistory: (index: number) => void
   scheduleSave: () => void
   setCurrentTime: (time: number) => void
   setPlaying: (playing: boolean) => void
@@ -97,6 +124,7 @@ interface AppStore {
   setFilter: (filter: DefectFilter) => void
   setOnlyUnreviewed: (value: boolean) => void
   setShowSettings: (show: boolean) => void
+  setShowHistory: (show: boolean) => void
   setError: (error: string | null) => void
   notify: (text: string, kind?: Toast['kind']) => void
 }
@@ -141,8 +169,10 @@ export const useApp = create<AppStore>((set, get) => ({
   downloadingModel: false,
 
   showSettings: false,
+  showHistory: false,
   filter: 'all',
   onlyUnreviewed: false,
+  history: createHistoryState(),
 
   init: async () => {
     if (get().initialized) return
@@ -234,7 +264,8 @@ export const useApp = create<AppStore>((set, get) => ({
         onlyUnreviewed: false,
         progress: null,
         jobId: null,
-        follow: true
+        follow: true,
+        history: createHistoryState()
       })
       void window.api
         .saveSettings(mergedSettings)
@@ -260,7 +291,8 @@ export const useApp = create<AppStore>((set, get) => ({
       selectedWordId: null,
       selection: null,
       jobId: null,
-      progress: null
+      progress: null,
+      history: createHistoryState()
     })
   },
 
@@ -279,7 +311,8 @@ export const useApp = create<AppStore>((set, get) => ({
           selectedWordId: null,
           selection: null,
           jobId: null,
-          progress: null
+          progress: null,
+          history: createHistoryState()
         })
       }
       await get().refreshProjects()
@@ -407,38 +440,52 @@ export const useApp = create<AppStore>((set, get) => ({
     get().updateSettings({ rules: { ...get().settings.rules, ...patch } })
   },
 
-  toggleReviewed: (defectId) => {
+  toggleReviewed: (defectId, label) => {
     const project = get().project
     if (!project) return
+    const before = snapshotEditable(project)
     const reviewed = new Set(project.reviewedDefectIds)
-    if (reviewed.has(defectId)) reviewed.delete(defectId)
-    else reviewed.add(defectId)
+    const nextReviewed = !reviewed.has(defectId)
+    if (nextReviewed) reviewed.add(defectId)
+    else reviewed.delete(defectId)
     set({ project: { ...project, reviewedDefectIds: [...reviewed] } })
+    recordProjectChange(
+      set,
+      get,
+      before,
+      label ?? (nextReviewed ? 'Отмечено проверенным' : 'Снята отметка')
+    )
     get().scheduleSave()
   },
 
   setNote: (defectId, note) => {
     const project = get().project
     if (!project) return
+    const before = snapshotEditable(project)
     const notes = { ...project.defectNotes }
     if (note.trim()) notes[defectId] = note
     else delete notes[defectId]
 
     // Manual marks keep their note on the mark itself so exports and reloads
-    // stay consistent even if the defect-note map is ever cleared.
-    const marks = defectId.startsWith('manual-')
-      ? project.marks.map((mark) =>
-          mark.id === defectId.slice('manual-'.length) ? { ...mark, note } : mark
-        )
-      : project.marks
+    // stay consistent even if the defect-note map is ever cleared. A logical
+    // mark stores the same note on every underlying mark.
+    const markIds = markIdsForDefectId(defectId, project.marks)
+    const marks =
+      markIds.length > 0
+        ? project.marks.map((mark) =>
+            markIds.includes(mark.id) ? { ...mark, note } : mark
+          )
+        : project.marks
 
     set({ project: { ...project, defectNotes: notes, marks } })
+    recordProjectChange(set, get, before, 'Заметка', `note:${defectId}`)
     get().scheduleSave()
   },
 
   addMark: () => {
     const project = get().project
     if (!project) return
+    const before = snapshotEditable(project)
     const words = project.transcript?.words ?? []
     const range = markRangeForSelection(
       words,
@@ -455,35 +502,213 @@ export const useApp = create<AppStore>((set, get) => ({
       note: '',
       createdAt: new Date().toISOString()
     }
+    const marks = mergeMarkNeighbours([...project.marks, mark], [mark.id])
+    const activeDefectId = manualDefectIdForMark(marks, mark.id) ?? `manual-${mark.id}`
     set({
-      project: { ...project, marks: [...project.marks, mark] },
-      activeDefectId: `manual-${mark.id}`,
+      project: {
+        ...project,
+        marks,
+        reviewedDefectIds: reconcileReviewedIds(
+          project.marks,
+          marks,
+          project.reviewedDefectIds
+        )
+      },
+      activeDefectId,
       filter: 'all',
       selection: null,
       selectedWordId: null
     })
+    recordProjectChange(set, get, before, 'Добавлена метка')
     get().scheduleSave()
+
+    const changed = marks.find((item) => item.id === mark.id)
+    const groupSize = changed?.groupId
+      ? marks.filter((item) => item.groupId === changed.groupId).length
+      : 1
     const count = range.wordIds.length
-    get().notify(
-      count > 1
-        ? `Метка на ${count} слов — введите заметку в панели справа`
-        : 'Метка добавлена — введите заметку в панели справа'
-    )
+    if (groupSize > 1) {
+      get().notify(`Метки объединены в логическую (${groupSize}) — проверяется за раз`)
+    } else {
+      get().notify(
+        count > 1
+          ? `Метка на ${count} слов — введите заметку в панели справа`
+          : 'Метка добавлена — введите заметку в панели справа'
+      )
+    }
   },
 
-  removeMark: (markId) => {
+  removeDefect: (defectId) => {
     const project = get().project
     if (!project) return
-    const defectId = `manual-${markId}`
+    const markIds = markIdsForDefectId(defectId, project.marks)
+    if (markIds.length === 0) return
+    const before = snapshotEditable(project)
     const notes = { ...project.defectNotes }
     delete notes[defectId]
+    for (const markId of markIds) delete notes[`manual-${markId}`]
+    const reviewed = project.reviewedDefectIds.filter(
+      (id) =>
+        id !== defectId && !markIds.some((markId) => id === `manual-${markId}`)
+    )
     set({
       project: {
         ...project,
-        marks: project.marks.filter((mark) => mark.id !== markId),
-        reviewedDefectIds: project.reviewedDefectIds.filter((id) => id !== defectId),
+        marks: project.marks.filter((mark) => !markIds.includes(mark.id)),
+        reviewedDefectIds: reviewed,
         defectNotes: notes
-      }
+      },
+      activeDefectId: null
+    })
+    recordProjectChange(set, get, before, 'Удалена метка')
+    get().scheduleSave()
+  },
+
+  splitManualGroup: (defectId) => {
+    const project = get().project
+    if (!project) return
+    const markIds = markIdsForDefectId(defectId, project.marks)
+    const groupMarks = project.marks.filter((mark) => markIds.includes(mark.id))
+    if (groupMarks.length < 2) return
+    const before = snapshotEditable(project)
+    const notes = { ...project.defectNotes }
+    const groupNote = notes[defectId]
+    delete notes[defectId]
+
+    const marks = project.marks.map((mark) =>
+      markIds.includes(mark.id) ? { ...mark, groupId: undefined } : mark
+    )
+    const reviewed = reconcileReviewedIds(
+      project.marks,
+      marks,
+      project.reviewedDefectIds
+    )
+    for (const mark of groupMarks) {
+      const singleId = `manual-${mark.id}`
+      if (groupNote) notes[singleId] = groupNote
+    }
+    set({
+      project: {
+        ...project,
+        marks,
+        reviewedDefectIds: reviewed,
+        defectNotes: notes
+      },
+      activeDefectId: `manual-${groupMarks[0].id}`
+    })
+    recordProjectChange(set, get, before, 'Логическая метка разделена')
+    get().scheduleSave()
+    get().notify(`Метка разделена на ${groupMarks.length} отдельных`)
+  },
+
+  setDefectBounds: (defectId, start, end) => {
+    const project = get().project
+    if (!project) return
+    const before = snapshotEditable(project)
+    const duration = Math.max(0.1, project.duration)
+    const bounds = clampBounds(start, end, duration)
+    const markIds = markIdsForDefectId(defectId, project.marks)
+
+    if (markIds.length > 0) {
+      const groupMarks = project.marks.filter((mark) => markIds.includes(mark.id))
+      const groupStart = Math.min(...groupMarks.map((mark) => mark.start))
+      const groupEnd = Math.max(...groupMarks.map((mark) => mark.end))
+      const startChanged = Math.abs(bounds.start - groupStart) > 1e-6
+      const endChanged = Math.abs(bounds.end - groupEnd) > 1e-6
+      const firstMark = groupMarks.reduce((a, b) => (a.start <= b.start ? a : b))
+      const lastMark = groupMarks.reduce((a, b) => (a.end >= b.end ? a : b))
+      const changedIds: string[] = []
+      const words = project.transcript?.words ?? []
+
+      let marks = project.marks.map((mark) => {
+        if (startChanged && mark.id === firstMark.id) {
+          changedIds.push(mark.id)
+          const start = bounds.start
+          return {
+            ...mark,
+            start,
+            wordIds: findWordIdsInRange(words, start, Math.max(start, mark.end))
+          }
+        }
+        if (endChanged && mark.id === lastMark.id) {
+          changedIds.push(mark.id)
+          const end = bounds.end
+          return {
+            ...mark,
+            end,
+            wordIds: findWordIdsInRange(words, Math.min(mark.start, end), end)
+          }
+        }
+        return mark
+      })
+      if (changedIds.length === 0) return
+
+      marks = mergeMarkNeighbours(marks, changedIds)
+      const changedId = changedIds[0]
+      const activeId = manualDefectIdForMark(marks, changedId) ?? defectId
+      const reviewed = reconcileReviewedIds(
+        project.marks,
+        marks,
+        project.reviewedDefectIds
+      )
+      set({
+        project: { ...project, marks, reviewedDefectIds: reviewed },
+        activeDefectId: activeId
+      })
+    } else {
+      set({
+        project: {
+          ...project,
+          defectOverrides: {
+            ...project.defectOverrides,
+            [defectId]: { start: bounds.start, end: bounds.end }
+          }
+        }
+      })
+    }
+
+    recordProjectChange(set, get, before, 'Границы дефекта', `bounds:${defectId}`)
+    get().scheduleSave()
+  },
+
+  undo: () => {
+    const { project, history } = get()
+    if (!project || !canUndo(history)) return
+    const entry = history.entries[history.index]
+    const target = history.index - 1
+    const snapshot = stateForHistoryIndex(history, target)
+    if (!entry || !snapshot) return
+    set({
+      project: applyEditable(project, snapshot),
+      history: withHistoryIndex(history, target)
+    })
+    get().scheduleSave()
+    get().notify(`Отменено: ${entry.label}`)
+  },
+
+  redo: () => {
+    const { project, history } = get()
+    if (!project || !canRedo(history)) return
+    const entry = history.entries[history.index + 1]
+    const target = history.index + 1
+    const snapshot = stateForHistoryIndex(history, target)
+    if (!entry || !snapshot) return
+    set({
+      project: applyEditable(project, snapshot),
+      history: withHistoryIndex(history, target)
+    })
+    get().scheduleSave()
+    get().notify(`Повторено: ${entry.label}`)
+  },
+
+  jumpHistory: (index) => {
+    const { project, history } = get()
+    if (!project) return
+    const snapshot = stateForHistoryIndex(history, index)
+    if (!snapshot) return
+    set({
+      project: applyEditable(project, snapshot),
+      history: withHistoryIndex(history, index)
     })
     get().scheduleSave()
   },
@@ -514,6 +739,7 @@ export const useApp = create<AppStore>((set, get) => ({
   setFilter: (filter) => set({ filter }),
   setOnlyUnreviewed: (value) => set({ onlyUnreviewed: value }),
   setShowSettings: (show) => set({ showSettings: show }),
+  setShowHistory: (show) => set({ showHistory: show }),
   setError: (error) => set({ error }),
 
   notify: (text, kind = 'info') => {
@@ -524,6 +750,33 @@ export const useApp = create<AppStore>((set, get) => ({
     }, 3800)
   }
 }))
+
+function clampBounds(
+  start: number,
+  end: number,
+  duration: number,
+  minLength = 0.05
+): { start: number; end: number } {
+  const total = Math.max(minLength, duration)
+  const safeStart = Math.min(Math.max(0, start), total - minLength)
+  const safeEnd = Math.min(Math.max(safeStart + minLength, end), total)
+  return { start: safeStart, end: safeEnd }
+}
+
+function recordProjectChange(
+  set: (partial: Partial<AppStore>) => void,
+  get: () => AppStore,
+  before: ReturnType<typeof snapshotEditable>,
+  label: string,
+  mergeKey?: string
+): void {
+  const project = get().project
+  if (!project) return
+  const after = snapshotEditable(project)
+  if (editableEquals(before, after)) return
+  const entry = makeHistoryEntry(label, before, after, mergeKey ? { mergeKey } : {})
+  set({ history: recordHistory(get().history, entry) })
+}
 
 async function createFromMedia(
   media: Awaited<ReturnType<typeof window.api.openVideo>>,
@@ -547,7 +800,8 @@ async function createFromMedia(
     onlyUnreviewed: false,
     progress: null,
     jobId: null,
-    follow: true
+    follow: true,
+    history: createHistoryState()
   })
   await get().refreshProjects()
   if (!get().status?.modelReady) {
@@ -617,13 +871,17 @@ function attachListeners(
       project: {
         ...partial.project,
         marks: state.project.marks,
+        defectOverrides: keepReview
+          ? state.project.defectOverrides
+          : partial.project.defectOverrides,
         reviewedDefectIds: keepReview
           ? state.project.reviewedDefectIds
           : partial.project.reviewedDefectIds,
         defectNotes: keepReview ? state.project.defectNotes : partial.project.defectNotes
       },
       peaks: partial.peaks ?? state.peaks,
-      jobId: partial.jobId
+      jobId: partial.jobId,
+      ...(keepReview ? {} : { history: createHistoryState() })
     })
   })
 
@@ -636,6 +894,7 @@ function attachListeners(
         project: {
           ...done.project,
           marks: state.project.marks,
+          defectOverrides: state.project.defectOverrides,
           reviewedDefectIds: state.project.reviewedDefectIds,
           defectNotes: state.project.defectNotes
         },
