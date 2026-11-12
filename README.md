@@ -1,35 +1,37 @@
 # Speech Review
 
-Локальное приложение для разбора записей вебинаров: распознаёт речь, находит филлеры, паузы, обрывы, повторы и растяжки, даёт быстрый переход к нужному месту по клику на слово.
+A local app for reviewing webinar recordings: it transcribes speech, finds fillers, pauses, false starts, repetitions and elongations, and lets you jump to any moment by clicking a word.
 
-MVP рассчитан на macOS + Apple Silicon. Обработка полностью локальная: запись и транскрипт не покидают компьютер. Интернет нужен только для однократной загрузки модели.
+The MVP targets macOS + Apple Silicon. Processing is fully local: the recording and transcript never leave the machine. The network is used only for the one-time model download.
 
-## Что умеет
+**Русская версия:** [`README.RU.md`](README.RU.md)
 
-- Транскрипция через **CrisperWhisper 2.0** и нативный рантайм **audio.cpp** с Metal.
-- Нарезка длинной записи по паузам; первый фрагмент короче, поэтому первые слова появляются раньше.
-- Промежуточный транскрипт сохраняется после каждого фрагмента и сразу доступен для разбора.
-- Осциллограмма с зумом, панорамой, маркерами дефектов и выделением слов.
-- Клик по слову или маркеру — переход к этому месту в видео.
-- Очередь дефектов: фильтры, отметка «проверено», заметки, ручные метки.
-- Соседние ручные метки объединяются в одну логическую метку: её можно проверить за раз, разъединить обратно или удалить целиком.
-- Границы выбранного дефекта или метки можно двигать прямо на таймлайне; при захвате соседних меток они объединяются.
-- Отмена и повтор действий (`⌘Z` / `⇧⌘Z`) с журналом истории.
-- Панель дефектов можно растягивать за границу и полностью скрывать.
-- Выделение слов кликом, `Shift`+кликом или перетаскиванием; метка ставится точно по границам выделения.
-- Цикл по фрагменту, скорость 0.5–2×, горячие клавиши.
-- Скип-режим: при проигрывании автоматически перепрыгивать непроверенные дефекты или только ручные метки, с настраиваемыми отступами. Проверенные элементы не пропускаются.
-- Экспорт дефектов в CSV (Excel) и JSON; набор полей CSV и разделитель настраиваются.
-- Тёмная тема в духе Photoshop, автосохранение проекта после каждого действия.
+## Features
 
-## Требования
+- Transcription with **CrisperWhisper 2.0** through the native **audio.cpp** runtime with Metal.
+- Long recordings are split at pauses; the first chunk is shorter, so the first words appear sooner.
+- The partial transcript is saved after every chunk and is immediately available for review.
+- Waveform with zoom, pan, defect markers and word selection.
+- Click a word or a marker to seek the video to that point.
+- Defect queue: filters, "reviewed" state, notes, manual marks.
+- Adjacent manual marks merge into one logical mark: it can be reviewed once, split back or deleted as a whole.
+- Boundaries of the selected defect or mark can be dragged directly on the timeline; touching neighbouring marks merge.
+- Undo/redo (`⌘Z` / `⇧⌘Z`) with an action history dialog.
+- The defect panel can be resized by dragging its edge and hidden completely.
+- Word selection with click, `Shift`+click or drag; a mark uses the exact selection boundaries.
+- Loop over a fragment, speed 0.5–2×, hotkeys.
+- Skip mode: during playback, automatically jump over unreviewed defects or manual marks, with configurable padding. Reviewed items are never skipped.
+- Export defects to CSV (Excel) and JSON; CSV fields and delimiter are configurable.
+- Photoshop-like dark theme, automatic project save after every action.
 
-- macOS 13+ на Apple Silicon (M1/M2/M3/M4/M5).
-- Node.js 20+ и npm для сборки.
-- ~3 ГБ свободного места: движок ~100 МБ, ffmpeg ~80 МБ, модель ~1.6 ГБ.
-- 8 ГБ RAM и больше.
+## Requirements
 
-## Быстрый старт
+- macOS 13+ on Apple Silicon (M1/M2/M3/M4/M5).
+- Node.js 20+ and npm for building.
+- ~3 GB of free space: engine ~100 MB, ffmpeg ~80 MB, model ~1.6 GB.
+- 8 GB RAM or more.
+
+## Quick start
 
 ```bash
 npm install
@@ -37,108 +39,108 @@ npm run fetch:engine
 npm run dev
 ```
 
-`npm run fetch:engine` скачивает в `resources/`:
+`npm run fetch:engine` downloads into `resources/`:
 
-- `engine/` — `audiocpp_cli` из audio.cpp v0.9.4 (macOS arm64 Metal);
-- `ffmpeg/ffmpeg` — статический ffmpeg 6.1.1.
+- `engine/` — `audiocpp_cli` from audio.cpp v0.9.4 (macOS arm64 Metal);
+- `ffmpeg/ffmpeg` — static ffmpeg 6.1.1.
 
-Затем в приложении:
+Then in the app:
 
-1. Откройте **Настройки** → **Общие** → **Скачать модель** (Q8_0, ~1.6 ГБ). Там же можно удалить скачанную модель.
-2. Нажмите **Открыть запись** и выберите MP4/MOV/MKV/MP3/WAV.
-3. Запустите **Распознать**. Готовые фрагменты появляются в транскрипте по мере обработки.
-4. Разбирайте дефекты справа, отмечайте проверенные, экспортируйте результат.
+1. Open **Settings** → **General** → **Download model** (Q8_0, ~1.6 GB). A downloaded model can also be deleted there.
+2. Click **Open recording** and choose MP4/MOV/MKV/MP3/WAV.
+3. Click **Transcribe**. Finished chunks appear in the transcript as they are processed.
+4. Review defects on the right, mark them as reviewed, export the result.
 
-Модель скачивается с Hugging Face и проверяется по SHA-256. Повторно скачивать её не нужно.
+The model is downloaded from Hugging Face and verified by SHA-256. It does not need to be downloaded again.
 
-## Сборка DMG
+## Building a DMG
 
 ```bash
 npm run package:mac
 ```
 
-Скрипт проверит платформу (`npm run check:platform`), наличие движка и ffmpeg (`npm run check:resources`), соберёт приложение и положит DMG в `dist/`.
+The script checks the platform (`npm run check:platform`), checks for the engine and ffmpeg (`npm run check:resources`), builds the app and places the DMG in `dist/`.
 
-Проверка логики без запуска Electron:
+Checking the logic without launching Electron:
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-Сборка подписывается ad-hoc (`codesign --sign -`), но не нотаризуется. Если macOS блокирует первый запуск:
+The build is ad-hoc signed (`codesign --sign -`) but not notarized. If macOS blocks the first launch:
 
 ```bash
 xattr -cr "/Applications/Speech Review.app"
 open "/Applications/Speech Review.app"
 ```
 
-Либо нажмите на приложение правой кнопкой → **Открыть** → **Открыть**.
+Or right-click the app → **Open** → **Open**.
 
-## Горячие клавиши
+## Hotkeys
 
-| Клавиши | Действие |
+| Keys | Action |
 |---|---|
-| `Space` | играть / пауза |
-| `←` / `→` | −2 / +2 секунды |
-| `Shift` + `←` / `→` | −10 / +10 секунд |
-| `[` / `]` или `k` / `j` | предыдущий / следующий дефект |
-| `R` | отметить активный дефект проверенным |
-| `M` | добавить ручную метку: по выделенным словам или в текущей позиции |
-| `L` | включить / выключить цикл по активному дефекту |
-| `F` | следовать за играющим словом |
-| `1`–`6` | скорость 0.5, 0.75, 1, 1.25, 1.5, 2× |
-| `Home` / `End` | в начало / в конец |
-| `Cmd+O` | открыть запись |
-| `Cmd+,` | настройки |
-| `Cmd+Z` / `Ctrl+Z` | отменить действие |
-| `Shift+Cmd+Z` / `Ctrl+Y` | повторить действие |
-| `Esc` | снять цикл / выделение |
+| `Space` | play / pause |
+| `←` / `→` | −2 / +2 seconds |
+| `Shift` + `←` / `→` | −10 / +10 seconds |
+| `[` / `]` or `k` / `j` | previous / next defect |
+| `R` | mark the active defect as reviewed |
+| `M` | add a manual mark: over selected words or at the current position |
+| `L` | toggle loop over the active defect |
+| `F` | follow the currently playing word |
+| `1`–`6` | speed 0.5, 0.75, 1, 1.25, 1.5, 2× |
+| `Home` / `End` | jump to the start / end |
+| `Cmd+O` | open a recording |
+| `Cmd+,` | settings |
+| `Cmd+Z` / `Ctrl+Z` | undo |
+| `Shift+Cmd+Z` / `Ctrl+Y` | redo |
+| `Esc` | clear loop / selection |
 
-Клик по осциллограмме перематывает, клик по треугольнику — выбирает дефект. Клик по слову в транскрипте перематывает на его начало.
+Clicking the waveform seeks; clicking the triangle selects a defect. Clicking a word in the transcript seeks to its start.
 
-Выделение слов: обычный клик выбирает слово, `Shift`+клик расширяет диапазон, перетаскивание мышью выделяет несколько слов. Метка `M` использует точные границы выделения. На таймлайне `Ctrl`/`Cmd`+колесо меняет масштаб, обычная прокрутка панорамирует; кнопки `+`, `−` и `⤢` дублируют это мышью.
+Word selection: a normal click selects one word, `Shift`+click extends the range, dragging selects several words. The `M` mark uses the exact selection boundaries. On the timeline, `Ctrl`/`Cmd`+wheel changes zoom, normal scrolling pans; the `+`, `−` and `⤢` buttons duplicate this with the mouse.
 
-Если выбрать дефект в списке или транскрипте, на таймлайне появятся две вертикальные границы — их можно перетаскивать мышью. Границы ручной метки при захвате соседних меток объединяют их в логическую; кнопка «разъединить» в панели возвращает отдельные метки. Ширину панели дефектов меняют перетаскиванием её левой границы, скрывают кнопкой `⟩`, возвращают кнопкой «Дефекты» в шапке.
+Selecting a defect in the list or transcript shows two vertical boundaries on the timeline; they can be dragged with the mouse. Dragging a manual mark boundary onto a neighbouring mark merges them into a logical mark; the "split" button in the panel restores separate marks. The defect panel width is changed by dragging its left edge; it is hidden with the `⟩` button and restored with the "Defects" button in the header.
 
-## Правила дефектов по умолчанию
+## Default defect rules
 
-| Тип | Условие | Важность |
+| Type | Condition | Severity |
 |---|---|---|
-| `filler` | `[UH]`, `[UM]`, `[ER]`, `[HM]` от CrisperWhisper | высокая |
-| `filler` | слова «э», «эм», «ну», «вот», «типа», «короче», «как бы» и т.п. | низкая |
-| `pause` | разрыв между словами ≥ 1.2 с | средняя, ≥ 2.0 с — высокая |
-| `repetition` | одинаковое слово в пределах 2 с | средняя |
-| `elongation` | 3+ одинаковые буквы подряд | средняя |
-| `false_start` | слово длиной > 2 заканчивается на `-` | средняя |
-| `vocal_sound` | прочие события `[laughter]`, `[cough]` и т.п. | низкая |
-| `unclear` | низкий confidence | **выключено** |
+| `filler` | `[UH]`, `[UM]`, `[ER]`, `[HM]` from CrisperWhisper | high |
+| `filler` | words "э", "эм", "ну", "вот", "типа", "короче", "как бы", etc. | low |
+| `pause` | gap between words ≥ 1.2 s | medium, ≥ 2.0 s — high |
+| `repetition` | the same word within 2 s | medium |
+| `elongation` | 3+ identical letters in a row | medium |
+| `false_start` | word longer than 2 characters ends with `-` | medium |
+| `vocal_sound` | other events `[laughter]`, `[cough]`, etc. | low |
+| `unclear` | low confidence | **disabled** |
 
-Пауза после `.`, `?`, `!` или `…` по умолчанию не считается дефектом: это нормальная межфразовая остановка. Порог, окно повторов и лексические филлеры настраиваются в приложении без пересборки и без повторного распознавания.
+A pause after `.`, `?`, `!` or `…` is not considered a defect by default: it is a normal inter-sentence stop. The threshold, repetition window and lexical fillers are configurable in the app without rebuilding or re-transcribing.
 
-## Как это устроено
+## How it works
 
 ```
 React renderer
    │  window.api (preload, contextBridge)
    ▼
 Electron main
-   ├─ ffmpeg: извлечение 16 кГц mono WAV, silencedetect
-   ├─ нарезка WAV по середине пауз; первый фрагмент до 3 мин, остальные — по настройке
+   ├─ ffmpeg: extract 16 kHz mono WAV, silencedetect
+   ├─ split WAV at pause midpoints; first chunk up to 3 min, later chunks per setting
    ├─ audiocpp_cli --family crisperwhisper --backend metal
-   ├─ слияние words.json всех фрагментов → transcript.json
-   ├─ осциллограмма peaks.json
-   └─ проект: project.json + transcript.json + peaks.json
+   ├─ merge words.json from all chunks → transcript.json
+   ├─ waveform peaks.json
+   └─ project: project.json + transcript.json + peaks.json
 ```
 
-- Видео отдаётся в renderer через привилегированную схему `app-media://` с поддержкой HTTP Range. Отдельный HTTP-сервер не поднимается.
-- Движок запускается отдельным процессом на каждый фрагмент. Модель перезагружается между фрагментами — это осознанный компромисс для простоты MVP.
-- `words.json` от audio.cpp содержит `start_sample`/`end_sample` при 16 кГц. Парсер терпим к trailing comma.
-- Дефекты вычисляются в renderer из транскрипта и правил. Отметки «проверено» и заметки хранятся по стабильным ID дефектов в `project.json`.
-- Промежуточный транскрипт пишется с `transcriptComplete: false`; при первом частичном результате старые отметки проверки сбрасываются, потому что ID дефектов могли измениться. Ручные метки сохраняются.
-- Скип-режим не перекодирует видео: во время проигрывания позиция перескакивает через рассчитанные интервалы. Отступы «до/после» задаются в настройках.
+- Video is served to the renderer through the privileged `app-media://` scheme with HTTP Range support. No separate HTTP server is started.
+- The engine runs as a separate process for each chunk. The model is reloaded between chunks — a deliberate trade-off for MVP simplicity.
+- `words.json` from audio.cpp contains `start_sample`/`end_sample` at 16 kHz. The parser tolerates trailing commas.
+- Defects are computed in the renderer from the transcript and rules. "Reviewed" flags and notes are stored by stable defect IDs in `project.json`.
+- The partial transcript is written with `transcriptComplete: false`; on the first partial result, old review flags are reset because defect IDs may have changed. Manual marks are preserved.
+- Skip mode does not re-encode video: during playback the position jumps over calculated intervals. "Before/after" padding is configured in settings.
 
-## Где лежат данные
+## Where data lives
 
 ```
 ~/Library/Application Support/Speech Review/
@@ -151,52 +153,61 @@ Electron main
 └── tmp/jobs/
 ```
 
-Удаление проекта в приложении удаляет его папку. Видеофайл не копируется и не изменяется.
+Deleting a project in the app deletes its folder. The video file is not copied or modified.
 
-## Диагностика
+## Troubleshooting
 
-**«Движок audio.cpp не найден» / «ffmpeg не найден»**
+**"audio.cpp engine not found" / "ffmpeg not found"**
 
 ```bash
 npm run fetch:engine
 ```
 
-Затем перезапустите приложение. В настройках есть кнопка «проверить» и пути к бинарникам.
+Then restart the app. Settings has a "check" button and the binary paths.
 
-**Модель не проходит проверку SHA-256**
+**The model fails SHA-256 verification**
 
-Удалите недокачанный файл в `~/Library/Application Support/Speech Review/models/CrisperWhisper2.0-GGUF/` и скачайте заново. Загрузка поддерживает докачивание после обрыва.
+Delete the incomplete file in `~/Library/Application Support/Speech Review/models/CrisperWhisper2.0-GGUF/` and download it again. The download supports resuming after an interruption.
 
-**Видео не воспроизводится**
+**Video does not play**
 
-Chromium не поддерживает часть кодеков (например, некоторые MKV/HEVC). Распознавание при этом работает, потому что аудио извлекает ffmpeg. Для просмотра перекодируйте запись в MP4/H.264:
+Chromium does not support some codecs (for example, certain MKV/HEVC files). Transcription still works because ffmpeg extracts the audio. To play the file, re-encode it to MP4/H.264:
 
 ```bash
 ffmpeg -i input.mkv -c:v libx264 -c:a aac -movflags +faststart output.mp4
 ```
 
-**Долго**
+**It takes a long time**
 
-Ориентир для M4 Pro: 10 минут аудио ≈ 1.5 минуты распознавания (RTF ≈ 0.15). На M5 Air может быть немного медленнее. Для ускорения можно выбрать модель Q4_K в настройках — качество будет ниже.
+Reference for M4 Pro: 10 minutes of audio ≈ 1.5 minutes of transcription (RTF ≈ 0.15). M5 Air may be a little slower. To speed it up, select the Q4_K model in settings — quality will be lower.
 
-**Приложение заблокировано macOS**
+**The app is blocked by macOS**
 
-См. раздел про ad-hoc подпись выше.
+See the ad-hoc signing section above.
 
-## Ограничения MVP
+## MVP limitations
 
-- Только Apple Silicon и macOS. Windows/Linux-сборки не проверялись.
-- Нет word-level confidence: audio.cpp пишет `confidence: 0`, поэтому тип `unclear` отключён. См. `docs/BACKLOG.md`.
-- Нет диаризации и разделения по спикерам.
-- Один активный проект в окне; фоновые задачи не ставятся в очередь.
-- При аварийном завершении приложения незавершённая транскрипция начинается заново. Завершённые проекты сохраняются.
-- Модель распространяется по некоммерческой исследовательской лицензии.
+- Apple Silicon and macOS only. Windows/Linux builds have not been tested.
+- No word-level confidence: audio.cpp writes `confidence: 0`, so the `unclear` type is disabled. See `docs/BACKLOG.md`.
+- No diarization or speaker separation.
+- One active project per window; background jobs are not queued.
+- If the app crashes, an unfinished transcription starts over. Completed projects are saved.
+- The model is distributed under a non-commercial research license.
 
-## Лицензии
+## Developer documentation
 
-- Код приложения — MIT.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — processes, modules, transcription pipeline, IPC and UI.
+- [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — setup, scripts, resources, DMG build and debugging.
+- [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — project, transcript, defects, manual marks, IDs and history.
+- [`docs/TESTING.md`](docs/TESTING.md) — tests, fixtures, coverage and environment limits.
+- [`docs/BACKLOG.md`](docs/BACKLOG.md) — deferred work.
+- [`AGENTS.md`](AGENTS.md) — rules and invariants for coding agents.
+
+## Licenses
+
+- Application code — MIT.
 - audio.cpp — Apache-2.0.
-- ffmpeg 6.1.1 (статическая сборка из релизов `ffmpeg-static`) — GPL-3.0.
-- CrisperWhisper 2.0 weights — **Nyra Health Non-Commercial Research License**. Использование модели регулируется её лицензией; для коммерческого применения нужно отдельное разрешение правообладателя.
+- ffmpeg 6.1.1 (static build from `ffmpeg-static` releases) — GPL-3.0.
+- CrisperWhisper 2.0 weights — **Nyra Health Non-Commercial Research License**. Use of the model is governed by its license; commercial use requires separate permission from the rights holder.
 
-См. `docs/BACKLOG.md` со списком доработок.
+See [`docs/BACKLOG.md`](docs/BACKLOG.md) for the list of improvements.

@@ -1,164 +1,164 @@
-# Доработки
+# Backlog
 
-Список того, что сознательно не вошло в MVP. Порядок примерно отражает пользу для сценария «разобрать вебинар».
+A list of work deliberately left out of the MVP. The order roughly reflects usefulness for the "review a webinar" scenario.
 
-## 1. Word-level confidence и тип «неразборчиво»
+## 1. Word-level confidence and the "unclear" type
 
-**Статус:** ждёт поддержки в audio.cpp.
+**Status:** waiting for audio.cpp support.
 
-`audiocpp_cli --words-out` сейчас пишет `confidence: 0` для каждого слова, поэтому определить ненадёжно распознанные слова нельзя. Парсер уже готов: если в JSON появится положительный `confidence`, `buildTranscript` сохранит его в `Word.confidence`, а `detectDefects` включит правило `unclear` по порогу `lowConfidenceThreshold`.
+`audiocpp_cli --words-out` currently writes `confidence: 0` for every word, so unreliable words cannot be identified. The parser is ready: if the JSON contains a positive `confidence`, `buildTranscript` stores it in `Word.confidence`, and `detectDefects` enables the `unclear` rule using `lowConfidenceThreshold`.
 
-Что нужно сделать, когда движок начнёт отдавать реальные значения:
+What to do when the engine starts returning real values:
 
-1. Проверить шкалу: 0…1 или 0…100, и обновить `lowConfidenceThreshold`.
-2. Включить чекбокс «Неразборчивые слова по confidence» в настройках (сейчас он disabled с пометкой «в разработке»).
-3. Добавить в интерфейс отдельный цвет/фильтр `unclear`.
-4. Добавить тест на реальном выводе движка.
+1. Check the scale: 0…1 or 0…100, and update `lowConfidenceThreshold`.
+2. Enable the "Unclear words by confidence" checkbox in settings (it is currently disabled with a "work in progress" badge).
+3. Add a separate color/filter for `unclear` in the UI.
+4. Add a test using real engine output.
 
-Пока правило выключено, потому что `0` — это «нет данных», а не «плохое распознавание». Иначе весь транскрипт стал бы одним дефектом.
+The rule is disabled for now because `0` means "no data", not "poor recognition". Otherwise the whole transcript would become one defect.
 
-## 2. Не перезагружать модель между фрагментами
+## 2. Avoid reloading the model between chunks
 
-Сейчас на каждый фрагмент 5–15 минут запускается новый процесс `audiocpp_cli`, и модель читается с диска заново. Для часового вебинара это заметная доля времени.
+Currently a new `audiocpp_cli` process is started for every 5–15 minute chunk, and the model is read from disk again. For a one-hour webinar this is a noticeable share of the time.
 
-Варианты:
+Options:
 
-- `--request-sequence` / batch-режим audio.cpp: несколько WAV за одну сессию.
-- Долгоживущий процесс с IPC и повторными запросами.
-- Нарезать сразу все фрагменты и передать их одним batch-вызовом.
+- audio.cpp `--request-sequence` / batch mode: several WAV files in one session.
+- A long-lived process with IPC and repeated requests.
+- Slice all chunks up front and pass them in one batch call.
 
-Нужно замерить выигрыш на M4 Pro: 10 минут ≈ 1.5 минуты сейчас (RTF ≈ 0.15).
+Measure the gain on M4 Pro: 10 minutes ≈ 1.5 minutes now (RTF ≈ 0.15).
 
-## 3. Продолжение прерванной транскрипции
+## 3. Resume interrupted transcription
 
-При аварийном закрытии приложения незавершённая задача начинается заново. Можно сохранять готовые фрагменты в папку проекта и при повторном запуске пропускать уже распознанные.
+If the app crashes, an unfinished job starts over. Completed chunks could be saved in the project folder and skipped on the next run.
 
-## 4. Стабильные ID дефектов при смене правил
+## 4. Stable defect IDs when rules change
 
-ID автоматических дефектов строятся из порядка (`auto-filler-3`). Если поменять порог паузы или список филлеров, нумерация сдвигается, и старые отметки «проверено»/заметки могут оказаться у других дефектов.
+Automatic defect IDs are based on order (`auto-filler-3`). Changing the pause threshold or filler list shifts the numbering, and old "reviewed" flags/notes may end up on different defects.
 
-Варианты:
+Options:
 
-- Хранить отметки по паре `(тип, слово/время)`, а не по ID.
-- Пересчитывать маппинг при изменении правил.
-- Предупреждать пользователя, что смена правил сбрасывает прогресс проверки.
+- Store flags by `(type, word/time)` instead of ID.
+- Recompute the mapping when rules change.
+- Warn the user that changing rules resets review progress.
 
-## 5. Подпись Developer ID и нотаризация
+## 5. Developer ID signing and notarization
 
-Сейчас сборка подписывается ad-hoc, первый запуск может требовать `xattr -cr` или «Открыть» через контекстное меню. Для передачи пользователям без Terminal нужны:
+The build is currently ad-hoc signed, and the first launch may require `xattr -cr` or "Open" from the context menu. To distribute to users without Terminal, the following are needed:
 
 - Apple Developer ID Application;
 - `notarytool` + stapling;
-- hardened runtime и entitlements для JIT/unsigned executable memory (Electron).
+- hardened runtime and entitlements for JIT/unsigned executable memory (Electron).
 
-## 6. Диаризация и спикеры
+## 6. Diarization and speakers
 
-CrisperWhisper 2.0 умеет ASR, но не размечает спикеров. Для вебинаров с вопросами из зала полезно:
+CrisperWhisper 2.0 does ASR but does not label speakers. For webinars with audience questions, useful additions are:
 
-- диаризация (например, отдельная модель audio.cpp, если появится);
-- фильтр «только ведущий»;
-- разные цвета дорожек на таймлайне.
+- diarization (for example, a separate audio.cpp model if one appears);
+- a "host only" filter;
+- different track colors on the timeline.
 
-## 7. Проверка кодека и прокси-транскрипт для видео
+## 7. Codec check and proxy transcode for video
 
-Распознавание работает с любым файлом, который читает ffmpeg, но Chromium не воспроизводит часть MKV/HEVC/AV1. Сейчас пользователь видит сообщение «перекодируйте». Можно автоматически делать прокси-файл MP4/H.264 во временной папке и играть его, не трогая оригинал.
+Transcription works with any file ffmpeg can read, but Chromium does not play some MKV/HEVC/AV1 files. Currently the user sees a "re-encode" message. It would be possible to automatically create an MP4/H.264 proxy in a temporary folder and play it without touching the original.
 
-## 8. Экспорт в SRT/VTT и монтажные метки
+## 8. SRT/VTT export and editing marks
 
-CSV/JSON уже есть. Для монтажа полезны:
+CSV/JSON already exist. Useful for editing:
 
-- SRT/VTT с помеченными дефектами;
-- EDL/FCPXML с cut-листом;
-- ссылки `file:///...#t=12.34` для перехода из таблицы.
+- SRT/VTT with marked defects;
+- EDL/FCPXML with a cut list;
+- `file:///...#t=12.34` links for jumping from a table.
 
-## 9. Поиск по транскрипту
+## 9. Transcript search
 
-Нет строки поиска по словам. Нужны:
+There is no word search field. Needed:
 
-- поиск с подсветкой и переходом между совпадениями;
-- фильтр по интервалу времени;
-- поиск по заметкам.
+- search with highlighting and next/previous match navigation;
+- a time-range filter;
+- search in notes.
 
-## 10. Оптимизация пересчёта дефектов
+## 10. Optimize defect recomputation
 
-`detectDefects` пересчитывается при каждом изменении `reviewedDefectIds` или заметок, хотя сам транскрипт не менялся. На часовой записи это десятки тысяч слов. Стоит разделить:
+`detectDefects` is recomputed on every change to `reviewedDefectIds` or notes, even though the transcript itself has not changed. For a one-hour recording that is tens of thousands of words. It should be split:
 
-- `autoDefects` — мемоизировать по `(transcript, rules)`;
-- `reviewed/notes` — накладывать отдельно.
+- `autoDefects` — memoized by `(transcript, rules)`;
+- `reviewed/notes` — applied separately.
 
-## 11. Производительность осциллограммы
+## 11. Waveform performance
 
-`peaks.json` для 3-часовой записи — сотни тысяч значений, файл в несколько мегабайт, а canvas перерисовывается на каждое изменение `currentTime`. Варианты:
+`peaks.json` for a 3-hour recording contains hundreds of thousands of values, a file of several megabytes, and the canvas is redrawn on every `currentTime` change. Options:
 
-- бинарный формат или Float32Array через IPC;
-- рисовать playhead отдельным слоем/canvas;
-- прореживать пики под ширину окна.
+- binary format or Float32Array over IPC;
+- draw the playhead on a separate layer/canvas;
+- downsample peaks to the window width.
 
-## 12. Тонкая настройка правил под язык и спикера
+## 12. Fine-tune rules for language and speaker
 
-Сейчас правила общие для проекта. Полезно:
+Rules are currently shared for the project. Useful additions:
 
-- профили «лектор», «интервью», «быстрый темп»;
-- отдельные списки филлеров для русского/английского;
-- исключения для слов, которые модель постоянно помечает как филлер;
-- порог паузы, зависящий от темпа речи.
+- profiles "lecturer", "interview", "fast pace";
+- separate filler lists for Russian/English;
+- exceptions for words the model constantly marks as fillers;
+- a pause threshold that depends on speech rate.
 
-## 13. Улучшение нарезки
+## 13. Improve chunking
 
-Если в окне 5–15 минут нет тишины, фрагмент режется по идеальной длине и может разрубить слово. Можно:
+If there is no silence in a 5–15 minute window, the chunk is cut at the ideal length and may split a word. Possible improvements:
 
-- расширять окно поиска тишины;
-- использовать VAD вместо `silencedetect`;
-- перекрывать фрагменты на 0.5–1 с и склеивать по таймстемпам.
+- widen the silence search window;
+- use VAD instead of `silencedetect`;
+- overlap chunks by 0.5–1 s and merge by timestamps.
 
-## 14. Windows и Linux
+## 14. Windows and Linux
 
-Код путей и загрузчика движка частично кроссплатформенный, но проверялись только macOS arm64. Нужны:
+Path and engine-loader code is partially cross-platform, but only macOS arm64 has been verified. Needed:
 
-- сборки ffmpeg/audio.cpp под нужные платформы;
-- проверка `app-media://` и Metal/CUDA/Vulkan;
-- отдельные иконки и подписи.
+- ffmpeg/audio.cpp builds for the target platforms;
+- verification of `app-media://` and Metal/CUDA/Vulkan;
+- separate icons and labels.
 
-## 15. Проверка целостности движка и ffmpeg
+## 15. Engine and ffmpeg integrity checks
 
-`npm run fetch:engine` скачивает бинарники без SHA-256. Стоит добавить контрольные суммы и проверку при `npm run check:resources`, чтобы исключить повреждённую загрузку.
+`npm run fetch:engine` downloads binaries without SHA-256. Checksums should be added and verified by `npm run check:resources` to rule out corrupted downloads.
 
-## 16. Автообновление
+## 16. Auto-update
 
-Приложение не обновляется само. Для одного пользователя это не критично, но для нескольких копий нужен `electron-updater` и подписанные релизы.
+The app does not update itself. For a single user this is not critical, but multiple copies need `electron-updater` and signed releases.
 
-## 17. Доступность и мелочи интерфейса
+## 17. Accessibility and UI polish
 
-- Полная навигация с клавиатуры по панели дефектов.
-- Настраиваемые горячие клавиши.
-- Отмена/повтор для заметок.
-- Экран «О программе» с версиями движка и модели.
-- Индикатор «модель загружается» с фазами, а не только процентом.
-- Тёмная/светлая тема.
+- Full keyboard navigation in the defect panel.
+- Configurable hotkeys.
+- Undo/redo for notes.
+- An "About" screen with engine and model versions.
+- A "model is loading" indicator with phases, not just a percentage.
+- Dark/light theme.
 
-## 18. Тесты
+## 18. Tests
 
-Сейчас 38 тестов: парсер, дефекты, нарезка (включая короткий первый фрагмент), WAV, пики, выделение слов и ручные метки, зум/панорама таймлайна, скип-интервалы, CSV-экспорт. Не покрыты:
+Currently 62 tests in 7 files: parser, defects, chunking (including the short first chunk), WAV, peaks, word selection, manual and logical marks, review reconciliation, defect boundaries and overrides, timeline zoom/pan/LOD, skip intervals, action history, CSV export. Not covered:
 
-- парсинг `silencedetect` и прогресса ffmpeg;
-- докачивание модели и проверка SHA-256;
-- сохранение/загрузка проектов и сброс отметок;
-- промежуточные транскрипты и слияние review-состояния;
-- IPC-контракты;
-- рендер компонентов.
+- parsing `silencedetect` and ffmpeg progress;
+- model resume and SHA-256 verification;
+- project save/load and review reset;
+- partial transcripts and review-state merging;
+- IPC contracts;
+- component rendering.
 
-## 19. Потоковое распознавание внутри фрагмента
+## 19. Streaming recognition inside a chunk
 
-Сейчас промежуточный результат появляется только после целого фрагмента (первый — до 3 минут). Для ещё более быстрого старта нужен streaming ASR: отдавать слова по мере декодирования. audio.cpp в текущем виде запускается на файл целиком, поэтому сначала нужно проверить, есть ли у него потоковый режим или возможность отдавать частичный вывод.
+Currently a partial result appears only after a whole chunk (the first one up to 3 minutes). Even faster startup needs streaming ASR: emit words as they are decoded. audio.cpp currently runs on a whole file, so first check whether it has a streaming mode or can emit partial output.
 
-## 20. Редактируемые токены пауз
+## 20. Editable pause tokens
 
-Паузы показываются отдельными «чипами» и строками-разделителями, но их нельзя превратить в слово транскрипта или поправить границы прямо в тексте. Нужны ad-hoc токены пауз с редактируемыми началом/концом, чтобы монтажный лист точно совпадал с правками пользователя.
+Pauses are shown as separate chips and separator rows, but they cannot be turned into a transcript word or have their boundaries edited directly in the text. Ad-hoc pause tokens with editable start/end are needed so the editing list matches the user's edits exactly.
 
-## 21. Индивидуальные отступы для вырезаемых мест
+## 21. Per-item padding for skipped places
 
-В скип-режиме отступы «до/после» общие для всех дефектов и меток. Для разных типов нужны свои значения (например, пауза — 0.3/0.3, филлер — 0.05/0.15) и возможность переопределить отступ у конкретной метки.
+In skip mode, "before/after" padding is shared by all defects and marks. Different types need their own values (for example, pause — 0.3/0.3, filler — 0.05/0.15) and the ability to override padding for a specific mark.
 
-## 22. Светлая тема и переключатель оформления
+## 22. Light theme and appearance switcher
 
-Сейчас тема только тёмная, в духе Photoshop. Нужны светлая палитра, переключатель в настройках и сохранение выбора. Отдельно стоит проверить контраст цветов дефектов на светлом фоне.
+The theme is currently dark only, in the spirit of Photoshop. Needed: a light palette, a switcher in settings, and persistence of the choice. Defect color contrast on a light background should be checked separately.
