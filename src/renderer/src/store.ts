@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { DEFAULT_SETTINGS } from '@shared/settings'
 import { findWordIdsInRange } from '@shared/defects'
+import { formatTimecode } from '@shared/format'
 import {
   markIdsForDefectId,
   manualDefectIdForMark,
@@ -8,6 +9,7 @@ import {
   reconcileReviewedIds
 } from '@shared/marks'
 import type {
+  Bookmark,
   DefectRules,
   EngineStatus,
   ExportSettings,
@@ -103,8 +105,12 @@ interface AppStore {
   updateSettings: (patch: SettingsPatch) => void
   setRules: (patch: Partial<DefectRules>) => void
   toggleReviewed: (defectId: string, label?: string) => void
+  setReviewedMany: (defectIds: string[], reviewed?: boolean, label?: string) => void
   setNote: (defectId: string, note: string) => void
   addMark: () => void
+  addBookmark: (time?: number) => void
+  removeBookmark: (id: string) => void
+  setBookmarkNote: (id: string, note: string) => void
   removeDefect: (defectId: string) => void
   splitManualGroup: (defectId: string) => void
   setDefectBounds: (defectId: string, start: number, end: number) => void
@@ -131,9 +137,25 @@ interface AppStore {
 
 const FALLBACK_SETTINGS: Settings = {
   ...DEFAULT_SETTINGS,
-  rules: { ...DEFAULT_SETTINGS.rules },
+  rules: {
+    ...DEFAULT_SETTINGS.rules,
+    fillerWords: [...DEFAULT_SETTINGS.rules.fillerWords],
+    multiWordFillers: DEFAULT_SETTINGS.rules.multiWordFillers.map((phrase) => [...phrase]),
+    minDurationByType: { ...DEFAULT_SETTINGS.rules.minDurationByType }
+  },
   export: { ...DEFAULT_SETTINGS.export, fields: [...DEFAULT_SETTINGS.export.fields] },
-  playback: { ...DEFAULT_SETTINGS.playback }
+  playback: {
+    ...DEFAULT_SETTINGS.playback,
+    paddingByType: Object.fromEntries(
+      Object.entries(DEFAULT_SETTINGS.playback.paddingByType ?? {}).map(([type, padding]) => [
+        type,
+        { ...padding }
+      ])
+    ),
+    groupPadding: DEFAULT_SETTINGS.playback.groupPadding
+      ? { ...DEFAULT_SETTINGS.playback.groupPadding }
+      : undefined
+  }
 }
 
 function cleanError(error: unknown): string {
@@ -455,6 +477,75 @@ export const useApp = create<AppStore>((set, get) => ({
       before,
       label ?? (nextReviewed ? 'Отмечено проверенным' : 'Снята отметка')
     )
+    get().scheduleSave()
+  },
+
+  setReviewedMany: (defectIds, reviewed, label) => {
+    const project = get().project
+    if (!project || defectIds.length === 0) return
+    const before = snapshotEditable(project)
+    const current = new Set(project.reviewedDefectIds)
+    const nextReviewed =
+      reviewed ?? !defectIds.every((defectId) => current.has(defectId))
+    for (const defectId of defectIds) {
+      if (nextReviewed) current.add(defectId)
+      else current.delete(defectId)
+    }
+    set({ project: { ...project, reviewedDefectIds: [...current] } })
+    recordProjectChange(
+      set,
+      get,
+      before,
+      label ??
+        (nextReviewed
+          ? `Проверено: ${defectIds.length}`
+          : `Снята отметка: ${defectIds.length}`)
+    )
+    get().scheduleSave()
+  },
+
+  addBookmark: (time) => {
+    const project = get().project
+    if (!project) return
+    const at = Math.min(
+      Math.max(0, time ?? get().currentTime),
+      Math.max(0, project.duration)
+    )
+    const bookmark: Bookmark = {
+      id: crypto.randomUUID(),
+      time: at,
+      note: '',
+      createdAt: new Date().toISOString()
+    }
+    const bookmarks = [...(project.bookmarks ?? []), bookmark].sort((a, b) => a.time - b.time)
+    set({ project: { ...project, bookmarks } })
+    get().scheduleSave()
+    get().notify(`Закладка ${formatTimecode(at, true)}`, 'success')
+  },
+
+  removeBookmark: (id) => {
+    const project = get().project
+    if (!project) return
+    set({
+      project: {
+        ...project,
+        bookmarks: (project.bookmarks ?? []).filter((bookmark) => bookmark.id !== id)
+      }
+    })
+    get().scheduleSave()
+  },
+
+  setBookmarkNote: (id, note) => {
+    const project = get().project
+    if (!project) return
+    set({
+      project: {
+        ...project,
+        bookmarks: (project.bookmarks ?? []).map((bookmark) =>
+          bookmark.id === id ? { ...bookmark, note } : bookmark
+        )
+      }
+    })
     get().scheduleSave()
   },
 
@@ -871,6 +962,7 @@ function attachListeners(
       project: {
         ...partial.project,
         marks: state.project.marks,
+        bookmarks: state.project.bookmarks ?? partial.project.bookmarks ?? [],
         defectOverrides: keepReview
           ? state.project.defectOverrides
           : partial.project.defectOverrides,
@@ -894,6 +986,7 @@ function attachListeners(
         project: {
           ...done.project,
           marks: state.project.marks,
+          bookmarks: state.project.bookmarks ?? done.project.bookmarks ?? [],
           defectOverrides: state.project.defectOverrides,
           reviewedDefectIds: state.project.reviewedDefectIds,
           defectNotes: state.project.defectNotes

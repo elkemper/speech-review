@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { Defect } from '@shared/types'
 import { nudge, playPause, seekTo, setPlaybackRate, toggleLoopForDefect } from '../player'
+import { defectIdsForSelection } from '../selection'
 import { useApp } from '../store'
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
@@ -15,6 +16,7 @@ type Action =
   | 'prev'
   | 'review'
   | 'mark'
+  | 'bookmark'
   | 'loop'
   | 'follow'
   | 'escape'
@@ -52,6 +54,8 @@ function actionFor(event: KeyboardEvent): Action | null {
       return 'review'
     case 'KeyM':
       return 'mark'
+    case 'KeyB':
+      return 'bookmark'
     case 'KeyL':
       return 'loop'
     case 'KeyF':
@@ -104,6 +108,9 @@ function actionFor(event: KeyboardEvent): Action | null {
     case 'm':
     case 'M':
       return 'mark'
+    case 'b':
+    case 'B':
+      return 'bookmark'
     case 'l':
     case 'L':
       return 'loop'
@@ -234,7 +241,22 @@ export function useHotkeys(defects: Defect[]): void {
           break
         case 'review':
           event.preventDefault()
-          if (active) {
+          if (event.shiftKey && state.selection) {
+            const ids = defectIdsForSelection(
+              defects,
+              state.project.transcript?.words ?? [],
+              state.selection
+            )
+            if (ids.length > 0) {
+              state.setReviewedMany(
+                ids,
+                true,
+                `Проверено выделение: ${ids.length}`
+              )
+            } else {
+              state.notify('В выделении нет дефектов')
+            }
+          } else if (active) {
             state.toggleReviewed(
               active.id,
               `${active.reviewed ? 'Снята отметка' : 'Проверено'}: ${active.text}`
@@ -244,6 +266,10 @@ export function useHotkeys(defects: Defect[]): void {
         case 'mark':
           event.preventDefault()
           state.addMark()
+          break
+        case 'bookmark':
+          event.preventDefault()
+          state.addBookmark()
           break
         case 'loop':
           event.preventDefault()

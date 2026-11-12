@@ -1,14 +1,24 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_RULES } from '@shared/defects'
+import { AUTO_DEFECT_TYPES, DEFAULT_RULES } from '@shared/defects'
 import { formatBytes } from '@shared/format'
 import { MODEL_ORDER, MODEL_SPECS } from '@shared/models'
 import {
+  DEFAULT_GROUP_PADDING,
+  DEFAULT_SKIP_PADDING_BY_TYPE,
   EXPORT_FIELDS,
   EXPORT_FIELD_LABELS,
   MAX_CHUNK_TARGET_SEC,
   MIN_CHUNK_TARGET_SEC
 } from '@shared/settings'
-import type { ExportField, ModelId, ModelStateInfo, SkipScope } from '@shared/types'
+import type {
+  DefectType,
+  ExportField,
+  ModelId,
+  ModelStateInfo,
+  SkipPadding,
+  SkipScope
+} from '@shared/types'
+import { DEFECT_LABELS } from '../defectsUi'
 import { useApp } from '../store'
 
 type SettingsTab = 'general' | 'defects' | 'export'
@@ -18,6 +28,100 @@ const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'defects', label: 'Дефекты' },
   { id: 'export', label: 'Экспорт' }
 ]
+
+const PADDING_TYPES: DefectType[] = [...AUTO_DEFECT_TYPES, 'manual']
+
+function RangeField({
+  label,
+  value,
+  min,
+  max,
+  step,
+  suffix,
+  disabled,
+  onChange
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  suffix?: string
+  disabled?: boolean
+  onChange: (value: number) => void
+}) {
+  const clampValue = (next: number): number => Math.min(max, Math.max(min, next))
+  return (
+    <div className={`range-field ${disabled ? 'disabled' : ''}`}>
+      <div className="range-head">
+        <span className="range-label">{label}</span>
+        <span className="range-number">
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            disabled={disabled}
+            onChange={(event) => {
+              const next = Number(event.target.value)
+              if (Number.isFinite(next)) onChange(clampValue(next))
+            }}
+          />
+          {suffix ? <span className="muted small">{suffix}</span> : null}
+        </span>
+      </div>
+      <input
+        className="range-slider"
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(clampValue(Number(event.target.value)))}
+      />
+    </div>
+  )
+}
+
+function PaddingField({
+  label,
+  value,
+  disabled,
+  onChange
+}: {
+  label: string
+  value: SkipPadding
+  disabled?: boolean
+  onChange: (value: SkipPadding) => void
+}) {
+  return (
+    <div className="padding-field">
+      <div className="padding-title">{label}</div>
+      <RangeField
+        label="до"
+        value={value.before}
+        min={0}
+        max={5}
+        step={0.05}
+        suffix="с"
+        disabled={disabled}
+        onChange={(before) => onChange({ ...value, before })}
+      />
+      <RangeField
+        label="после"
+        value={value.after}
+        min={0}
+        max={5}
+        step={0.05}
+        suffix="с"
+        disabled={disabled}
+        onChange={(after) => onChange({ ...value, after })}
+      />
+    </div>
+  )
+}
 
 function PathRow({
   label,
@@ -380,62 +484,95 @@ export default function SettingsDialog() {
                   />
                   Пропускать непроверенные дефекты при проигрывании
                 </label>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Что пропускать</span>
-                    <select
-                      value={playback.skipScope}
-                      disabled={!playback.skipEnabled}
-                      onChange={(event) =>
-                        updateSettings({
-                          playback: { skipScope: event.target.value as SkipScope }
-                        })
-                      }
-                    >
-                      <option value="all">Все дефекты и метки</option>
-                      <option value="marks">Только ручные метки</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Отступ до, сек</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={5}
-                      step={0.05}
-                      value={playback.skipBeforeSec}
-                      disabled={!playback.skipEnabled}
-                      onChange={(event) =>
-                        updateSettings({
-                          playback: {
-                            skipBeforeSec: Math.max(0, Number(event.target.value) || 0)
-                          }
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Отступ после, сек</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={5}
-                      step={0.05}
-                      value={playback.skipAfterSec}
-                      disabled={!playback.skipEnabled}
-                      onChange={(event) =>
-                        updateSettings({
-                          playback: {
-                            skipAfterSec: Math.max(0, Number(event.target.value) || 0)
-                          }
-                        })
-                      }
-                    />
-                  </label>
-                </div>
+                <label className="field">
+                  <span>Что пропускать</span>
+                  <select
+                    value={playback.skipScope}
+                    onChange={(event) =>
+                      updateSettings({
+                        playback: { skipScope: event.target.value as SkipScope }
+                      })
+                    }
+                  >
+                    <option value="all">Все дефекты и метки</option>
+                    <option value="marks">Только ручные метки</option>
+                  </select>
+                </label>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={settings.hideReviewed}
+                    onChange={(event) =>
+                      updateSettings({ hideReviewed: event.target.checked })
+                    }
+                  />
+                  Убирать проверенные дефекты из списка полностью
+                </label>
                 <div className="hint">
                   Проверенные дефекты и метки не пропускаются. Отступы оставляют базовую паузу по
                   краям, чтобы вырезанное место не склеивалось вплотную. Видео не перекодируется.
+                </div>
+              </section>
+
+              <section className="settings-section">
+                <div className="section-title-row">
+                  <h3>Отступы при пропуске</h3>
+                  <button
+                    className="link-btn"
+                    onClick={() =>
+                      updateSettings({
+                        playback: {
+                          paddingByType: Object.fromEntries(
+                            Object.entries(DEFAULT_SKIP_PADDING_BY_TYPE).map(
+                              ([type, padding]) => [type, { ...padding }]
+                            )
+                          ),
+                          groupPadding: { ...DEFAULT_GROUP_PADDING }
+                        }
+                      })
+                    }
+                  >
+                    сбросить
+                  </button>
+                </div>
+                <div className="hint">
+                  Отступы настраиваются отдельно для каждого типа и не зависят от включённого
+                  режима пропуска. Для паузы по умолчанию отступов нет.
+                </div>
+                <div className="padding-grid">
+                  {PADDING_TYPES.map((type) => (
+                    <PaddingField
+                      key={type}
+                      label={DEFECT_LABELS[type]}
+                      value={
+                        playback.paddingByType?.[type] ?? {
+                          before: playback.skipBeforeSec,
+                          after: playback.skipAfterSec
+                        }
+                      }
+                      onChange={(value) =>
+                        updateSettings({
+                          playback: {
+                            paddingByType: {
+                              ...(playback.paddingByType ?? {}),
+                              [type]: value
+                            }
+                          }
+                        })
+                      }
+                    />
+                  ))}
+                  <PaddingField
+                    label="группа дефектов"
+                    value={playback.groupPadding ?? DEFAULT_GROUP_PADDING}
+                    onChange={(value) =>
+                      updateSettings({ playback: { groupPadding: value } })
+                    }
+                  />
+                </div>
+                <div className="hint">
+                  Если дефекты объединены в группу, применяются отступы группы, а не каждого
+                  элемента внутри.
                 </div>
               </section>
 
@@ -447,59 +584,51 @@ export default function SettingsDialog() {
                   </button>
                 </div>
 
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Пауза от, сек</span>
-                    <input
-                      type="number"
-                      min={0.3}
-                      max={5}
-                      step={0.1}
-                      value={rules.pauseThresholdSec}
-                      onChange={(event) =>
-                        setRules({ pauseThresholdSec: Number(event.target.value) || 0.3 })
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Критичная пауза, сек</span>
-                    <input
-                      type="number"
-                      min={0.5}
-                      max={10}
-                      step={0.1}
-                      value={rules.pauseHighSec}
-                      onChange={(event) =>
-                        setRules({ pauseHighSec: Number(event.target.value) || 0.5 })
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Окно повторов, сек</span>
-                    <input
-                      type="number"
-                      min={0.5}
-                      max={10}
-                      step={0.5}
-                      value={rules.repetitionWindowSec}
-                      onChange={(event) =>
-                        setRules({ repetitionWindowSec: Number(event.target.value) || 0.5 })
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Растяжка, повторов буквы</span>
-                    <input
-                      type="number"
-                      min={2}
-                      max={10}
-                      step={1}
-                      value={rules.elongationMinRepeats}
-                      onChange={(event) =>
-                        setRules({ elongationMinRepeats: Number(event.target.value) || 2 })
-                      }
-                    />
-                  </label>
+                <div className="range-grid">
+                  <RangeField
+                    label="Пауза от"
+                    value={rules.pauseThresholdSec}
+                    min={0.3}
+                    max={5}
+                    step={0.1}
+                    suffix="с"
+                    onChange={(value) => setRules({ pauseThresholdSec: value })}
+                  />
+                  <RangeField
+                    label="Критичная пауза"
+                    value={rules.pauseHighSec}
+                    min={0.5}
+                    max={10}
+                    step={0.1}
+                    suffix="с"
+                    onChange={(value) => setRules({ pauseHighSec: value })}
+                  />
+                  <RangeField
+                    label="Окно повторов"
+                    value={rules.repetitionWindowSec}
+                    min={0.5}
+                    max={10}
+                    step={0.5}
+                    suffix="с"
+                    onChange={(value) => setRules({ repetitionWindowSec: value })}
+                  />
+                  <RangeField
+                    label="Растяжка, повторов буквы"
+                    value={rules.elongationMinRepeats}
+                    min={2}
+                    max={10}
+                    step={1}
+                    onChange={(value) => setRules({ elongationMinRepeats: value })}
+                  />
+                  <RangeField
+                    label="Автообъединение: макс. пауза"
+                    value={rules.autoGroupGapSec}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    suffix="с"
+                    onChange={(value) => setRules({ autoGroupGapSec: value })}
+                  />
                 </div>
 
                 <label className="check">
@@ -525,9 +654,42 @@ export default function SettingsDialog() {
                   Неразборчивые слова по confidence
                   <span className="badge">в разработке</span>
                 </label>
+
+                <details className="settings-advanced">
+                  <summary>Минимальная длительность по типам</summary>
+                  <div className="hint">
+                    Дефект короче указанного значения не попадает в список. Для повтора
+                    учитывается длительность повторяемого слова, для паузы — длина тишины.
+                    0 — без ограничения.
+                  </div>
+                  <div className="range-grid">
+                    {AUTO_DEFECT_TYPES.map((type) => (
+                      <RangeField
+                        key={type}
+                        label={DEFECT_LABELS[type]}
+                        value={rules.minDurationByType?.[type] ?? 0}
+                        min={0}
+                        max={type === 'pause' ? 10 : 3}
+                        step={0.05}
+                        suffix="с"
+                        onChange={(value) =>
+                          setRules({
+                            minDurationByType: {
+                              ...rules.minDurationByType,
+                              [type]: value
+                            }
+                          })
+                        }
+                      />
+                    ))}
+                  </div>
+                </details>
+
                 <div className="hint">
                   Правила применяются к открытому проекту сразу, пересчитывать транскрипт не нужно.
-                  Границы выбранного дефекта можно двигать мышкой на таймлайне.
+                  Автообъединение склеивает соседние дефекты, если между ними нет других слов и
+                  пауза не больше указанной; 0 — выключено. Границы выбранного дефекта можно
+                  двигать мышкой на таймлайне.
                 </div>
               </section>
             </>

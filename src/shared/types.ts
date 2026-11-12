@@ -60,6 +60,10 @@ export interface Defect {
   wordIds: number[]
   /** Manual logical marks: ids of the underlying marks. */
   markIds?: string[]
+  /** Automatically grouped defects: ids of the underlying defects. */
+  groupIds?: string[]
+  /** Automatically grouped defects: every type inside the group. */
+  groupTypes?: DefectType[]
   text: string
   severity: Severity
   source: 'auto' | 'manual'
@@ -95,6 +99,17 @@ export interface DefectRules {
   elongationMinRepeats: number
   detectLexicalFillers: boolean
   lowConfidenceThreshold: number
+  /** Minimum duration for each automatically detected defect type. */
+  minDurationByType: Record<DefectType, number>
+  /** Group neighbouring automatic defects when the gap is at most this value. 0 disables grouping. */
+  autoGroupGapSec: number
+}
+
+export interface Bookmark {
+  id: string
+  time: number
+  note: string
+  createdAt: string
 }
 
 export interface MediaInfo {
@@ -127,6 +142,8 @@ export interface Project {
   defectOverrides: Record<string, DefectBoundsOverride>
   reviewedDefectIds: string[]
   defectNotes: Record<string, string>
+  /** Explicit navigation markers. Not part of undo/redo history. */
+  bookmarks: Bookmark[]
   transcriptComplete: boolean
   transcript?: Transcript
 }
@@ -183,11 +200,21 @@ export interface ExportSettings {
 
 export type SkipScope = 'marks' | 'all'
 
+export interface SkipPadding {
+  before: number
+  after: number
+}
+
 export interface PlaybackSettings {
   skipEnabled: boolean
   skipScope: SkipScope
+  /** Global fallback padding used when a type has no explicit entry. */
   skipBeforeSec: number
   skipAfterSec: number
+  /** Per-type padding. A missing entry falls back to the global values. */
+  paddingByType?: Partial<Record<DefectType, SkipPadding>>
+  /** Padding for a logical group (manual marks or automatically grouped defects). */
+  groupPadding?: SkipPadding
 }
 
 export interface Settings {
@@ -198,6 +225,8 @@ export interface Settings {
   chunkTargetSec: number
   export: ExportSettings
   playback: PlaybackSettings
+  /** Hide reviewed defects from the defect list completely. */
+  hideReviewed: boolean
 }
 
 export type TranscribePhase =

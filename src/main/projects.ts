@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
-import { DEFAULT_RULES } from '@shared/defects'
+import { normalizeRules } from '@shared/defects'
 import type {
   MediaInfo,
   Peaks,
@@ -70,6 +70,7 @@ export async function createProject(
     defectOverrides: {},
     reviewedDefectIds: [],
     defectNotes: {},
+    bookmarks: [],
     transcriptComplete: false
   }
 
@@ -84,10 +85,11 @@ export async function loadProject(id: string): Promise<LoadedProject> {
     ...meta,
     marks: meta.marks ?? [],
     // Projects created by older builds may not contain every rule field.
-    rules: { ...DEFAULT_RULES, ...(meta.rules ?? {}) },
+    rules: normalizeRules(meta.rules),
     defectOverrides: meta.defectOverrides ?? {},
     reviewedDefectIds: meta.reviewedDefectIds ?? [],
     defectNotes: meta.defectNotes ?? {},
+    bookmarks: Array.isArray(meta.bookmarks) ? meta.bookmarks : [],
     transcriptComplete: meta.transcriptComplete ?? false
   }
 

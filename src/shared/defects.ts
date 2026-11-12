@@ -11,6 +11,27 @@ import type {
 import { endsSentence, normalizeWord } from './transcript'
 import { groupManualMarks } from './marks'
 
+export const AUTO_DEFECT_TYPES: DefectType[] = [
+  'filler',
+  'pause',
+  'repetition',
+  'elongation',
+  'false_start',
+  'vocal_sound',
+  'unclear'
+]
+
+export const DEFAULT_MIN_DURATION_BY_TYPE: Record<DefectType, number> = {
+  filler: 0,
+  pause: 0,
+  repetition: 0,
+  elongation: 0,
+  false_start: 0,
+  vocal_sound: 0,
+  unclear: 0,
+  manual: 0
+}
+
 export const DEFAULT_RULES: DefectRules = {
   fillerWords: [
     'э',
@@ -40,7 +61,43 @@ export const DEFAULT_RULES: DefectRules = {
   repetitionWindowSec: 2.0,
   elongationMinRepeats: 3,
   detectLexicalFillers: true,
-  lowConfidenceThreshold: 0.45
+  lowConfidenceThreshold: 0.45,
+  minDurationByType: { ...DEFAULT_MIN_DURATION_BY_TYPE },
+  autoGroupGapSec: 0
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, value))
+}
+
+/**
+ * Rules are stored inside both settings and projects. Projects written by older
+ * builds miss the newer nested fields, so they are merged field by field
+ * instead of a shallow spread that would drop defaults.
+ */
+export function normalizeRules(value: unknown): DefectRules {
+  const raw = (value ?? {}) as Partial<DefectRules>
+  const minDuration: Record<DefectType, number> = { ...DEFAULT_MIN_DURATION_BY_TYPE }
+  const rawMin = (raw.minDurationByType ?? {}) as Partial<Record<DefectType, number>>
+  for (const type of DEFECT_TYPE_ORDER) {
+    minDuration[type] = clampNumber(rawMin[type], 0, 10, DEFAULT_MIN_DURATION_BY_TYPE[type])
+  }
+  return {
+    ...DEFAULT_RULES,
+    ...raw,
+    fillerWords: Array.isArray(raw.fillerWords)
+      ? raw.fillerWords.filter((word): word is string => typeof word === 'string')
+      : [...DEFAULT_RULES.fillerWords],
+    multiWordFillers: Array.isArray(raw.multiWordFillers)
+      ? raw.multiWordFillers.filter(
+          (phrase): phrase is string[] =>
+            Array.isArray(phrase) && phrase.every((word) => typeof word === 'string')
+        )
+      : DEFAULT_RULES.multiWordFillers.map((phrase) => [...phrase]),
+    minDurationByType: minDuration,
+    autoGroupGapSec: clampNumber(raw.autoGroupGapSec, 0, 10, DEFAULT_RULES.autoGroupGapSec)
+  }
 }
 
 export const DEFECT_TYPE_ORDER: DefectType[] = [
@@ -78,6 +135,86 @@ export function findWordIdsInRange(words: Word[], start: number, end: number): n
     .map((word) => word.id)
 }
 
+/** Any real spoken word fully inside the gap blocks automatic grouping. */
+function hasWordBetween(words: Word[], from: number, to: number): boolean {
+  if (to <= from) return false
+  const epsilon = 1e-6
+  return words.some(
+    (word) =>
+      word.kind === 'word' &&
+      word.duration > epsilon &&
+      word.start >= from - epsilon &&
+      word.end <= to + epsilon
+  )
+}
+
+function mergedSeverity(group: Defect[]): Severity {
+  if (group.some((defect) => defect.severity === 'high')) return 'high'
+  if (group.some((defect) => defect.severity === 'medium')) return 'medium'
+  return 'low'
+}
+
+function mergeAutoGroup(group: Defect[]): Defect {
+  const first = group.reduce((a, b) => (a.start <= b.start ? a : b))
+  return {
+    id: `auto-group-${first.id}`,
+    type: first.type,
+    start: Math.min(...group.map((defect) => defect.start)),
+    end: Math.max(...group.map((defect) => defect.end)),
+    wordIds: [...new Set(group.flatMap((defect) => defect.wordIds))],
+    groupIds: group.map((defect) => defect.id),
+    groupTypes: [...new Set(group.map((defect) => defect.type))],
+    text: group
+      .map((defect) => defect.text)
+      .filter(Boolean)
+      .join(' · '),
+    severity: mergedSeverity(group),
+    source: 'auto',
+    reviewed: false,
+    note: ''
+  }
+}
+
+/**
+ * Automatic grouping: neighbouring defects become one logical item when the gap
+ * between them is small and no real word sits inside that gap. A pause defect
+ * spans only the silence, so a filler right before the pause groups with it,
+ * while a spoken word between them prevents grouping.
+ */
+export function groupAutoDefects(
+  defects: Defect[],
+  gapSec: number,
+  words: Word[]
+): Defect[] {
+  if (gapSec <= 0 || defects.length < 2) return defects
+  const sorted = [...defects].sort((a, b) => a.start - b.start)
+  const result: Defect[] = []
+  let group: Defect[] = []
+
+  const flush = (): void => {
+    if (group.length === 1) result.push(group[0])
+    else if (group.length > 1) result.push(mergeAutoGroup(group))
+    group = []
+  }
+
+  for (const defect of sorted) {
+    if (group.length === 0) {
+      group.push(defect)
+      continue
+    }
+    const groupEnd = Math.max(...group.map((item) => item.end))
+    const gap = defect.start - groupEnd
+    if (gap <= gapSec + 1e-6 && !hasWordBetween(words, groupEnd, defect.start)) {
+      group.push(defect)
+    } else {
+      flush()
+      group.push(defect)
+    }
+  }
+  flush()
+  return result
+}
+
 export function detectDefects(
   transcript: Transcript,
   rules: DefectRules = DEFAULT_RULES,
@@ -94,8 +231,11 @@ export function detectDefects(
     end: number,
     wordIds: number[],
     text: string,
-    severity: Severity
+    severity: Severity,
+    measuredSec = Math.max(start, end) - start
   ): void => {
+    const min = rules.minDurationByType?.[type] ?? 0
+    if (measuredSec + 1e-9 < min) return
     auto.push({
       id: `auto-${type}-${sequence++}`,
       type,
@@ -190,7 +330,8 @@ export function detectDefects(
       current.end,
       [previous.id, current.id],
       `${previous.text} ${current.text}`,
-      'medium'
+      'medium',
+      Math.min(previous.duration, current.duration)
     )
   }
 
@@ -251,7 +392,8 @@ export function detectDefects(
   })
 
   const seen = new Set<string>()
-  return [...auto, ...manual]
+  const grouped = groupAutoDefects(auto, rules.autoGroupGapSec ?? 0, words)
+  return [...grouped, ...manual]
     .filter((defect) => {
       const key =
         defect.source === 'manual'
@@ -290,6 +432,9 @@ export function countDefects(defects: Defect[]): Record<DefectType, number> {
     DefectType,
     number
   >
-  for (const defect of defects) counts[defect.type]++
+  for (const defect of defects) {
+    const types = defect.groupTypes ?? [defect.type]
+    for (const type of new Set(types)) counts[type]++
+  }
   return counts
 }

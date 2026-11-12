@@ -44,7 +44,8 @@ Speech Review/
 | `rules` | `DEFAULT_RULES` | defect rules |
 | `chunkTargetSec` | `600` | target chunk length, 120–900 s |
 | `export` | see below | CSV fields and format |
-| `playback` | see below | skip mode |
+| `playback` | see below | skip mode and padding |
+| `hideReviewed` | `false` | hide reviewed defects from the defect list |
 
 `DEFAULT_RULES` (`src/shared/defects.ts`):
 
@@ -59,9 +60,14 @@ Speech Review/
   repetitionWindowSec: 2.0,
   elongationMinRepeats: 3,
   detectLexicalFillers: true,
-  lowConfidenceThreshold: 0.45
+  lowConfidenceThreshold: 0.45,
+  minDurationByType: { filler: 0, pause: 0, repetition: 0, elongation: 0,
+                       false_start: 0, vocal_sound: 0, unclear: 0, manual: 0 },
+  autoGroupGapSec: 0
 }
 ```
+
+`minDurationByType` sets the shortest reported defect for each type. For `pause` it is the silence length, for `repetition` the shorter of the two repeated words; `0` means no limit. `autoGroupGapSec` is the largest gap at which neighbouring automatic defects become one group; `0` disables grouping.
 
 `export`:
 
@@ -73,7 +79,11 @@ Speech Review/
 
 - `skipEnabled` — `false` by default;
 - `skipScope` — `all` or `marks`;
-- `skipBeforeSec` / `skipAfterSec` — 0–5 s, defaults 0.15 / 0.35.
+- `skipBeforeSec` / `skipAfterSec` — global fallback, 0–5 s, defaults 0.15 / 0.35;
+- `paddingByType` — `Record<DefectType, { before, after }>`; defaults give a pause `0/0` and a filler `0.1/0.2`;
+- `groupPadding` — `{ before, after }` for a logical group, default 0.15 / 0.35.
+
+Padding is resolved when skip intervals are built and does not depend on `skipEnabled`: the controls stay editable even when skip mode is off.
 
 `loadSettings` is tolerant of old or broken files:
 
@@ -81,7 +91,8 @@ Speech Review/
 - `rules` is merged with missing `DEFAULT_RULES` fields;
 - `chunkTargetSec` is rounded and clamped to 120–900;
 - `export.fields` is filtered to known fields; an empty list is replaced with the full list;
-- `playback` is clamped to valid ranges.
+- `playback` is normalized by `normalizePlaybackSettings`: every per-type padding entry is filled from the defaults and values are clamped to 0–5 s;
+- `rules` is normalized by `normalizeRules`: missing `minDurationByType` entries and `autoGroupGapSec` are added, and values are clamped.
 
 `saveSettings` writes `settings.json.tmp`, then renames it to `settings.json`. Format — JSON with 2-space indentation.
 
@@ -105,6 +116,7 @@ Speech Review/
 | `defectOverrides` | `Record<string, {start,end}>` | edited automatic defect boundaries |
 | `reviewedDefectIds` | string[] | reviewed defect IDs |
 | `defectNotes` | `Record<string, string>` | notes by defect ID |
+| `bookmarks` | `Bookmark[]` | navigation markers: `id`, `time`, `note`, `createdAt` |
 | `transcriptComplete` | boolean | whether the transcript is final |
 | `transcript` | `Transcript?` | **in memory only**, loaded from `transcript.json` |
 
@@ -113,12 +125,12 @@ Project creation:
 1. `projects:create` checks ffmpeg, the audio track and the duration;
 2. name is `basename(path, extname(path))`;
 3. `rules`, `language`, `modelId`, `backend` come from current settings;
-4. `marks`, `defectOverrides`, `reviewedDefectIds`, `defectNotes` are empty;
+4. `marks`, `defectOverrides`, `reviewedDefectIds`, `defectNotes` and `bookmarks` are empty;
 5. `transcriptComplete: false`.
 
 Loading:
 
-- missing `marks`, `defectOverrides`, `reviewedDefectIds`, `defectNotes`, `transcriptComplete` are filled with safe values;
+- missing `marks`, `defectOverrides`, `reviewedDefectIds`, `defectNotes`, `bookmarks`, `transcriptComplete` are filled with safe values;
 - `rules` is merged with `DEFAULT_RULES`;
 - `transcript.json` is read separately; if it is missing or broken, `transcript` is not set and `transcriptComplete` is forced to `false`;
 - `peaks.json` is read separately; on error `peaks = null`.
@@ -201,6 +213,8 @@ Fields:
 | `start`, `end` | seconds |
 | `wordIds` | words the defect refers to |
 | `markIds` | manual only: IDs of all marks in the logical group |
+| `groupIds` | automatic grouping only: IDs of the underlying automatic defects |
+| `groupTypes` | automatic grouping only: every type inside the group |
 | `text` | defect text/note |
 | `severity` | `low`, `medium`, `high` |
 | `source` | `auto` or `manual` |
@@ -237,6 +251,7 @@ Rules:
 - `splitManualGroup` removes `groupId` from every mark in the group. The group note is copied to each single mark.
 - `removeDefect` deletes all marks in the group, their notes and review IDs.
 - `groupManualMarks` groups by `groupId` and computes combined `start`, `end`, `wordIds`, `note`.
+- Automatic defects are grouped by `groupAutoDefects` before manual defects are appended. A group gets the id `auto-group-${firstDefectId}`, combined bounds/words and `groupTypes`. It is used by the list, the transcript, review state and skip mode (which applies `playback.groupPadding`).
 - Old marks without `wordIds` use strict interval overlap: a word that only touches the boundary is not included.
 
 ## 8. Review and note IDs
@@ -244,6 +259,7 @@ Rules:
 | Entity | ID |
 |---|---|
 | Automatic defect | `auto-${type}-${sequence}` |
+| Automatically grouped defect | `auto-group-${firstDefectId}` |
 | Single manual mark | `manual-${mark.id}` |
 | Logical manual mark | `manual-group-${groupId}` |
 | Note | key in `Project.defectNotes` by defect ID |
@@ -279,7 +295,7 @@ History is stored only in renderer memory and is reset when a project is opened 
 - A new entry after undo truncates the redo branch.
 - Entries with the same `mergeKey` within 2 seconds are coalesced (for example, note typing or boundary dragging).
 - `undo`/`redo`/`jumpHistory` apply a snapshot to the project and schedule a save.
-- History does not include: playhead position, speed, loop, selection, filters, transcript or settings.
+- History does not include: playhead position, speed, loop, selection, filters, bookmarks, transcript or settings.
 
 ## 10. Writes and review reset
 
@@ -297,13 +313,13 @@ History is stored only in renderer memory and is reset when a project is opened 
 
 There is no explicit project schema version. Compatibility is provided by defaults at load time:
 
-- missing `marks`, `defectOverrides`, `reviewedDefectIds`, `defectNotes` → empty objects/arrays;
-- missing `rules` fields → `DEFAULT_RULES`;
+- missing `marks`, `defectOverrides`, `reviewedDefectIds`, `defectNotes`, `bookmarks` → empty objects/arrays;
+- missing `rules` fields, including `minDurationByType` and `autoGroupGapSec` → values from `normalizeRules`/`DEFAULT_RULES`;
 - old marks without `wordIds` → strict time overlap;
 - old marks without `groupId` → single marks;
 - missing/broken `transcript.json` → project without a transcript, `transcriptComplete = false`;
 - missing/broken `peaks.json` → `peaks = null`;
-- old settings are normalized in `loadSettings`.
+- old settings are normalized in `loadSettings`, including every per-type skip padding entry;
 
 When adding new fields to `Project` or `Settings`:
 
@@ -335,10 +351,10 @@ JSON:
     "modelId": "q8_0",
     "createdAt": "ISO"
   },
-  "counts": { "filler": 6, "pause": 3, "false_start": 1 },
+  "counts": { "filler": 6, "pause": 3, "repetition": 0, "false_start": 1, "unclear": 0 },
   "defects": [ … ],
   "marks": [ … ]
 }
 ```
 
-JSON always contains the full set of defect fields and the original manual marks; field settings apply only to CSV.
+JSON always contains the full set of defect fields and the original manual marks; field settings apply only to CSV. `counts` contains every defect type, including zeros, and a grouped defect is counted once per type in `groupTypes`.

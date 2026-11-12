@@ -14,7 +14,13 @@ import {
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
-export default function Player({ defects }: { defects: Defect[] }) {
+export default function Player({
+  defects,
+  videoHeight
+}: {
+  defects: Defect[]
+  videoHeight?: number
+}) {
   const mediaUrl = useApp((state) => state.mediaUrl)
   const project = useApp((state) => state.project)
   const currentTime = useApp((state) => state.currentTime)
@@ -25,6 +31,7 @@ export default function Player({ defects }: { defects: Defect[] }) {
   const setCurrentTime = useApp((state) => state.setCurrentTime)
   const setPlaying = useApp((state) => state.setPlaying)
   const addMark = useApp((state) => state.addMark)
+  const addBookmark = useApp((state) => state.addBookmark)
   const setError = useApp((state) => state.setError)
   const playback = useApp((state) => state.settings.playback)
   const updateSettings = useApp((state) => state.updateSettings)
@@ -124,7 +131,11 @@ export default function Player({ defects }: { defects: Defect[] }) {
 
   return (
     <div className="player">
-      <div className="video-wrap" ref={wrapRef}>
+      <div
+        className="video-wrap"
+        ref={wrapRef}
+        style={videoHeight ? { height: `${videoHeight}px` } : undefined}
+      >
         {mediaUrl ? (
           <video
             ref={videoRef}
@@ -241,6 +252,9 @@ export default function Player({ defects }: { defects: Defect[] }) {
         </button>
         <button className="ctrl" onClick={addMark} title="Добавить ручную метку (M)">
           ＋ метка
+        </button>
+        <button className="ctrl" onClick={() => addBookmark()} title="Поставить закладку (B)">
+          🔖
         </button>
         <button className="ctrl" onClick={toggleFullscreen} title="Полный экран">
           ⛶

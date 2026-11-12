@@ -3,6 +3,7 @@ import { formatTimecode } from '@shared/format'
 import type { Defect, DefectType } from '@shared/types'
 import { DEFECT_COLORS, DEFECT_LABELS, SEVERITY_LABELS, TYPE_ORDER } from '../defectsUi'
 import { playFrom, seekTo, toggleLoopForDefect } from '../player'
+import { defectIdsForSelection } from '../selection'
 import { buildSkipIntervals } from '../skip'
 import { useApp, type DefectFilter } from '../store'
 
@@ -18,6 +19,8 @@ export default function DefectPanel({
   const onlyUnreviewed = useApp((state) => state.onlyUnreviewed)
   const activeDefectId = useApp((state) => state.activeDefectId)
   const loop = useApp((state) => state.loop)
+  const selection = useApp((state) => state.selection)
+  const setReviewedMany = useApp((state) => state.setReviewedMany)
   const setFilter = useApp((state) => state.setFilter)
   const setOnlyUnreviewed = useApp((state) => state.setOnlyUnreviewed)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
@@ -30,6 +33,7 @@ export default function DefectPanel({
   const notify = useApp((state) => state.notify)
   const exportSettings = useApp((state) => state.settings.export)
   const playback = useApp((state) => state.settings.playback)
+  const hideReviewed = useApp((state) => state.settings.hideReviewed)
 
   const itemRefs = useRef(new Map<string, HTMLDivElement>())
 
@@ -47,9 +51,23 @@ export default function DefectPanel({
   const reviewedCount = defects.filter((defect) => defect.reviewed).length
   const unreviewedCount = defects.length - reviewedCount
 
+  const selectedDefectIds = useMemo(
+    () =>
+      defectIdsForSelection(
+        defects,
+        project?.transcript?.words ?? [],
+        selection
+      ),
+    [defects, project?.transcript?.words, selection]
+  )
+
   const counts = useMemo(() => {
     const map = new Map<DefectType, number>()
-    for (const defect of defects) map.set(defect.type, (map.get(defect.type) ?? 0) + 1)
+    for (const defect of defects) {
+      for (const type of defect.groupTypes ?? [defect.type]) {
+        map.set(type, (map.get(type) ?? 0) + 1)
+      }
+    }
     return map
   }, [defects])
 
@@ -57,10 +75,13 @@ export default function DefectPanel({
     () =>
       defects.filter(
         (defect) =>
-          (filter === 'all' || defect.type === filter) &&
-          (!onlyUnreviewed || !defect.reviewed)
+          (filter === 'all' ||
+            defect.type === filter ||
+            defect.groupTypes?.includes(filter as DefectType)) &&
+          (!onlyUnreviewed || !defect.reviewed) &&
+          (!hideReviewed || !defect.reviewed)
       ),
-    [defects, filter, onlyUnreviewed]
+    [defects, filter, onlyUnreviewed, hideReviewed]
   )
 
   useEffect(() => {
@@ -158,9 +179,25 @@ export default function DefectPanel({
           />
           только непроверенные
         </label>
-        <button className="link-btn" onClick={goNextUnreviewed} disabled={unreviewedCount === 0}>
-          следующий →
-        </button>
+        {selectedDefectIds.length > 0 ? (
+          <button
+            className="link-btn"
+            onClick={() =>
+              setReviewedMany(
+                selectedDefectIds,
+                true,
+                `Проверено выделение: ${selectedDefectIds.length}`
+              )
+            }
+            title="Отметить проверенными все дефекты в выделении (Shift+R)"
+          >
+            проверить выделение ({selectedDefectIds.length})
+          </button>
+        ) : (
+          <button className="link-btn" onClick={goNextUnreviewed} disabled={unreviewedCount === 0}>
+            следующий →
+          </button>
+        )}
       </div>
 
       <div className="defect-list">
@@ -168,7 +205,9 @@ export default function DefectPanel({
           <div className="panel-empty">
             {defects.length === 0
               ? 'Дефектов пока нет. Запустите распознавание или добавьте ручную метку.'
-              : 'Под текущий фильтр ничего не попадает.'}
+              : hideReviewed && defects.every((defect) => defect.reviewed)
+                ? 'Все дефекты проверены и скрыты по настройке.'
+                : 'Под текущий фильтр ничего не попадает.'}
           </div>
         ) : (
           filtered.map((defect) => {
@@ -218,6 +257,16 @@ export default function DefectPanel({
                       {SEVERITY_LABELS[defect.severity]}
                     </span>
                     {defect.source === 'manual' ? <span className="badge">ручная</span> : null}
+                    {defect.groupIds && defect.groupIds.length > 1 ? (
+                      <span
+                        className="badge logical"
+                        title={`Автоматически объединены: ${(defect.groupTypes ?? [])
+                          .map((type) => DEFECT_LABELS[type])
+                          .join(' + ')}`}
+                      >
+                        группа · {defect.groupIds.length}
+                      </span>
+                    ) : null}
                     {defect.markIds && defect.markIds.length > 1 ? (
                       <span className="badge logical" title="Несколько соседних меток объединены">
                         логическая · {defect.markIds.length}

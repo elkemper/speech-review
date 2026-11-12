@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the current MVP implementation, not the desired state. Deferred improvements are listed in `docs/BACKLOG.md`.
+This document describes the current MVP implementation, not the desired state. Deferred improvements are listed in `docs/BACKLOG.md`, and consolidated requirements with status/acceptance criteria are in `docs/SPEC.md`.
 
 ## 1. Purpose and scope
 
@@ -78,7 +78,8 @@ MVP limitations:
 | `src/renderer/src/selection.ts` | word selection, manual-mark range, nearest word |
 | `src/renderer/src/timelineView.ts` | zoom, pan, LOD, ticks, defect boundaries |
 | `src/renderer/src/defectsUi.ts` | labels, colors, type ordering |
-| `src/renderer/src/hooks/useHotkeys.ts` | hotkeys and defect navigation |
+| `src/renderer/src/hooks/useHotkeys.ts` | hotkeys, bulk review and bookmark shortcut |
+| `src/renderer/src/components/Bookmarks.tsx` | bookmark list, notes and resume |
 
 ## 4. Startup and security
 
@@ -141,7 +142,7 @@ Cancellation: `cancel(jobId)` or `cancelProject(projectId)` calls `AbortControll
 
 ## 7. Defects and manual marks
 
-`detectDefects(transcript, rules, marks)` is a pure function. It returns automatic and manual defects sorted by time, type and severity.
+`detectDefects(transcript, rules, marks)` is a pure function. It returns automatic and manual defects sorted by time, type and severity. Automatic defects are filtered by `minDurationByType` and optionally merged by `groupAutoDefects` before manual marks are appended.
 
 Automatic rules (`DEFAULT_RULES`):
 
@@ -156,7 +157,11 @@ Automatic rules (`DEFAULT_RULES`):
 | `vocal_sound` | events `[LAUGHTER]`, `[COUGH]`, etc. |
 | `unclear` | confidence below the threshold; effectively disabled while the engine writes `0` |
 
+Every automatic defect is also filtered by `rules.minDurationByType[type]`. A pause measures the silence, a repetition the shorter of the repeated words.
+
 Automatic defect ID: `auto-${type}-${sequence}`, where `sequence` is the global insertion order. IDs are not stable when rules change or the recording is re-transcribed.
+
+**Automatic grouping.** When `rules.autoGroupGapSec > 0`, `groupAutoDefects` walks the sorted automatic defects and merges neighbours while the gap is within the limit and no other spoken word lies in that gap. A pause spans only the silence, so a filler immediately before it forms one group, while a filler separated by a real word does not. The group gets the id `auto-group-${firstDefectId}`, combined bounds and words, `groupIds`, `groupTypes` and the highest severity. `0` disables grouping, which is the default.
 
 `applyDefectOverrides` applies `Project.defectOverrides` on top of automatic defects. Manual marks do not use overrides: their boundaries are stored in the marks themselves.
 
@@ -174,12 +179,12 @@ Manual marks:
 - `reconcileReviewedIds(before, after, reviewedIds)` recomputes manual IDs after add, merge, split or move. A logical mark stays reviewed only if all its parts were reviewed before the change.
 - Notes are stored in `Project.defectNotes` by defect ID; for manual marks they are duplicated in `ManualMark.note`.
 - History (`src/renderer/src/history.ts`) stores snapshots of editable state only: `marks`, `reviewedDefectIds`, `defectNotes`, `defectOverrides`. Rapid changes with the same `mergeKey` within 2 seconds are coalesced. History lives in memory and is reset when a project is opened or closed.
-- `buildSkipIntervals` takes defects only, excludes `reviewed`, adds before/after padding, clamps to the duration and merges overlapping intervals. `skipScope: 'marks'` keeps only `source === 'manual'`.
+- `buildSkipIntervals` takes defects only, excludes `reviewed`, adds before/after padding, clamps to the duration and merges overlapping intervals. Padding comes from `playback.paddingByType[defect.type]`; a logical group (manual or automatic) uses `playback.groupPadding` instead. `skipScope: 'marks'` keeps only `source === 'manual'`. Padding settings are editable regardless of `skipEnabled`.
 - `player.ts` jumps over an interval once so it does not fight the seek. The "listen" button temporarily disables skipping for the selected defect.
 
 ## 9. UI
 
-`Workspace` is the main grid: video and timeline on top, transcript on the left, defect panel on the right. The panel can be hidden and resized; width and visibility are stored in `localStorage` (`sr.panelWidth`, `sr.panelVisible`).
+`Workspace` is the main grid: video and timeline on top, transcript on the left, defect panel on the right. The panel can be hidden and resized; width and visibility are stored in `localStorage` (`sr.panelWidth`, `sr.panelVisible`). Two horizontal splitters resize the video area (`sr.videoHeight`) and the timeline (`sr.timelineHeight`); the transcript takes the remaining height. A bookmarks popover lists `project.bookmarks` and seeks to them.
 
 ### Player
 
@@ -194,8 +199,10 @@ Canvas waveform with zoom and pan:
 - `Ctrl`/`Cmd` + wheel zooms around the cursor, normal wheel pans;
 - `+`, `−`, `⤢` buttons;
 - `follow` keeps the playhead visible until the user starts panning;
+- bookmarks are drawn as green flags and dashed lines;
 - LOD: waveform and defect markers first, then word marks, boundaries and labels;
 - click seeks; `Shift`+click/drag selects words; clicking a marker selects a defect;
+- `Shift+R` reviews every defect touched by the current selection;
 - the active defect has two draggable boundaries. An automatic defect is saved in `defectOverrides`; a manual mark updates its `start`/`end` and `wordIds`;
 - skip intervals are highlighted in yellow.
 
@@ -203,13 +210,15 @@ Canvas waveform with zoom and pan:
 
 - Virtualized segment list (`@tanstack/react-virtual`).
 - Click a word to seek; `Shift`+click and drag select; `M` creates a mark using exact boundaries.
+- A selection that contains defects can be reviewed at once with `Shift+R`; the toolbar shows the count.
 - Pauses are shown as chips after a word; long sentence-boundary pauses are shown as a separate row.
 - Defect, reviewed-word and skipped-place highlighting.
 - "Only with defects", "Follow" and "Copy" buttons.
 
 ### DefectPanel
 
-- Filters by type, "only unreviewed", counters.
+- Filters by type, "only unreviewed", counters; `settings.hideReviewed` removes reviewed items entirely.
+- A selected range with defects shows "проверить выделение" (review the selection).
 - Mark as reviewed, note, "listen", loop, delete and "split" for manual marks.
 - Jump to the next unreviewed defect.
 - CSV/JSON export.
@@ -219,12 +228,12 @@ Canvas waveform with zoom and pan:
 Three tabs:
 
 - **General** — engine, model (download/delete), language, backend, chunk size, licenses;
-- **Defects** — skip mode, padding, defect rules;
+- **Defects** — skip mode, per-type and group padding, defect rules with sliders, per-type minimum duration, automatic grouping and hiding reviewed defects;
 - **Export** — CSV fields, delimiter, header.
 
 ### Hotkeys
 
-`useHotkeys` matches `event.code` first, so the Russian keyboard layout does not break `R`, `M`, `[`, `]`, `J`, `K`. Hotkeys are disabled in input fields.
+`useHotkeys` matches `event.code` first, so the Russian keyboard layout does not break `R`, `M`, `B`, `[`, `]`, `J`, `K`. Hotkeys are disabled in input fields. `Shift+R` reviews the selected words, `B` adds a bookmark.
 
 ## 10. Export
 

@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { buildCsv } from '@shared/exportCsv'
+import { countDefects } from '@shared/defects'
 import type { ExportRequest } from '@shared/types'
 
 function safeName(name: string): string {
@@ -42,10 +43,7 @@ export async function exportProject(
         modelId: project.modelId,
         createdAt: project.createdAt
       },
-      counts: defects.reduce<Record<string, number>>((accumulator, defect) => {
-        accumulator[defect.type] = (accumulator[defect.type] ?? 0) + 1
-        return accumulator
-      }, {}),
+      counts: countDefects(defects),
       defects,
       marks
     }

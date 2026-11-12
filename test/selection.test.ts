@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { markRangeForSelection, nearestWord, rangeForSelection } from '../src/renderer/src/selection'
+import {
+  defectIdsForSelection,
+  markRangeForSelection,
+  nearestWord,
+  rangeForSelection
+} from '../src/renderer/src/selection'
 import {
   canDrawWordLabel,
   canDrawWordMark,
@@ -15,7 +20,7 @@ import {
   wordMarksVisible,
   zoomView
 } from '../src/renderer/src/timelineView'
-import type { Word } from '../src/shared/types'
+import type { Defect, Word } from '../src/shared/types'
 
 function word(id: number, start: number, end: number, text = `w${id}`): Word {
   return {
@@ -174,5 +179,52 @@ describe('defect boundary dragging', () => {
       start: 0,
       end: 0.05
     })
+  })
+})
+
+describe('reviewing a word selection', () => {
+  const defects: Defect[] = [
+    {
+      id: 'd0',
+      type: 'filler',
+      start: 1,
+      end: 1.4,
+      wordIds: [0],
+      text: 'Привет',
+      severity: 'low',
+      source: 'auto',
+      reviewed: false,
+      note: ''
+    },
+    {
+      id: 'd2',
+      type: 'pause',
+      start: 2,
+      end: 5,
+      wordIds: [1, 2],
+      text: 'мир … пауза',
+      severity: 'high',
+      source: 'auto',
+      reviewed: false,
+      note: ''
+    }
+  ]
+
+  it('returns every defect touched by the selected words', () => {
+    expect(defectIdsForSelection(defects, words, { anchorId: 0, focusId: 1 })).toEqual([
+      'd0',
+      'd2'
+    ])
+  })
+
+  it('ignores defects outside the selection', () => {
+    expect(defectIdsForSelection(defects, words, { anchorId: 2, focusId: 2 })).toEqual([
+      'd2'
+    ])
+  })
+
+  it('returns nothing without a selection or transcript', () => {
+    expect(defectIdsForSelection(defects, words, null)).toEqual([])
+    expect(defectIdsForSelection(defects, [], { anchorId: 0, focusId: 0 })).toEqual([])
   })
 })

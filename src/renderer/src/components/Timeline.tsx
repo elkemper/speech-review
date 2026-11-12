@@ -19,9 +19,15 @@ import {
   type TimeView
 } from '../timelineView'
 
-const HEIGHT = 120
+const DEFAULT_HEIGHT = 120
 
-export default function Timeline({ defects }: { defects: Defect[] }) {
+export default function Timeline({
+  defects,
+  height = DEFAULT_HEIGHT
+}: {
+  defects: Defect[]
+  height?: number
+}) {
   const project = useApp((state) => state.project)
   const peaks = useApp((state) => state.peaks)
   const currentTime = useApp((state) => state.currentTime)
@@ -34,6 +40,9 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
   const setDefectBounds = useApp((state) => state.setDefectBounds)
   const selectRange = useApp((state) => state.selectRange)
   const setFollow = useApp((state) => state.setFollow)
+
+  const HEIGHT = Math.max(64, Math.round(height))
+  const bookmarks = project?.bookmarks ?? []
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -154,8 +163,8 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
 
     // Waveform
     if (peaks && peaks.max.length > 0) {
-      const mid = 54
-      const amp = 30
+      const mid = Math.max(30, HEIGHT * 0.42)
+      const amp = Math.max(6, Math.min(40, HEIGHT * 0.24))
       const count = peaks.max.length
       const peakPps = peaks.peaksPerSecond > 0 ? peaks.peaksPerSecond : count / Math.max(0.1, peaks.duration)
       ctx.strokeStyle = 'rgba(120, 176, 240, 0.72)'
@@ -183,6 +192,7 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
     if (words.length > 0) {
       const from = firstVisibleWord(words, view.start)
       const lastRight = [-Infinity, -Infinity]
+      const barTop = HEIGHT - 29
       ctx.font = '9px -apple-system, "SF Pro Text", sans-serif'
       for (let i = from; i < words.length && words[i].start <= view.end; i++) {
         const word = words[i]
@@ -193,13 +203,13 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
         if (detail === 'none') continue
 
         ctx.fillStyle = 'rgba(150, 160, 175, 0.22)'
-        ctx.fillRect(x1, 91, Math.max(1, wordWidth - 1), 3)
+        ctx.fillRect(x1, barTop, Math.max(1, wordWidth - 1), 3)
 
         if (detail !== 'label') continue
         const row = lastRight[0] + 4 <= x1 ? 0 : lastRight[1] + 4 <= x1 ? 1 : -1
         if (row < 0) continue
         lastRight[row] = x2
-        const y = 96 + row * 12
+        const y = barTop + 5 + row * 12
         ctx.fillStyle = 'rgba(150, 160, 175, 0.12)'
         ctx.fillRect(x1, y, wordWidth - 1, 11)
         ctx.fillStyle = 'rgba(225, 230, 238, 0.82)'
@@ -242,6 +252,32 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
         const x2 = clamp(toX(interval.end), 0, width)
         ctx.fillRect(x1, 16, Math.max(1, x2 - x1), HEIGHT - 16)
       }
+    }
+
+    // Bookmarks: a thin green line with a flag at the top so they stay visible
+    // even when the waveform is zoomed out.
+    if (bookmarks.length > 0) {
+      ctx.save()
+      for (const bookmark of bookmarks) {
+        if (bookmark.time < view.start || bookmark.time > view.end) continue
+        const x = toX(bookmark.time)
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.55)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([2, 3])
+        ctx.beginPath()
+        ctx.moveTo(x, 8)
+        ctx.lineTo(x, HEIGHT)
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.95)'
+        ctx.beginPath()
+        ctx.moveTo(x, 2)
+        ctx.lineTo(x + 7, 5)
+        ctx.lineTo(x, 8)
+        ctx.closePath()
+        ctx.fill()
+      }
+      ctx.restore()
     }
 
     // Selected word range
@@ -313,7 +349,9 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
     words,
     selectedRange,
     skipIntervals,
-    activeDefect
+    activeDefect,
+    bookmarks,
+    HEIGHT
   ])
 
   const timeFromClientX = (clientX: number): number => {
@@ -466,6 +504,7 @@ export default function Timeline({ defects }: { defects: Defect[] }) {
     <div
       className={`timeline ${handleHover ? 'handle-hover' : ''}`}
       ref={wrapRef}
+      style={{ height: `${HEIGHT}px`, flexBasis: `${HEIGHT}px` }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

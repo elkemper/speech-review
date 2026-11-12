@@ -1,34 +1,32 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { DEFAULT_RULES } from '@shared/defects'
+import { normalizeRules } from '@shared/defects'
 import { MODEL_SPECS } from '@shared/models'
 import {
   DEFAULT_EXPORT_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
   DEFAULT_SETTINGS,
   EXPORT_FIELDS,
-  normalizeChunkTarget
+  normalizeChunkTarget,
+  normalizePlaybackSettings
 } from '@shared/settings'
 import type {
   Backend,
   ExportField,
   ExportSettings,
   ModelId,
-  PlaybackSettings,
-  Settings,
-  SkipScope
+  Settings
 } from '@shared/types'
 import { userDataDir } from './paths'
 
 const DEFAULTS: Settings = {
   ...DEFAULT_SETTINGS,
-  rules: { ...DEFAULT_SETTINGS.rules },
+  rules: normalizeRules(DEFAULT_SETTINGS.rules),
   export: { ...DEFAULT_SETTINGS.export, fields: [...DEFAULT_SETTINGS.export.fields] },
-  playback: { ...DEFAULT_SETTINGS.playback }
+  playback: normalizePlaybackSettings(DEFAULT_SETTINGS.playback)
 }
 
 const BACKENDS: Backend[] = ['metal', 'cpu']
-const SKIP_SCOPES: SkipScope[] = ['marks', 'all']
 
 function settingsFile(): string {
   return join(userDataDir(), 'settings.json')
@@ -57,23 +55,6 @@ function normalizeExport(value: unknown): ExportSettings {
   }
 }
 
-function normalizePlayback(value: unknown): PlaybackSettings {
-  const raw = (value ?? {}) as Partial<PlaybackSettings>
-  return {
-    skipEnabled: raw.skipEnabled === true,
-    skipScope: SKIP_SCOPES.includes(raw.skipScope as SkipScope)
-      ? (raw.skipScope as SkipScope)
-      : DEFAULT_PLAYBACK_SETTINGS.skipScope,
-    skipBeforeSec: clampNumber(raw.skipBeforeSec, 0, 5, DEFAULT_PLAYBACK_SETTINGS.skipBeforeSec),
-    skipAfterSec: clampNumber(raw.skipAfterSec, 0, 5, DEFAULT_PLAYBACK_SETTINGS.skipAfterSec)
-  }
-}
-
-function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
-  return Math.min(max, Math.max(min, value))
-}
-
 export async function loadSettings(): Promise<Settings> {
   try {
     const parsed = JSON.parse(await readFile(settingsFile(), 'utf8')) as Partial<Settings>
@@ -81,17 +62,18 @@ export async function loadSettings(): Promise<Settings> {
       language: typeof parsed.language === 'string' ? parsed.language : DEFAULTS.language,
       modelId: validModelId(parsed.modelId) ? parsed.modelId : DEFAULTS.modelId,
       backend: validBackend(parsed.backend) ? parsed.backend : DEFAULTS.backend,
-      rules: { ...DEFAULT_RULES, ...(parsed.rules ?? {}) },
+      rules: normalizeRules(parsed.rules),
       chunkTargetSec: normalizeChunkTarget(parsed.chunkTargetSec),
       export: normalizeExport(parsed.export),
-      playback: normalizePlayback(parsed.playback)
+      playback: normalizePlaybackSettings(parsed.playback),
+      hideReviewed: parsed.hideReviewed === true
     }
   } catch {
     return {
       ...DEFAULTS,
-      rules: { ...DEFAULT_RULES },
+      rules: normalizeRules(DEFAULT_SETTINGS.rules),
       export: { ...DEFAULT_EXPORT_SETTINGS, fields: [...DEFAULT_EXPORT_SETTINGS.fields] },
-      playback: { ...DEFAULT_PLAYBACK_SETTINGS }
+      playback: normalizePlaybackSettings(DEFAULT_PLAYBACK_SETTINGS)
     }
   }
 }

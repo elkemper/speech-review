@@ -16,6 +16,7 @@ import Player from './Player'
 import Timeline from './Timeline'
 import Transcript from './Transcript'
 import DefectPanel from './DefectPanel'
+import Bookmarks from './Bookmarks'
 
 const STEPS: Array<{ phase: TranscribeProgress['phase']; label: string }> = [
   { phase: 'prepare', label: 'Подготовка' },
@@ -44,6 +45,15 @@ function formatEta(seconds: number | undefined): string {
   return `~${minutes} мин${rest > 0 ? ` ${rest} c` : ''}`
 }
 
+function readStoredNumber(key: string, fallback: number, min: number, max: number): number {
+  const stored = Number(window.localStorage.getItem(key))
+  if (!Number.isFinite(stored) || stored <= 0) return fallback
+  return Math.min(max, Math.max(min, stored))
+}
+
+const VIDEO_MIN = 140
+const TIMELINE_MIN = 80
+
 export default function Workspace() {
   const project = useApp((state) => state.project)
   const status = useApp((state) => state.status)
@@ -66,7 +76,19 @@ export default function Workspace() {
   const [panelVisible, setPanelVisible] = useState(
     () => window.localStorage.getItem('sr.panelVisible') !== '0'
   )
+  const [videoHeight, setVideoHeight] = useState(() =>
+    readStoredNumber('sr.videoHeight', 300, VIDEO_MIN, 900)
+  )
+  const [timelineHeight, setTimelineHeight] = useState(() =>
+    readStoredNumber('sr.timelineHeight', 120, TIMELINE_MIN, 420)
+  )
+  const [showBookmarks, setShowBookmarks] = useState(false)
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
+  const rowResizeRef = useRef<{
+    kind: 'video' | 'timeline'
+    startY: number
+    startHeight: number
+  } | null>(null)
 
   useEffect(() => {
     window.localStorage.setItem('sr.panelWidth', String(Math.round(panelWidth)))
@@ -75,6 +97,14 @@ export default function Workspace() {
   useEffect(() => {
     window.localStorage.setItem('sr.panelVisible', panelVisible ? '1' : '0')
   }, [panelVisible])
+
+  useEffect(() => {
+    window.localStorage.setItem('sr.videoHeight', String(Math.round(videoHeight)))
+  }, [videoHeight])
+
+  useEffect(() => {
+    window.localStorage.setItem('sr.timelineHeight', String(Math.round(timelineHeight)))
+  }, [timelineHeight])
 
   const startResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
     event.preventDefault()
@@ -92,6 +122,42 @@ export default function Workspace() {
 
   const endResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
     resizeRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  const startRowResize = (
+    kind: 'video' | 'timeline',
+    event: ReactPointerEvent<HTMLDivElement>
+  ): void => {
+    event.preventDefault()
+    rowResizeRef.current = {
+      kind,
+      startY: event.clientY,
+      startHeight: kind === 'video' ? videoHeight : timelineHeight
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const moveRowResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const start = rowResizeRef.current
+    if (!start) return
+    const delta = event.clientY - start.startY
+    const max = Math.max(VIDEO_MIN + 40, Math.round(window.innerHeight * 0.75))
+    if (start.kind === 'video') {
+      const room = Math.max(VIDEO_MIN, window.innerHeight - timelineHeight - 260)
+      setVideoHeight(Math.min(max, room, Math.max(VIDEO_MIN, start.startHeight + delta)))
+    } else {
+      const room = Math.max(TIMELINE_MIN, window.innerHeight - videoHeight - 220)
+      setTimelineHeight(
+        Math.min(420, room, Math.max(TIMELINE_MIN, start.startHeight + delta))
+      )
+    }
+  }
+
+  const endRowResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    rowResizeRef.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
@@ -180,6 +246,13 @@ export default function Workspace() {
           >
             История
           </button>
+          <button
+            className={`btn ghost small ${showBookmarks ? 'active' : ''}`}
+            onClick={() => setShowBookmarks((value) => !value)}
+            title="Закладки — вернуться к месту, где остановились (B)"
+          >
+            🔖 {(project.bookmarks ?? []).length}
+          </button>
           {!panelVisible ? (
             <button className="btn ghost small" onClick={() => setPanelVisible(true)}>
               Дефекты
@@ -194,6 +267,8 @@ export default function Workspace() {
         </div>
       </header>
 
+      {showBookmarks ? <Bookmarks onClose={() => setShowBookmarks(false)} /> : null}
+
       <div
         className="workspace-body"
         style={{
@@ -203,8 +278,24 @@ export default function Workspace() {
         }}
       >
         <main className="workspace-main">
-          <Player defects={defects} />
-          <Timeline defects={defects} />
+          <Player defects={defects} videoHeight={videoHeight} />
+          <div
+            className="row-splitter"
+            onPointerDown={(event) => startRowResize('video', event)}
+            onPointerMove={moveRowResize}
+            onPointerUp={endRowResize}
+            onPointerCancel={endRowResize}
+            title="Потяните, чтобы изменить высоту окна просмотра"
+          />
+          <Timeline defects={defects} height={timelineHeight} />
+          <div
+            className="row-splitter"
+            onPointerDown={(event) => startRowResize('timeline', event)}
+            onPointerMove={moveRowResize}
+            onPointerUp={endRowResize}
+            onPointerCancel={endRowResize}
+            title="Потяните, чтобы изменить высоту таймлайна"
+          />
 
           {progress && project.transcript ? (
             <div className="progress-banner">
@@ -269,7 +360,9 @@ export default function Workspace() {
         <span><kbd>←</kbd><kbd>→</kbd> ±2 c</span>
         <span><kbd>[</kbd><kbd>]</kbd> дефект</span>
         <span><kbd>R</kbd> проверено</span>
+        <span><kbd>⇧R</kbd> выделение</span>
         <span><kbd>M</kbd> метка</span>
+        <span><kbd>B</kbd> закладка</span>
         <span><kbd>L</kbd> цикл</span>
         <span><kbd>1</kbd>–<kbd>6</kbd> скорость</span>
         <span className="hotkeys-spacer" />

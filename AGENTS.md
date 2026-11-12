@@ -8,7 +8,7 @@ Instructions for coding agents working in this repository. Read this file before
 
 The current MVP targets **macOS 13+ on Apple Silicon** and Russian speech. The UI is in Russian and the theme is dark-only.
 
-User-facing documentation is available in English (`README.md`) and Russian (`README.RU.md`); deferred work is in `docs/BACKLOG.md`.
+User-facing documentation is available in English (`README.md`) and Russian (`README.RU.md`); requested features and bugs are consolidated in `docs/SPEC.md`; deferred work is in `docs/BACKLOG.md`.
 
 ## Read first
 
@@ -16,11 +16,15 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 |---|---|
 | `README.md` | English user overview, features, setup, troubleshooting |
 | `README.RU.md` | Russian user overview (same content) |
+| `docs/SPEC.md` | Spec index: ordered story files, status triage, acceptance criteria |
+| `docs/spec/` | One feature per file: stories + acceptance criteria |
 | `docs/ARCHITECTURE.md` | Processes, modules, transcription pipeline, IPC and UI flow |
 | `docs/DATA_MODEL.md` | Project/transcript/defect/mark persistence and ID rules |
 | `docs/DEVELOPMENT.md` | Setup, scripts, resources, packaging, debugging |
 | `docs/TESTING.md` | Test layout, coverage, fixtures, platform limits |
 | `docs/BACKLOG.md` | Explicitly deferred features |
+
+**Before changing a feature, find its story in `docs/SPEC.md` and read only that file from `docs/spec/`. Do not regress a `Done` story, and do not pull a `Backlog` story into scope without updating the spec. If a story grows, split a logically autonomous part into a `docs/spec/NNa-...` file and link it from the parent story; the sub-file links back and keeps the parent's story number.**
 
 ## Non-negotiable constraints
 
@@ -87,7 +91,7 @@ test/                     Vitest suites and fixtures
 | Command | What it does | Works in this Linux container? |
 |---|---|---|
 | `npm run typecheck` | `tsc --noEmit` for node and web configs | Yes |
-| `npm test` | Vitest run (62 tests / 7 files) | Yes |
+| `npm test` | Vitest run (82 tests / 8 files) | Yes |
 | `npm run test:watch` | Vitest watch mode | Yes |
 | `npm run build` | electron-vite production build into `out/` | Yes |
 | `npm run dev` | electron-vite dev + Electron | **No** (needs macOS + macOS Electron) |
@@ -132,12 +136,15 @@ If you changed UI behavior or runtime code, also state clearly that Electron, `a
 - **Boundary edits:** automatic defects use `Project.defectOverrides[defectId]`; manual marks update `mark.start`/`mark.end` and recompute `wordIds` with strict overlap.
 - **Manual grouping is explicit.** `mergeMarkNeighbours` runs only when a mark is added or a boundary moves. Do not regroup all marks on every render; that would undo an intentional split.
 - **First partial transcript resets review state** (`reviewedDefectIds`, notes, overrides) because automatic IDs may change. Later partials preserve the user's local edits to the already visible prefix. Manual marks survive.
-- **Skip intervals** use defects only, filter out `reviewed`, clamp to duration, and merge overlapping padded ranges. `skipScope: 'marks'` filters `source === 'manual'`.
+- **Skip intervals** use defects only, filter out `reviewed`, clamp to duration, and merge overlapping padded ranges. Padding is resolved per defect type, and a logical group (manual or automatic) uses `playback.groupPadding` instead of per-member padding. `skipScope: 'marks'` filters `source === 'manual'`.
+- **Automatic grouping** is opt-in through `rules.autoGroupGapSec` (0 disables it). Neighbouring automatic defects merge only when the gap is within the limit and no real spoken word sits inside the gap. The result carries `groupIds` / `groupTypes` and the id `auto-group-${firstId}`.
+- **Minimum duration** is a per-type rule (`rules.minDurationByType`). For pauses it measures the silence, for repetitions the shorter repeated word.
+- **Bookmarks** (`Project.bookmarks`) are navigation markers, not defects. They persist with the project but stay out of undo/redo, skip intervals and exports.
 
 ## Testing rules
 
 - Tests live in `test/**/*.test.ts`; Vitest includes only that pattern and excludes `node_modules_linux`.
-- Add regression tests for every pure rule change: defect detection, chunk planning, marks/groups, review reconciliation, overrides, selection, timeline math, skip intervals, CSV.
+- Add regression tests for every pure rule change: defect detection, automatic grouping, per-type minimum duration, chunk planning, marks/groups, review reconciliation, overrides, selection, timeline math, skip intervals and padding, settings normalization, CSV.
 - Tests may import renderer helpers by relative path (for example `../src/renderer/src/skip`); the only configured alias is `@shared`.
 - Do not add e2e or Electron launch tests. If behavior depends on Electron, extract the pure part and test that.
 - Keep the sample fixture expectations intact unless the fixture itself is intentionally replaced: the current `test/fixtures/chunk.json` produces 6 fillers, 3 pauses and 1 false start (10 defects).

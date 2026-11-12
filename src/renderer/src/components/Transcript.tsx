@@ -5,7 +5,7 @@ import { endsSentence, findActiveWord, findSegmentIndexForWord } from '@shared/t
 import type { Defect, Segment } from '@shared/types'
 import { DEFECT_COLORS, DEFECT_LABELS, SEVERITY_LABELS } from '../defectsUi'
 import { seekTo } from '../player'
-import { rangeForSelection } from '../selection'
+import { rangeForSelection, defectIdsForSelection } from '../selection'
 import { buildSkipIntervals } from '../skip'
 import { useApp } from '../store'
 
@@ -25,6 +25,7 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
   const selectRange = useApp((state) => state.selectRange)
   const clearSelection = useApp((state) => state.clearSelection)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
+  const setReviewedMany = useApp((state) => state.setReviewedMany)
   const notify = useApp((state) => state.notify)
   const playback = useApp((state) => state.settings.playback)
 
@@ -42,6 +43,10 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
   const selectedIds = useMemo(
     () => new Set(selectedRange?.wordIds ?? []),
     [selectedRange]
+  )
+  const selectedDefectIds = useMemo(
+    () => defectIdsForSelection(defects, words, selection),
+    [defects, words, selection]
   )
 
   const skipIntervals = useMemo(
@@ -280,6 +285,24 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
           {selection && selection.anchorId !== selection.focusId ? (
             <span className="selection-badge">
               выделено {selectedRange?.wordIds.length ?? 0} · <kbd>M</kbd> метка ·{' '}
+              {selectedDefectIds.length > 0 ? (
+                <>
+                  <button
+                    className="link-btn"
+                    onClick={() =>
+                      setReviewedMany(
+                        selectedDefectIds,
+                        true,
+                        `Проверено выделение: ${selectedDefectIds.length}`
+                      )
+                    }
+                    title="Отметить все дефекты в выделении проверенными"
+                  >
+                    <kbd>Shift+R</kbd> проверено ({selectedDefectIds.length})
+                  </button>{' '}
+                  ·{' '}
+                </>
+              ) : null}
               <button className="link-btn" onClick={clearSelection}>
                 снять
               </button>

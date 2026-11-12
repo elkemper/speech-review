@@ -2,6 +2,8 @@
 
 A list of work deliberately left out of the MVP. The order roughly reflects usefulness for the "review a webinar" scenario.
 
+Current feature requests, their triage (fix now / next / backlog) and acceptance criteria live in [`docs/SPEC.md`](SPEC.md). This file is the long-term list of deferred work.
+
 ## 1. Word-level confidence and the "unclear" type
 
 **Status:** waiting for audio.cpp support.
@@ -138,7 +140,7 @@ The app does not update itself. For a single user this is not critical, but mult
 
 ## 18. Tests
 
-Currently 62 tests in 7 files: parser, defects, chunking (including the short first chunk), WAV, peaks, word selection, manual and logical marks, review reconciliation, defect boundaries and overrides, timeline zoom/pan/LOD, skip intervals, action history, CSV export. Not covered:
+Currently 82 tests in 8 files: parser, defects, per-type minimum duration, automatic grouping, settings normalization, chunking (including the short first chunk), WAV, peaks, word selection and bulk review, manual and logical marks, review reconciliation, defect boundaries and overrides, timeline zoom/pan/LOD, per-type skip padding, action history, CSV export. Not covered:
 
 - parsing `silencedetect` and ffmpeg progress;
 - model resume and SHA-256 verification;
@@ -155,10 +157,6 @@ Currently a partial result appears only after a whole chunk (the first one up to
 
 Pauses are shown as separate chips and separator rows, but they cannot be turned into a transcript word or have their boundaries edited directly in the text. Ad-hoc pause tokens with editable start/end are needed so the editing list matches the user's edits exactly.
 
-## 21. Per-item padding for skipped places
-
-In skip mode, "before/after" padding is shared by all defects and marks. Different types need their own values (for example, pause — 0.3/0.3, filler — 0.05/0.15) and the ability to override padding for a specific mark.
-
-## 22. Light theme and appearance switcher
+## 21. Light theme and appearance switcher
 
 The theme is currently dark only, in the spirit of Photoshop. Needed: a light palette, a switcher in settings, and persistence of the choice. Defect color contrast on a light background should be checked separately.

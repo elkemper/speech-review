@@ -1,8 +1,24 @@
-import type { Defect, PlaybackSettings } from '@shared/types'
+import type { Defect, PlaybackSettings, SkipPadding } from '@shared/types'
 
 export interface SkipInterval {
   start: number
   end: number
+}
+
+export function isGroupedDefect(defect: Defect): boolean {
+  return (defect.groupIds?.length ?? 0) > 1 || (defect.markIds?.length ?? 0) > 1
+}
+
+/**
+ * Padding depends on the defect type: a pause usually needs none, while a
+ * filler benefits from a short pre-roll. A logical group gets its own padding
+ * so the outer edges of the group are padded once, not per member.
+ */
+export function paddingFor(defect: Defect, settings: PlaybackSettings): SkipPadding {
+  if (isGroupedDefect(defect) && settings.groupPadding) return settings.groupPadding
+  const typed = settings.paddingByType?.[defect.type]
+  if (typed) return typed
+  return { before: settings.skipBeforeSec, after: settings.skipAfterSec }
 }
 
 /**
@@ -26,10 +42,13 @@ export function buildSkipIntervals(
 
   const padded = source
     .filter((defect) => !defect.reviewed)
-    .map((defect) => ({
-      start: Math.max(0, defect.start - settings.skipBeforeSec),
-      end: Math.min(duration, defect.end + settings.skipAfterSec)
-    }))
+    .map((defect) => {
+      const padding = paddingFor(defect, settings)
+      return {
+        start: Math.max(0, defect.start - padding.before),
+        end: Math.min(duration, defect.end + padding.after)
+      }
+    })
     .filter((item) => item.end > item.start)
     .sort((a, b) => a.start - b.start)
 

@@ -653,6 +653,7 @@ body[data-platform^="darwin"] .titlebar {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .workspace-titlebar {
@@ -1850,7 +1851,7 @@ kbd {
     grid-template-columns: minmax(0, 1fr) 340px;
   }
 
-  .hotkeys-bar span:nth-child(6) {
+  .hotkeys-bar span:nth-child(8) {
     display: none;
   }
 }
@@ -2496,4 +2497,236 @@ kbd {
   font-family: var(--mono);
   font-size: 10.5px;
   color: var(--faint);
+}
+
+/* ---------- resizable workspace rows ---------- */
+
+.row-splitter {
+  flex: 0 0 6px;
+  height: 6px;
+  margin: -5px 0;
+  border-radius: 4px;
+  cursor: row-resize;
+  background: transparent;
+  position: relative;
+  z-index: 3;
+}
+
+.row-splitter::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 46px;
+  height: 2px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.12s;
+}
+
+.row-splitter:hover::after,
+.row-splitter:active::after {
+  background: rgba(59, 156, 255, 0.75);
+}
+
+/* ---------- bookmarks ---------- */
+
+.bookmarks-popover {
+  position: absolute;
+  top: 46px;
+  right: 16px;
+  z-index: 30;
+  width: min(430px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.bookmarks-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bookmarks-head h3 {
+  margin: 0 0 3px;
+  font-size: 14px;
+}
+
+.bookmarks-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.bookmarks-list {
+  flex: 1;
+  min-height: 80px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bookmarks-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.bookmark-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bookmark-time {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: 6px;
+  background: rgba(52, 211, 153, 0.1);
+  color: #6ee7b7;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.bookmark-time:hover {
+  background: rgba(52, 211, 153, 0.2);
+}
+
+.bookmark-note {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.bookmark-note:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ---------- settings sliders and padding ---------- */
+
+.range-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.range-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.range-field.disabled {
+  opacity: 0.55;
+}
+
+.range-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.range-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.range-number {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.range-number input {
+  width: 70px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.range-number input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.range-slider {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.padding-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.padding-field {
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.padding-title {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.settings-advanced {
+  margin-top: 6px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.settings-advanced > summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-advanced[open] > summary {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+  .range-grid {
+    grid-template-columns: 1fr;
+  }
 }

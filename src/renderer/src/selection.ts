@@ -1,4 +1,4 @@
-import type { Word } from '@shared/types'
+import type { Defect, Word } from '@shared/types'
 import { clamp } from '@shared/format'
 
 export interface WordSelection {
@@ -100,4 +100,22 @@ export function nearestWord(words: Word[], time: number): Word | null {
     }
   }
   return best
+}
+
+/**
+ * Defects touched by the current word selection. Used to review several words
+ * (and therefore several defects) in one action, both in the transcript and on
+ * the timeline.
+ */
+export function defectIdsForSelection(
+  defects: Defect[],
+  words: Word[],
+  selection: WordSelection | null
+): string[] {
+  const range = rangeForSelection(words, selection)
+  if (!range) return []
+  const selected = new Set(range.wordIds)
+  return defects
+    .filter((defect) => defect.wordIds.some((wordId) => selected.has(wordId)))
+    .map((defect) => defect.id)
 }

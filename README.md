@@ -17,10 +17,15 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Adjacent manual marks merge into one logical mark: it can be reviewed once, split back or deleted as a whole.
 - Boundaries of the selected defect or mark can be dragged directly on the timeline; touching neighbouring marks merge.
 - Undo/redo (`⌘Z` / `⇧⌘Z`) with an action history dialog.
-- The defect panel can be resized by dragging its edge and hidden completely.
+- The defect panel can be resized by dragging its edge and hidden completely; the video and timeline heights are adjustable the same way.
 - Word selection with click, `Shift`+click or drag; a mark uses the exact selection boundaries.
+- Selected words can be reviewed in one action with `Shift+R` when they contain defects.
+- Bookmarks: `B` remembers a place, the list returns to it and can resume from the last one.
+- Thresholds are edited with a slider and a number field; every defect type has a minimum duration, and neighbouring defects can be grouped automatically.
+- Skip padding is configured per defect type and per group.
 - Loop over a fragment, speed 0.5–2×, hotkeys.
 - Skip mode: during playback, automatically jump over unreviewed defects or manual marks, with configurable padding. Reviewed items are never skipped.
+- Reviewed defects can be hidden from the list completely.
 - Export defects to CSV (Excel) and JSON; CSV fields and delimiter are configurable.
 - Photoshop-like dark theme, automatic project save after every action.
 
@@ -86,7 +91,9 @@ Or right-click the app → **Open** → **Open**.
 | `Shift` + `←` / `→` | −10 / +10 seconds |
 | `[` / `]` or `k` / `j` | previous / next defect |
 | `R` | mark the active defect as reviewed |
+| `Shift+R` | mark every defect in the selection as reviewed |
 | `M` | add a manual mark: over selected words or at the current position |
+| `B` | add a bookmark at the current position |
 | `L` | toggle loop over the active defect |
 | `F` | follow the currently playing word |
 | `1`–`6` | speed 0.5, 0.75, 1, 1.25, 1.5, 2× |
@@ -101,7 +108,9 @@ Clicking the waveform seeks; clicking the triangle selects a defect. Clicking a 
 
 Word selection: a normal click selects one word, `Shift`+click extends the range, dragging selects several words. The `M` mark uses the exact selection boundaries. On the timeline, `Ctrl`/`Cmd`+wheel changes zoom, normal scrolling pans; the `+`, `−` and `⤢` buttons duplicate this with the mouse.
 
-Selecting a defect in the list or transcript shows two vertical boundaries on the timeline; they can be dragged with the mouse. Dragging a manual mark boundary onto a neighbouring mark merges them into a logical mark; the "split" button in the panel restores separate marks. The defect panel width is changed by dragging its left edge; it is hidden with the `⟩` button and restored with the "Defects" button in the header.
+Selecting a defect in the list or transcript shows two vertical boundaries on the timeline; they can be dragged with the mouse. Dragging a manual mark boundary onto a neighbouring mark merges them into a logical mark; the "split" button in the panel restores separate marks. The defect panel width is changed by dragging its left edge; it is hidden with the `⟩` button and restored with the "Defects" button in the header. Dragging the horizontal splitters changes the height of the video area and the timeline; the transcript takes the remaining space.
+
+On the **Defects** settings tab, thresholds have both a slider and a number field. The "Minimum duration by type" section sets the shortest defect that is reported, and "Auto-group: max gap" merges neighbouring defects when no other word sits between them (`0` disables grouping). Skip padding is configured per type and for a whole group, independently of whether skip mode is on.
 
 ## Default defect rules
 
@@ -138,7 +147,7 @@ Electron main
 - `words.json` from audio.cpp contains `start_sample`/`end_sample` at 16 kHz. The parser tolerates trailing commas.
 - Defects are computed in the renderer from the transcript and rules. "Reviewed" flags and notes are stored by stable defect IDs in `project.json`.
 - The partial transcript is written with `transcriptComplete: false`; on the first partial result, old review flags are reset because defect IDs may have changed. Manual marks are preserved.
-- Skip mode does not re-encode video: during playback the position jumps over calculated intervals. "Before/after" padding is configured in settings.
+- Skip mode does not re-encode video: during playback the position jumps over calculated intervals. "Before/after" padding is configured per defect type and per group.
 
 ## Where data lives
 
@@ -196,6 +205,7 @@ See the ad-hoc signing section above.
 
 ## Developer documentation
 
+- [`docs/SPEC.md`](docs/SPEC.md) — spec index; ordered story files in [`docs/spec/`](docs/spec/) with acceptance criteria.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — processes, modules, transcription pipeline, IPC and UI.
 - [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — setup, scripts, resources, DMG build and debugging.
 - [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — project, transcript, defects, manual marks, IDs and history.
