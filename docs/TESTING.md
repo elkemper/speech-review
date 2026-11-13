@@ -11,7 +11,7 @@ npm run typecheck     # checks main/preload/shared and renderer types separately
 npm run build         # checks that the production build succeeds
 ```
 
-Current state: **133 tests in 10 files**. A run takes less than a second in the Linux container.
+Current state: **139 tests in 11 files**. A run takes less than a second in the Linux container.
 
 ## 2. Configuration
 
@@ -37,6 +37,7 @@ Current state: **133 tests in 10 files**. A run takes less than a second in the 
 | File | Tests | What it checks |
 |---|---:|---|
 | `test/core.test.ts` | 19 | `words.json` parser, trailing comma, real fixture, `buildTranscript`, confidence, event classification, active word/segment, automatic defects, sentence-boundary pauses, manual marks, exact word boundaries, old marks without `wordIds`, overrides, logical marks |
+| `test/defectCardView.test.ts` | 6 | pending/confirmed/deleted card layout, collapsing in skip mode, automatic group marker, manual badges and split visibility |
 | `test/engine.test.ts` | 8 | chunk planner (short recording, silence, max size, short first chunk, target), WAV reading, slicing, waveform |
 | `test/export.test.ts` | 4 | CSV field order, escaping, delimiter/header, all fields |
 | `test/format.test.ts` | 11 | number parsing (dot/comma/empty/partial), step snapping, float noise, display formatting, slider fill |

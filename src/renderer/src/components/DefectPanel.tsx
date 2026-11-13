@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { formatShortSeconds, formatTimecode } from '@shared/format'
 import type { Defect, DefectType } from '@shared/types'
 import { DEFECT_COLORS, DEFECT_LABELS, TYPE_ORDER } from '../defectsUi'
+import { defectCardView } from '../defectCardView'
 import { playFrom, seekTo, toggleLoopForDefect } from '../player'
 import { defectIdsForSelection } from '../selection'
 import { useApp, type DefectFilter } from '../store'
@@ -252,11 +253,6 @@ export default function DefectPanel({
             следующий неподтверждённый →
           </button>
         )}
-        {ff ? (
-          <span className="ff-hint">
-            Режим пропуска: кнопки доступны, хоткеи подтверждения и удаления — на паузе
-          </span>
-        ) : null}
       </div>
 
       <div className="defect-list">
@@ -271,12 +267,10 @@ export default function DefectPanel({
         ) : (
           filtered.map((defect) => {
             const active = defect.id === activeDefectId
-            const dismissed = defect.dismissed
-            const confirmed = defect.confirmed && !dismissed
-            const compact = dismissed || (confirmed && !ff)
-            const showRail = !dismissed && !confirmed
-            const fullBody = !dismissed && (!confirmed || ff)
-            const showUndo = dismissed || confirmed
+            const view = defectCardView(defect, ff)
+            const dismissed = view.mode === 'dismissed'
+            const confirmed = view.mode === 'confirmed'
+            const { compact, fullBody, showRail, showUndo } = view
             const isLooping =
               active && loop !== null && Math.abs(loop.start - Math.max(0, defect.start - 0.25)) < 0.05
             return (
@@ -289,7 +283,6 @@ export default function DefectPanel({
                 className={`defect-item ${active ? 'active' : ''} ${
                   compact ? 'compact' : ''
                 } ${showRail ? '' : 'no-rail'} ${dismissed ? 'dismissed' : ''}`}
-                title={compact ? defect.text : undefined}
                 onClick={() => selectDefect(defect)}
               >
                 {showRail ? (
@@ -338,22 +331,22 @@ export default function DefectPanel({
                     <span className="defect-duration">
                       {formatShortSeconds(defect.end - defect.start)}
                     </span>
-                    {!ff && !confirmed && !dismissed && defect.source === 'manual' ? (
+                    {view.showManualBadge ? (
                       <span className="badge">ручная</span>
                     ) : null}
-                    {!ff && !confirmed && !dismissed && defect.groupIds && defect.groupIds.length > 1 ? (
+                    {view.showGroupBadge ? (
                       <span
                         className="badge logical"
                         title={`Автоматически объединены: ${(defect.groupTypes ?? [])
                           .map((type) => DEFECT_LABELS[type])
                           .join(' + ')}`}
                       >
-                        группа · {defect.groupIds.length}
+                        группа · {defect.groupIds?.length ?? 0}
                       </span>
                     ) : null}
-                    {!ff && !confirmed && !dismissed && defect.markIds && defect.markIds.length > 1 ? (
+                    {view.showLogicalBadge ? (
                       <span className="badge logical" title="Несколько соседних меток объединены">
-                        логическая · {defect.markIds.length}
+                        логическая · {defect.markIds?.length ?? 0}
                       </span>
                     ) : null}
                     {showUndo ? (
@@ -429,11 +422,7 @@ export default function DefectPanel({
                           >
                             {isLooping ? 'выключить цикл' : 'цикл'}
                           </button>
-                          {!ff &&
-                          !confirmed &&
-                          defect.source === 'manual' &&
-                          defect.markIds &&
-                          defect.markIds.length > 1 ? (
+                          {view.showSplit ? (
                             <button
                               className="link-btn"
                               onClick={(event) => {

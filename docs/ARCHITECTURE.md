@@ -225,6 +225,7 @@ Canvas waveform with zoom and pan:
 - Filters by type and counters; `settings.showDismissed` decides whether deleted cards stay visible as thin rows.
 - A selected range with defects shows confirm and delete actions.
 - A pending card has a left rail with delete and confirm buttons. A confirmed card collapses to a compact row with a right-side undo button. A deleted card is a thin row with a restore button when `showDismissed` is on. Further actions: note, "listen", loop, delete and "split" for manual marks.
+- `defectCardView` derives the card layout. Skip mode does not expand compact cards: confirming or deleting in skip mode collapses the card exactly like outside it. The automatic group marker stays visible, while a compact card never exposes its hidden text.
 - The active item shows a mini timeline under its text: waveform context, the defect span, draggable boundaries and the shared playhead.
 - Jump to the next unconfirmed defect.
 - CSV/JSON export.

@@ -117,8 +117,12 @@ actions, so I can decide the fate of a defect without treating the checkmark as
 - The mini-timeline loses its "границы дефекта" label and the zoom percentage;
   zoom stays on −/+ and resets on double-click.
 - In skip mode, cards keep their actions. Pending cards retain the left rail;
-  confirmed and deleted cards retain the right-side undo button. While playback
-  is running, confirm/delete/mark hotkeys are blocked; on pause they work again.
+  confirmed and deleted cards retain the right-side undo button.
+- Confirming or deleting a card in skip mode collapses it exactly like outside
+  skip mode. A compact card never shows its hidden text, including on hover.
+- The automatic group marker («группа · N») stays visible in skip mode.
+- The panel has no skip-mode annotation. While playback is running,
+  confirm/delete/mark hotkeys are blocked; on pause they work again.
 - The panel's "только непроверенные" checkbox is removed. Settings has
   `showDismissed` for deleted cards only.
 
@@ -184,11 +188,15 @@ actions, so I can decide the fate of a defect without treating the checkmark as
 - [ ] A deleted automatic defect is stored in `dismissedDefectIds` and is undoable.
 - [ ] A deleted manual mark is stored in `dismissedMarks` and is undoable.
 - [ ] The header shows time · type — duration with up to two decimals.
-- [ ] Skip mode keeps card actions and does not collapse cards.
+- [ ] Skip mode keeps card actions.
+- [ ] Confirming/deleting in skip mode collapses the card like outside it.
+- [ ] A compact card does not reveal its hidden text on hover.
+- [ ] The automatic group marker stays visible in skip mode.
+- [ ] No skip-mode hint annotation is shown.
 - [ ] Confirm/delete/mark hotkeys work in skip mode only while paused.
 - [ ] The panel no longer has "только непроверенные"; `showDismissed` remains in Settings.
 
 ## Verification
 
-- `test/marks.test.ts`, `test/core.test.ts`, `test/selection.test.ts`.
+- `test/defectCardView.test.ts`, `test/marks.test.ts`, `test/core.test.ts`, `test/selection.test.ts`.
 - Add the exact-mark regression from story 8 before changing selection code.

@@ -1175,13 +1175,6 @@ body[data-platform^="darwin"] .titlebar {
   flex-wrap: wrap;
 }
 
-.ff-hint {
-  font-size: 10.5px;
-  color: var(--faint);
-  line-height: 1.4;
-  flex-basis: 100%;
-}
-
 .defect-list {
   flex: 1;
   min-height: 0;
