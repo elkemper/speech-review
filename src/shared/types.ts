@@ -227,6 +227,8 @@ export interface Settings {
   playback: PlaybackSettings
   /** Context shown on each side of the selected defect in the mini timeline. */
   miniTimelinePadSec: number
+  /** Display-only waveform contrast (0 = linear, 100 = strongest). */
+  waveformContrast: number
   /** Hide reviewed defects from the defect list completely. */
   hideReviewed: boolean
 }

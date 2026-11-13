@@ -42,7 +42,9 @@ hunting for it on the main timeline.
   boundaries are lighter than the active ones but still faint. They are never
   interactive and cannot be dragged from this snippet.
 - Marked words get a colored underlay using their defect/mark type
-  ([story 41](04b-word-underlays.md)). The active mark is stronger; other marked
+  ([story 41](04b-word-underlays.md)).
+- The waveform uses the same display-only contrast curve as the main timeline
+  ([story 42](04c-waveform-contrast.md)). The active mark is stronger; other marked
   words are faint. Pauses do not color words.
 
 ## Acceptance criteria
@@ -73,6 +75,7 @@ hunting for it on the main timeline.
       still faint and non-interactive.
 - [ ] Marked words have a colored underlay; active words are stronger, other
       marked words are faint, reviewed words are dimmer.
+- [ ] The waveform contrast matches the main timeline for the same window.
 - [ ] `Ctrl`/`Cmd`+wheel or pinch zooms around the pointer; plain wheel keeps
       scrolling the list unless it is a horizontal gesture.
 - [ ] Selecting another defect resets the snippet zoom to 100%.

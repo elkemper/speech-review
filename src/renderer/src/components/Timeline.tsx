@@ -6,14 +6,17 @@ import { seekTo } from '../player'
 import { nearestWord, rangeForSelection } from '../selection'
 import { buildSkipIntervals } from '../skip'
 import { useApp } from '../store'
+import { buildWaveLut, computeWaveStats, waveAmp } from '../waveform'
 import {
   chooseTickStep,
   clampDefectEdge,
   firstVisibleWord,
   fitView,
+  labelHasRoom,
   panView,
   pixelsPerSecond,
   wordDetail,
+  wordLabelRow,
   zoomView,
   type DefectEdge,
   type TimeView
@@ -36,6 +39,7 @@ export default function Timeline({
   const activeDefectId = useApp((state) => state.activeDefectId)
   const selection = useApp((state) => state.selection)
   const playback = useApp((state) => state.settings.playback)
+  const waveContrast = useApp((state) => state.settings.waveformContrast)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
   const setDefectBounds = useApp((state) => state.setDefectBounds)
   const selectRange = useApp((state) => state.selectRange)
@@ -63,6 +67,11 @@ export default function Timeline({
   const activeWordIds = useMemo(
     () => new Set(activeDefect?.wordIds ?? []),
     [activeDefect]
+  )
+  const waveStats = useMemo(() => computeWaveStats(peaks), [peaks])
+  const waveLut = useMemo(
+    () => buildWaveLut(waveStats, waveContrast),
+    [waveStats, waveContrast]
   )
   const selectedRange = useMemo(() => rangeForSelection(words, selection), [words, selection])
   const skipIntervals = useMemo(
@@ -172,6 +181,15 @@ export default function Timeline({
       const amp = Math.max(6, Math.min(40, HEIGHT * 0.24))
       const count = peaks.max.length
       const peakPps = peaks.peaksPerSecond > 0 ? peaks.peaksPerSecond : count / Math.max(0.1, peaks.duration)
+      // Thin baseline under the envelope: gated silence and gaps between words
+      // stay connected instead of looking like empty holes.
+      ctx.strokeStyle = 'rgba(120, 176, 240, 0.3)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(0, Math.round(mid) + 0.5)
+      ctx.lineTo(width, Math.round(mid) + 0.5)
+      ctx.stroke()
+
       ctx.strokeStyle = 'rgba(120, 176, 240, 0.72)'
       ctx.lineWidth = 1
       ctx.beginPath()
@@ -186,8 +204,8 @@ export default function Timeline({
           if (peaks.min[i] < low) low = peaks.min[i]
           if (peaks.max[i] > high) high = peaks.max[i]
         }
-        ctx.moveTo(x + 0.5, mid - high * amp)
-        ctx.lineTo(x + 0.5, mid - low * amp)
+        ctx.moveTo(x + 0.5, mid - waveAmp(waveLut, high) * amp)
+        ctx.lineTo(x + 0.5, mid - waveAmp(waveLut, low) * amp)
       }
       ctx.stroke()
     }
@@ -196,7 +214,6 @@ export default function Timeline({
     // word by pixel width, so zooming reveals detail gradually.
     if (words.length > 0) {
       const from = firstVisibleWord(words, view.start)
-      const lastRight = [-Infinity, -Infinity]
       const barTop = HEIGHT - 29
       ctx.font = '9px -apple-system, "SF Pro Text", sans-serif'
       for (let i = from; i < words.length && words[i].start <= view.end; i++) {
@@ -235,9 +252,11 @@ export default function Timeline({
         }
 
         if (detail !== 'label') continue
-        const row = lastRight[0] + 4 <= x1 ? 0 : lastRight[1] + 4 <= x1 ? 1 : -1
-        if (row < 0) continue
-        lastRight[row] = x2
+        // Rows come from the word index, so panning never reshuffles them. Only
+        // skip a tile when the previous word in the same row is too close.
+        const row = wordLabelRow(word.id)
+        const previous = i >= 2 ? words[i - 2] : null
+        if (previous && !labelHasRoom(previous.end, word.start, pps)) continue
         const y = barTop + 5 + row * 12
         if (color) {
           ctx.save()
@@ -390,7 +409,8 @@ export default function Timeline({
     bookmarks,
     HEIGHT,
     wordDefectMap,
-    activeWordIds
+    activeWordIds,
+    waveLut
   ])
 
   const timeFromClientX = (clientX: number): number => {

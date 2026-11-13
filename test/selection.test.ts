@@ -12,11 +12,14 @@ import {
   clampDefectEdge,
   clampView,
   fitView,
+  LABEL_MIN_GAP_PX,
+  labelHasRoom,
   lodFor,
   minWordLabelWidth,
   panView,
   pixelsPerSecond,
   wordDetail,
+  wordLabelRow,
   wordMarksVisible,
   zoomView
 } from '../src/renderer/src/timelineView'
@@ -375,5 +378,37 @@ describe('colored word underlays', () => {
   it('does not color words for pause defects', () => {
     const map = defectByWordId([pause])
     expect(map.size).toBe(0)
+  })
+})
+
+describe('stable word label rows', () => {
+  it('assigns rows by word index, not by position in the viewport', () => {
+    expect(wordLabelRow(0)).toBe(0)
+    expect(wordLabelRow(1)).toBe(1)
+    expect(wordLabelRow(2)).toBe(0)
+    expect(wordLabelRow(41)).toBe(1)
+
+    // The same word keeps its row no matter which index the visible slice
+    // starts from: panning cannot reshuffle the strip.
+    const rows = Array.from({ length: 20 }, (_, id) => wordLabelRow(id))
+    for (const offset of [0, 1, 5, 20]) {
+      const shifted = Array.from({ length: 20 }, (_, i) => wordLabelRow(i + offset))
+      expect(shifted).toEqual(rows.slice(offset).concat(shifted.slice(rows.length - offset)))
+    }
+  })
+
+  it('keeps two neighbouring labels in different rows', () => {
+    expect(wordLabelRow(10)).not.toBe(wordLabelRow(11))
+  })
+
+  it('leaves room for a tile only when the previous same-row word is far enough', () => {
+    // 20 ms apart at 80 px/s is 1.6 px: too tight for the 4 px gap.
+    expect(labelHasRoom(1, 1.02, 80)).toBe(false)
+    // 100 ms at 80 px/s is 8 px: fine.
+    expect(labelHasRoom(1, 1.1, 80)).toBe(true)
+    // The gap is measured in pixels, so zooming in always helps.
+    expect(labelHasRoom(1, 1.02, 400)).toBe(true)
+    expect(labelHasRoom(1, 1.02, 0)).toBe(false)
+    expect(LABEL_MIN_GAP_PX).toBe(4)
   })
 })

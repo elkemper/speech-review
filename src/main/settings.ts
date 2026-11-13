@@ -9,7 +9,8 @@ import {
   EXPORT_FIELDS,
   normalizeChunkTarget,
   normalizeMiniTimelinePad,
-  normalizePlaybackSettings
+  normalizePlaybackSettings,
+  normalizeWaveformContrast
 } from '@shared/settings'
 import type {
   Backend,
@@ -68,6 +69,7 @@ export async function loadSettings(): Promise<Settings> {
       export: normalizeExport(parsed.export),
       playback: normalizePlaybackSettings(parsed.playback),
       miniTimelinePadSec: normalizeMiniTimelinePad(parsed.miniTimelinePadSec),
+      waveformContrast: normalizeWaveformContrast(parsed.waveformContrast),
       hideReviewed: parsed.hideReviewed === true
     }
   } catch {

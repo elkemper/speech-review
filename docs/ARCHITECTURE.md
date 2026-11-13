@@ -82,6 +82,7 @@ MVP limitations:
 | `src/renderer/src/components/Bookmarks.tsx` | bookmark list, notes and resume |
 | `src/renderer/src/components/MiniTimeline.tsx` | selected-defect snippet with editable boundaries |
 | `src/renderer/src/miniTimeline.ts` | mini window/zoom/pan, time↔x mapping and handle hit-testing |
+| `src/renderer/src/waveform.ts` | display-only waveform statistics and contrast lookup table |
 
 ## 4. Startup and security
 

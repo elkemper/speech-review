@@ -77,6 +77,10 @@ export const DEFAULT_MINI_TIMELINE_PAD_SEC = 3
 export const MIN_MINI_TIMELINE_PAD_SEC = 0
 export const MAX_MINI_TIMELINE_PAD_SEC = 15
 
+export const DEFAULT_WAVEFORM_CONTRAST = 55
+export const MIN_WAVEFORM_CONTRAST = 0
+export const MAX_WAVEFORM_CONTRAST = 100
+
 export const DEFAULT_CHUNK_TARGET_SEC = 600
 export const MIN_CHUNK_TARGET_SEC = 120
 export const MAX_CHUNK_TARGET_SEC = 900
@@ -90,6 +94,7 @@ export const DEFAULT_SETTINGS: Settings = {
   export: DEFAULT_EXPORT_SETTINGS,
   playback: DEFAULT_PLAYBACK_SETTINGS,
   miniTimelinePadSec: DEFAULT_MINI_TIMELINE_PAD_SEC,
+  waveformContrast: DEFAULT_WAVEFORM_CONTRAST,
   hideReviewed: false
 }
 
@@ -99,6 +104,17 @@ export function normalizeMiniTimelinePad(value: unknown): number {
     MIN_MINI_TIMELINE_PAD_SEC,
     MAX_MINI_TIMELINE_PAD_SEC,
     DEFAULT_MINI_TIMELINE_PAD_SEC
+  )
+}
+
+export function normalizeWaveformContrast(value: unknown): number {
+  return Math.round(
+    clampNumber(
+      value,
+      MIN_WAVEFORM_CONTRAST,
+      MAX_WAVEFORM_CONTRAST,
+      DEFAULT_WAVEFORM_CONTRAST
+    )
   )
 }
 

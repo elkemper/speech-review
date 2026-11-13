@@ -9,8 +9,10 @@ import {
   EXPORT_FIELD_LABELS,
   MAX_CHUNK_TARGET_SEC,
   MAX_MINI_TIMELINE_PAD_SEC,
+  MAX_WAVEFORM_CONTRAST,
   MIN_CHUNK_TARGET_SEC,
-  MIN_MINI_TIMELINE_PAD_SEC
+  MIN_MINI_TIMELINE_PAD_SEC,
+  MIN_WAVEFORM_CONTRAST
 } from '@shared/settings'
 import type {
   DefectType,
@@ -533,6 +535,26 @@ export default function SettingsDialog() {
                   Сколько секунд показывать слева и справа от выбранной метки в маленьком
                   таймлайне. По умолчанию ±3 с. Внутри этого окна можно приближать до 400% и
                   прокручивать.
+                </div>
+              </section>
+
+              <section className="settings-section">
+                <h3>Осциллограмма</h3>
+                <div className="range-grid">
+                  <RangeField
+                    label="Контраст"
+                    value={settings.waveformContrast}
+                    min={MIN_WAVEFORM_CONTRAST}
+                    max={MAX_WAVEFORM_CONTRAST}
+                    step={5}
+                    suffix="%"
+                    onChange={(value) => updateSettings({ waveformContrast: value })}
+                  />
+                </div>
+                <div className="hint">
+                  Поднимает тихую речь относительно громкой: шумовой пол отсекается, а тихие слова
+                  становятся заметнее. 0% — линейная осциллограмма, 55% — по умолчанию. Меняется
+                  только отображение, запись и транскрипт не затрагиваются.
                 </div>
               </section>
 

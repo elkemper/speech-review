@@ -46,6 +46,7 @@ Speech Review/
 | `export` | see below | CSV fields and format |
 | `playback` | see below | skip mode and padding |
 | `miniTimelinePadSec` | `3` | context on each side of the selected defect in the mini timeline |
+| `waveformContrast` | `55` | display-only waveform contrast, 0 = linear |
 | `hideReviewed` | `false` | hide reviewed defects from the defect list |
 
 `DEFAULT_RULES` (`src/shared/defects.ts`):
@@ -94,6 +95,7 @@ Padding is resolved when skip intervals are built and does not depend on `skipEn
 - `export.fields` is filtered to known fields; an empty list is replaced with the full list;
 - `playback` is normalized by `normalizePlaybackSettings`: every per-type padding entry is filled from the defaults and values are clamped to 0–5 s;
 - `miniTimelinePadSec` is clamped to 0–15 s (`normalizeMiniTimelinePad`);
+- `waveformContrast` is rounded and clamped to 0–100 (`normalizeWaveformContrast`);
 - `rules` is normalized by `normalizeRules`: missing `minDurationByType` entries and `autoGroupGapSec` are added, and values are clamped.
 
 `saveSettings` writes `settings.json.tmp`, then renames it to `settings.json`. Format — JSON with 2-space indentation.

@@ -12,6 +12,7 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Long recordings are split at pauses; the first chunk is shorter, so the first words appear sooner.
 - The partial transcript is saved after every chunk and is immediately available for review.
 - Waveform with zoom, pan, defect markers, colored word underlays and word selection.
+- Display-only waveform contrast lifts quiet speech above the noise floor, so speech and real silence are easy to tell apart; adjustable in Settings.
 - Click a word or a marker to seek the video to that point.
 - Defect queue: filters, "reviewed" state, notes, manual marks.
 - Adjacent manual marks merge into one logical mark: it can be reviewed once, split back or deleted as a whole.

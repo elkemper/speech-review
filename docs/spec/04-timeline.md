@@ -41,7 +41,16 @@ Priority order:
 `timelineView.ts` owns the thresholds (`wordDetail`, `wordMarksVisible`,
 `minWordLabelWidth`).
 
+Label rows are fixed by the word index (`wordLabelRow`: even indexes on top,
+odd below), never by the viewport. Scrolling or zooming therefore never makes
+the tiles jump between rows. A tile is only skipped when the previous word in
+the same row is closer than `LABEL_MIN_GAP_PX` (`labelHasRoom`); both rules are
+pure and depend on the zoom level only through pixel widths.
+
 Marked words also get a colored underlay by type: [story 41](04b-word-underlays.md).
+
+The waveform itself is drawn with a display-only contrast curve so quiet speech
+stays readable: [story 42](04c-waveform-contrast.md).
 
 ### Story 16 — Skip and bookmark overlays
 
@@ -81,9 +90,14 @@ Detail and acceptance criteria: [`04a-waveform-selection.md`](04a-waveform-selec
 - [ ] At medium zoom, word ticks appear.
 - [ ] At close zoom, labels appear only where they fit.
 - [ ] Labels hide again when they no longer fit.
+- [ ] Label rows depend on the word index: panning left/right never reshuffles them.
+- [ ] Zooming never moves a visible label to the other row.
+- [ ] A tile is skipped only when the previous word in its row is closer than 4 px.
+- [ ] No per-word layout state is stored; the rows are a pure function of the index.
 - [ ] Pause defects render as blocks; other defects as markers.
 - [ ] Tests cover the thresholds and the hide-again case.
 - [ ] Marked words use the type color as an underlay (story 41).
+- [ ] Quiet speech stays visible and silence collapses to the baseline (story 42).
 
 ### Story 16
 

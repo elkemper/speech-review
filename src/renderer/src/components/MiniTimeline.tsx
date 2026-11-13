@@ -5,6 +5,7 @@ import { DEFECT_COLORS, defectByWordId } from '../defectsUi'
 import { seekTo } from '../player'
 import { useApp } from '../store'
 import { clampDefectEdge, chooseTickStep, type DefectEdge } from '../timelineView'
+import { buildWaveLut, computeWaveStats, waveAmp } from '../waveform'
 import {
   MINI_ZOOM_MAX,
   MINI_ZOOM_MIN,
@@ -60,6 +61,7 @@ export default function MiniTimeline({
   const currentTime = useApp((state) => state.currentTime)
   const project = useApp((state) => state.project)
   const padSec = useApp((state) => state.settings.miniTimelinePadSec)
+  const waveContrast = useApp((state) => state.settings.waveformContrast)
   const setDefectBounds = useApp((state) => state.setDefectBounds)
 
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -88,6 +90,11 @@ export default function MiniTimeline({
   } | null>(null)
 
   const words = project?.transcript?.words ?? []
+  const waveStats = useMemo(() => computeWaveStats(peaks), [peaks])
+  const waveLut = useMemo(
+    () => buildWaveLut(waveStats, waveContrast),
+    [waveStats, waveContrast]
+  )
   const wordDefectMap = useMemo(() => defectByWordId(defects), [defects])
   const activeWordIds = useMemo(() => new Set(defect.wordIds), [defect.wordIds])
   const nearbyDefects = useMemo(
@@ -261,6 +268,15 @@ export default function MiniTimeline({
       const count = peaks.max.length
       const peakPps =
         peaks.peaksPerSecond > 0 ? peaks.peaksPerSecond : count / Math.max(0.1, peaks.duration)
+      // Thin baseline under the envelope: gated silence and gaps between words
+      // stay connected instead of looking like empty holes.
+      ctx.strokeStyle = 'rgba(120, 176, 240, 0.3)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(0, Math.round(mid) + 0.5)
+      ctx.lineTo(width, Math.round(mid) + 0.5)
+      ctx.stroke()
+
       ctx.strokeStyle = 'rgba(120, 176, 240, 0.72)'
       ctx.lineWidth = 1
       ctx.beginPath()
@@ -275,8 +291,8 @@ export default function MiniTimeline({
           if (peaks.min[i] < low) low = peaks.min[i]
           if (peaks.max[i] > high) high = peaks.max[i]
         }
-        ctx.moveTo(x + 0.5, mid - high * amp)
-        ctx.lineTo(x + 0.5, mid - low * amp)
+        ctx.moveTo(x + 0.5, mid - waveAmp(waveLut, high) * amp)
+        ctx.lineTo(x + 0.5, mid - waveAmp(waveLut, low) * amp)
       }
       ctx.stroke()
     }
@@ -365,7 +381,8 @@ export default function MiniTimeline({
     nearbyDefects,
     wordDefectMap,
     activeWordIds,
-    padSec
+    padSec,
+    waveLut
   ])
 
   const xFromEvent = (event: ReactPointerEvent<HTMLDivElement>): number => {

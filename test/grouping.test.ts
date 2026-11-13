@@ -8,9 +8,11 @@ import {
 import { buildSkipIntervals } from '../src/renderer/src/skip'
 import {
   DEFAULT_MINI_TIMELINE_PAD_SEC,
+  DEFAULT_WAVEFORM_CONTRAST,
   normalizeMiniTimelinePad,
   normalizePlaybackSettings,
-  normalizeSkipPadding
+  normalizeSkipPadding,
+  normalizeWaveformContrast
 } from '../src/shared/settings'
 import type { Defect, PlaybackSettings, Transcript, Word } from '../src/shared/types'
 
@@ -237,6 +239,13 @@ describe('settings normalization', () => {
     expect(normalizeMiniTimelinePad(-2)).toBe(0)
     expect(normalizeMiniTimelinePad(99)).toBe(15)
     expect(normalizeMiniTimelinePad(4.5)).toBe(4.5)
+  })
+
+  it('clamps the waveform contrast', () => {
+    expect(normalizeWaveformContrast(undefined)).toBe(DEFAULT_WAVEFORM_CONTRAST)
+    expect(normalizeWaveformContrast(-10)).toBe(0)
+    expect(normalizeWaveformContrast(500)).toBe(100)
+    expect(normalizeWaveformContrast(62.4)).toBe(62)
   })
 
   it('clamps the automatic grouping gap', () => {

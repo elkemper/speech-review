@@ -109,6 +109,28 @@ export function canDrawWordLabel(pps: number, wordWidth: number): boolean {
   return wordWidth >= minWordLabelWidth(pps)
 }
 
+/** Minimum gap between two label tiles in the same row. */
+export const LABEL_MIN_GAP_PX = 4
+
+/**
+ * Label row of a word: even transcript indexes on top, odd below. The row
+ * depends only on the word index, never on the viewport, so labels keep their
+ * place while the timeline is panned or zoomed.
+ */
+export function wordLabelRow(wordId: number): 0 | 1 {
+  return wordId % 2 === 0 ? 0 : 1
+}
+
+/** Whether a label still has a gap after the previous word in the same row. */
+export function labelHasRoom(
+  previousEndSec: number,
+  startSec: number,
+  pps: number,
+  minGapPx = LABEL_MIN_GAP_PX
+): boolean {
+  return (startSec - previousEndSec) * pps >= minGapPx
+}
+
 export type WordDetail = 'none' | 'mark' | 'label'
 
 /**
