@@ -2730,3 +2730,130 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- mini timeline inside the selected defect ---------- */
+
+.mini-timeline {
+  margin: 7px 0 3px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  overflow: hidden;
+  background: #141414;
+}
+
+.mini-timeline-head,
+.mini-timeline-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 7px;
+  font-size: 9.5px;
+  color: var(--muted);
+}
+
+.mini-timeline-head {
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.mini-timeline-foot {
+  border-top: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 9px;
+}
+
+.mini-timeline .mono {
+  font-family: var(--mono);
+  color: var(--text);
+}
+
+.mini-timeline-canvas {
+  position: relative;
+  height: 76px;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.mini-timeline-canvas canvas {
+  display: block;
+}
+
+.mini-timeline.edge-hover .mini-timeline-canvas {
+  cursor: ew-resize;
+}
+
+.mini-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mini-zoom button {
+  height: 16px;
+  min-width: 16px;
+  padding: 0 3px;
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mini-zoom button:hover:not(:disabled) {
+  background: rgba(59, 156, 255, 0.22);
+  border-color: rgba(59, 156, 255, 0.5);
+}
+
+.mini-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.mini-zoom .mini-zoom-value {
+  min-width: 34px;
+  padding: 0 4px;
+  border-color: transparent;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.mini-zoom .mini-zoom-value:hover {
+  color: var(--text);
+  border-color: var(--line2);
+}
+
+.mini-scrollbar {
+  position: relative;
+  height: 8px;
+  margin: 0 7px 3px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.mini-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 16px;
+  border-radius: 4px;
+  background: rgba(190, 198, 210, 0.35);
+  cursor: grab;
+}
+
+.mini-scrollbar-thumb:hover {
+  background: rgba(190, 198, 210, 0.52);
+}
+
+.mini-scrollbar-thumb:active {
+  cursor: grabbing;
+  background: var(--accent);
+}

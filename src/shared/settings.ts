@@ -73,6 +73,10 @@ export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
   groupPadding: { ...DEFAULT_GROUP_PADDING }
 }
 
+export const DEFAULT_MINI_TIMELINE_PAD_SEC = 3
+export const MIN_MINI_TIMELINE_PAD_SEC = 0
+export const MAX_MINI_TIMELINE_PAD_SEC = 15
+
 export const DEFAULT_CHUNK_TARGET_SEC = 600
 export const MIN_CHUNK_TARGET_SEC = 120
 export const MAX_CHUNK_TARGET_SEC = 900
@@ -85,7 +89,17 @@ export const DEFAULT_SETTINGS: Settings = {
   chunkTargetSec: DEFAULT_CHUNK_TARGET_SEC,
   export: DEFAULT_EXPORT_SETTINGS,
   playback: DEFAULT_PLAYBACK_SETTINGS,
+  miniTimelinePadSec: DEFAULT_MINI_TIMELINE_PAD_SEC,
   hideReviewed: false
+}
+
+export function normalizeMiniTimelinePad(value: unknown): number {
+  return clampNumber(
+    value,
+    MIN_MINI_TIMELINE_PAD_SEC,
+    MAX_MINI_TIMELINE_PAD_SEC,
+    DEFAULT_MINI_TIMELINE_PAD_SEC
+  )
 }
 
 export function normalizeChunkTarget(value: unknown): number {

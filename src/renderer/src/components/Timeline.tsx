@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { clamp, formatTimecode } from '@shared/format'
 import type { Defect } from '@shared/types'
-import { DEFECT_COLORS } from '../defectsUi'
+import { DEFECT_COLORS, defectByWordId } from '../defectsUi'
 import { seekTo } from '../player'
 import { nearestWord, rangeForSelection } from '../selection'
 import { buildSkipIntervals } from '../skip'
@@ -58,6 +58,11 @@ export default function Timeline({
   const activeDefect = useMemo(
     () => defects.find((defect) => defect.id === activeDefectId) ?? null,
     [defects, activeDefectId]
+  )
+  const wordDefectMap = useMemo(() => defectByWordId(defects), [defects])
+  const activeWordIds = useMemo(
+    () => new Set(activeDefect?.wordIds ?? []),
+    [activeDefect]
   )
   const selectedRange = useMemo(() => rangeForSelection(words, selection), [words, selection])
   const skipIntervals = useMemo(
@@ -202,16 +207,48 @@ export default function Timeline({
         const detail = wordDetail(pps, wordWidth)
         if (detail === 'none') continue
 
+        const wordDefect = wordDefectMap.get(word.id)
+        const activeWord = activeWordIds.has(word.id)
+        const type = activeWord && activeDefect ? activeDefect.type : wordDefect?.type
+        const reviewed = wordDefect?.reviewed ?? false
+        const color = type ? DEFECT_COLORS[type] : null
+
+        // Colored backing for marked words. Reviewed words stay visible but
+        // dimmer; the active defect's words are the strongest.
+        if (color) {
+          ctx.save()
+          ctx.globalAlpha = activeWord ? 0.24 : reviewed ? 0.09 : 0.15
+          ctx.fillStyle = color
+          ctx.fillRect(x1, barTop - 1, Math.max(1, wordWidth - 1), HEIGHT - barTop + 1)
+          ctx.restore()
+        }
+
         ctx.fillStyle = 'rgba(150, 160, 175, 0.22)'
-        ctx.fillRect(x1, barTop, Math.max(1, wordWidth - 1), 3)
+        if (color) {
+          ctx.save()
+          ctx.globalAlpha = activeWord ? 0.9 : 0.5
+          ctx.fillStyle = color
+          ctx.fillRect(x1, barTop, Math.max(1, wordWidth - 1), 3)
+          ctx.restore()
+        } else {
+          ctx.fillRect(x1, barTop, Math.max(1, wordWidth - 1), 3)
+        }
 
         if (detail !== 'label') continue
         const row = lastRight[0] + 4 <= x1 ? 0 : lastRight[1] + 4 <= x1 ? 1 : -1
         if (row < 0) continue
         lastRight[row] = x2
         const y = barTop + 5 + row * 12
-        ctx.fillStyle = 'rgba(150, 160, 175, 0.12)'
-        ctx.fillRect(x1, y, wordWidth - 1, 11)
+        if (color) {
+          ctx.save()
+          ctx.globalAlpha = activeWord ? 0.28 : reviewed ? 0.1 : 0.17
+          ctx.fillStyle = color
+          ctx.fillRect(x1, y, wordWidth - 1, 11)
+          ctx.restore()
+        } else {
+          ctx.fillStyle = 'rgba(150, 160, 175, 0.12)'
+          ctx.fillRect(x1, y, wordWidth - 1, 11)
+        }
         ctx.fillStyle = 'rgba(225, 230, 238, 0.82)'
         ctx.fillText(word.text, x1 + 1, y + 1, Math.max(1, wordWidth - 3))
       }
@@ -351,7 +388,9 @@ export default function Timeline({
     skipIntervals,
     activeDefect,
     bookmarks,
-    HEIGHT
+    HEIGHT,
+    wordDefectMap,
+    activeWordIds
   ])
 
   const timeFromClientX = (clientX: number): number => {

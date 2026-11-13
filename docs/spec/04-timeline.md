@@ -41,6 +41,8 @@ Priority order:
 `timelineView.ts` owns the thresholds (`wordDetail`, `wordMarksVisible`,
 `minWordLabelWidth`).
 
+Marked words also get a colored underlay by type: [story 41](04b-word-underlays.md).
+
 ### Story 16 — Skip and bookmark overlays
 
 **Status:** Done · **Priority:** P1
@@ -81,6 +83,7 @@ Detail and acceptance criteria: [`04a-waveform-selection.md`](04a-waveform-selec
 - [ ] Labels hide again when they no longer fit.
 - [ ] Pause defects render as blocks; other defects as markers.
 - [ ] Tests cover the thresholds and the hide-again case.
+- [ ] Marked words use the type color as an underlay (story 41).
 
 ### Story 16
 

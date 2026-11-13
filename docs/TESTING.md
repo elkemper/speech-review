@@ -11,7 +11,7 @@ npm run typecheck     # checks main/preload/shared and renderer types separately
 npm run build         # checks that the production build succeeds
 ```
 
-Current state: **82 tests in 8 files**. A run takes less than a second in the Linux container.
+Current state: **98 tests in 8 files**. A run takes less than a second in the Linux container.
 
 ## 2. Configuration
 
@@ -39,10 +39,10 @@ Current state: **82 tests in 8 files**. A run takes less than a second in the Li
 | `test/core.test.ts` | 18 | `words.json` parser, trailing comma, real fixture, `buildTranscript`, confidence, event classification, active word/segment, automatic defects, sentence-boundary pauses, manual marks, exact word boundaries, old marks without `wordIds`, overrides, logical marks |
 | `test/engine.test.ts` | 8 | chunk planner (short recording, silence, max size, short first chunk, target), WAV reading, slicing, waveform |
 | `test/export.test.ts` | 4 | CSV field order, escaping, delimiter/header, all fields |
-| `test/grouping.test.ts` | 17 | per-type minimum duration, automatic grouping rules and limits, per-type/group skip padding, settings normalization |
+| `test/grouping.test.ts` | 18 | per-type minimum duration, automatic grouping rules and limits, per-type/group skip padding, settings normalization |
 | `test/history.test.ts` | 4 | undo/redo by index, redo branch truncation, `mergeKey` coalescing, different keys |
 | `test/marks.test.ts` | 9 | merge on add and move, split, logical mark ID, combined bounds/words/notes, reviewed reconciliation on merge/split, new marks |
-| `test/selection.test.ts` | 17 | selection range in both directions, exact mark boundaries, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, defect boundary dragging, bulk review of a selection |
+| `test/selection.test.ts` | 32 | selection range in both directions, exact mark boundaries, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, defect boundary dragging, bulk review of a selection, mini timeline zoom/pan and colored word mapping |
 | `test/skip.test.ts` | 5 | padding and interval merging, "marks only" mode, reviewed items, clamp/disabled, interval lookup |
 
 ## 4. Fixtures

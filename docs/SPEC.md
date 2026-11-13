@@ -41,6 +41,7 @@ only the area it is working on.
 | [`03-marks.md`](spec/03-marks.md) | 8–13 | Manual marks, selection, logical marks, boundaries, review state |
 | [`04-timeline.md`](spec/04-timeline.md) | 14–17 | Zoom/pan, LOD, overlays, timeline selection |
 | [`04a-waveform-selection.md`](spec/04a-waveform-selection.md) | 17 detail | Arbitrary waveform selection + pause tokens |
+| [`04b-word-underlays.md`](spec/04b-word-underlays.md) | 41 | Colored word underlays in both timelines |
 | [`05-transcript.md`](spec/05-transcript.md) | 18–24 | Seeking, sync, follow, pause rows, skipping style, partials |
 | [`06-playback.md`](spec/06-playback.md) | 25–30 | Skip rules, padding, listen, robustness, clean playback, bookmarks |
 | [`06a-clean-playback.md`](spec/06a-clean-playback.md) | 29 detail | Playback without marked places |
@@ -49,6 +50,7 @@ only the area it is working on.
 | [`08-processing-progress.md`](spec/08-processing-progress.md) | 35–37 | Progress semantics, chunk length, streaming |
 | [`08a-streaming-asr.md`](spec/08a-streaming-asr.md) | 37 detail | Streaming recognition |
 | [`09-export.md`](spec/09-export.md) | 38–39 | CSV and JSON |
+| [`10-mini-timeline.md`](spec/10-mini-timeline.md) | 40 | Selected defect snippet with editable boundaries |
 
 ## Product invariants
 
@@ -132,7 +134,7 @@ Applies to every story.
 
 ### Done — do not regress
 
-Stories 1–7, 10–13, 16, 20–21, 25–26, 30–32, 34, 38–39.
+Stories 1–7, 10–13, 16, 20–21, 25–26, 30–32, 34, 38–41.
 Verification only (implemented, needs a pass): 9, 24.
 
 ## Related documents

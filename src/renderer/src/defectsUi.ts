@@ -1,4 +1,4 @@
-import type { DefectType, Severity } from '@shared/types'
+import type { Defect, DefectType, Severity } from '@shared/types'
 
 export const DEFECT_LABELS: Record<DefectType, string> = {
   filler: 'филлер',
@@ -38,3 +38,22 @@ export const TYPE_ORDER: DefectType[] = [
   'manual',
   'unclear'
 ]
+
+/**
+ * The defect/mark that owns each word, used for colored underlays on the
+ * timelines. Pauses are excluded because they describe a gap, not words.
+ * A manual mark wins over an automatic defect when both cover a word.
+ */
+export function defectByWordId(defects: Defect[]): Map<number, Defect> {
+  const map = new Map<number, Defect>()
+  for (const defect of defects) {
+    if (defect.type === 'pause') continue
+    for (const wordId of defect.wordIds) {
+      const current = map.get(wordId)
+      if (!current || (current.source === 'auto' && defect.source === 'manual')) {
+        map.set(wordId, defect)
+      }
+    }
+  }
+  return map
+}

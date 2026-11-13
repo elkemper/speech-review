@@ -8,7 +8,9 @@ import {
   EXPORT_FIELDS,
   EXPORT_FIELD_LABELS,
   MAX_CHUNK_TARGET_SEC,
-  MIN_CHUNK_TARGET_SEC
+  MAX_MINI_TIMELINE_PAD_SEC,
+  MIN_CHUNK_TARGET_SEC,
+  MIN_MINI_TIMELINE_PAD_SEC
 } from '@shared/settings'
 import type {
   DefectType,
@@ -511,6 +513,26 @@ export default function SettingsDialog() {
                 <div className="hint">
                   Проверенные дефекты и метки не пропускаются. Отступы оставляют базовую паузу по
                   краям, чтобы вырезанное место не склеивалось вплотную. Видео не перекодируется.
+                </div>
+              </section>
+
+              <section className="settings-section">
+                <h3>Мини-таймлайн</h3>
+                <div className="range-grid">
+                  <RangeField
+                    label="Отступ вокруг метки"
+                    value={settings.miniTimelinePadSec}
+                    min={MIN_MINI_TIMELINE_PAD_SEC}
+                    max={MAX_MINI_TIMELINE_PAD_SEC}
+                    step={0.5}
+                    suffix="с"
+                    onChange={(value) => updateSettings({ miniTimelinePadSec: value })}
+                  />
+                </div>
+                <div className="hint">
+                  Сколько секунд показывать слева и справа от выбранной метки в маленьком
+                  таймлайне. По умолчанию ±3 с. Внутри этого окна можно приближать до 400% и
+                  прокручивать.
                 </div>
               </section>
 

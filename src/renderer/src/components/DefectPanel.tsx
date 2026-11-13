@@ -6,6 +6,7 @@ import { playFrom, seekTo, toggleLoopForDefect } from '../player'
 import { defectIdsForSelection } from '../selection'
 import { buildSkipIntervals } from '../skip'
 import { useApp, type DefectFilter } from '../store'
+import MiniTimeline from './MiniTimeline'
 
 export default function DefectPanel({
   defects,
@@ -280,6 +281,14 @@ export default function DefectPanel({
                   </div>
 
                   <div className="defect-text">{defect.text}</div>
+
+                  {active ? (
+                    <MiniTimeline
+                      defect={defect}
+                      defects={defects}
+                      duration={project?.duration ?? 0}
+                    />
+                  ) : null}
 
                   {active ? (
                     <textarea

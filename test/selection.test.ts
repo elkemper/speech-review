@@ -21,6 +21,18 @@ import {
   zoomView
 } from '../src/renderer/src/timelineView'
 import type { Defect, Word } from '../src/shared/types'
+import { defectByWordId } from '../src/renderer/src/defectsUi'
+import {
+  MINI_WINDOW_MIN_SPAN_SEC,
+  clampMiniZoom,
+  miniEdgeAt,
+  miniTimeForX,
+  miniVisibleFraction,
+  miniWindowForDefect,
+  miniXForTime,
+  panMiniWindow,
+  zoomMiniWindow
+} from '../src/renderer/src/miniTimeline'
 
 function word(id: number, start: number, end: number, text = `w${id}`): Word {
   return {
@@ -226,5 +238,142 @@ describe('reviewing a word selection', () => {
   it('returns nothing without a selection or transcript', () => {
     expect(defectIdsForSelection(defects, words, null)).toEqual([])
     expect(defectIdsForSelection(defects, [], { anchorId: 0, focusId: 0 })).toEqual([])
+  })
+})
+
+describe('mini timeline window', () => {
+  it('keeps the default ±3 s context around a short defect', () => {
+    const view = miniWindowForDefect(10, 10.2, 60)
+    expect(view.start).toBeCloseTo(7, 6)
+    expect(view.end).toBeCloseTo(13.2, 6)
+    expect(view.end - view.start).toBeGreaterThanOrEqual(MINI_WINDOW_MIN_SPAN_SEC)
+  })
+
+  it('accepts a custom padding from settings', () => {
+    expect(miniWindowForDefect(10, 11, 60, 1)).toEqual({ start: 9, end: 12 })
+    expect(miniWindowForDefect(10, 11, 60, 0)).toEqual({ start: 10, end: 11 })
+  })
+
+  it('clamps the window to the recording edges', () => {
+    const atStart = miniWindowForDefect(0, 0.2, 60)
+    expect(atStart.start).toBe(0)
+    expect(atStart.end).toBeGreaterThan(0.2)
+
+    const atEnd = miniWindowForDefect(59.8, 60, 60)
+    expect(atEnd.end).toBe(60)
+    expect(atEnd.start).toBeLessThan(59.8)
+  })
+
+  it('does not grow beyond a short recording', () => {
+    expect(miniWindowForDefect(0.5, 1, 2)).toEqual({ start: 0, end: 2 })
+    expect(miniWindowForDefect(0, 0, 0)).toEqual({ start: 0, end: 0.1 })
+  })
+
+  it('round-trips time through x coordinates', () => {
+    const view = { start: 8, end: 14 }
+    const x = miniXForTime(10, view, 300)
+    expect(x).toBeCloseTo(100, 5)
+    expect(miniTimeForX(100, view, 300)).toBeCloseTo(10, 5)
+    expect(miniTimeForX(-50, view, 300)).toBe(8)
+    expect(miniTimeForX(400, view, 300)).toBe(14)
+  })
+
+  it('detects which boundary handle is grabbed', () => {
+    const view = { start: 8, end: 14 }
+    expect(miniEdgeAt(100, 10, 11, view, 300)).toBe('start')
+    expect(miniEdgeAt(150, 10, 11, view, 300)).toBe('end')
+    expect(miniEdgeAt(125, 10, 11, view, 300)).toBeNull()
+  })
+})
+
+describe('mini timeline zoom and pan', () => {
+  const bounds = { start: 8, end: 12 }
+
+  it('clamps zoom to the 1x–2x range', () => {
+    expect(clampMiniZoom(0.1)).toBe(1)
+    expect(clampMiniZoom(5)).toBe(4)
+    expect(clampMiniZoom(Number.NaN)).toBe(1)
+  })
+
+  it('zooms in around the anchor inside the base window', () => {
+    expect(zoomMiniWindow(bounds, 2, 10, bounds)).toEqual({
+      start: 9,
+      end: 11
+    })
+  })
+
+  it('never zooms out beyond the base window', () => {
+    expect(zoomMiniWindow({ start: 9, end: 11 }, 0.5, 10, bounds)).toEqual(bounds)
+    expect(zoomMiniWindow(bounds, 1, 10, bounds)).toEqual(bounds)
+  })
+
+  it('clamps the zoomed window to the base edges', () => {
+    expect(zoomMiniWindow(bounds, 2, 8, bounds)).toEqual({ start: 8, end: 10 })
+    expect(zoomMiniWindow(bounds, 2, 12, bounds)).toEqual({ start: 10, end: 12 })
+  })
+
+  it('keeps a minimum span when zooming in hard', () => {
+    const view = zoomMiniWindow({ start: 9, end: 11 }, 100, 10, bounds)
+    expect(view.end - view.start).toBeCloseTo(0.02, 5)
+  })
+
+  it('pans only inside the base window', () => {
+    expect(panMiniWindow({ start: 9, end: 11 }, 1, bounds)).toEqual({
+      start: 10,
+      end: 12
+    })
+    expect(panMiniWindow({ start: 9, end: 11 }, -1, bounds)).toEqual({
+      start: 8,
+      end: 10
+    })
+    expect(panMiniWindow(bounds, 1, bounds)).toEqual(bounds)
+  })
+
+  it('reports how much of the base window is visible', () => {
+    expect(miniVisibleFraction(bounds, bounds)).toBe(1)
+    expect(miniVisibleFraction({ start: 9, end: 11 }, bounds)).toBe(0.5)
+  })
+})
+
+describe('colored word underlays', () => {
+  const base = {
+    type: 'filler' as const,
+    start: 1,
+    end: 2,
+    severity: 'low' as const,
+    reviewed: false,
+    note: '',
+    text: ''
+  }
+  const auto: Defect = {
+    ...base,
+    id: 'auto-1',
+    wordIds: [0, 1],
+    source: 'auto'
+  }
+  const pause: Defect = {
+    ...base,
+    id: 'pause-1',
+    type: 'pause',
+    wordIds: [1, 2],
+    source: 'auto'
+  }
+  const manual: Defect = {
+    ...base,
+    id: 'manual-1',
+    type: 'manual',
+    wordIds: [1],
+    source: 'manual'
+  }
+
+  it('maps words to their defect and lets manual marks win', () => {
+    const map = defectByWordId([auto, pause, manual])
+    expect(map.get(0)?.id).toBe('auto-1')
+    expect(map.get(1)?.id).toBe('manual-1')
+  })
+
+  it('does not color words for pause defects', () => {
+    const map = defectByWordId([pause])
+    expect(map.size).toBe(0)
   })
 })

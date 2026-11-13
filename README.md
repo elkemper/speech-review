@@ -11,13 +11,14 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Transcription with **CrisperWhisper 2.0** through the native **audio.cpp** runtime with Metal.
 - Long recordings are split at pauses; the first chunk is shorter, so the first words appear sooner.
 - The partial transcript is saved after every chunk and is immediately available for review.
-- Waveform with zoom, pan, defect markers and word selection.
+- Waveform with zoom, pan, defect markers, colored word underlays and word selection.
 - Click a word or a marker to seek the video to that point.
 - Defect queue: filters, "reviewed" state, notes, manual marks.
 - Adjacent manual marks merge into one logical mark: it can be reviewed once, split back or deleted as a whole.
 - Boundaries of the selected defect or mark can be dragged directly on the timeline; touching neighbouring marks merge.
 - Undo/redo (`⌘Z` / `⇧⌘Z`) with an action history dialog.
 - The defect panel can be resized by dragging its edge and hidden completely; the video and timeline heights are adjustable the same way.
+- The selected defect shows a mini waveform in the right panel with ±3 s context (configurable), draggable boundaries, 1–4× zoom with horizontal panning, faint neighbouring marks, colored word underlays and the same playhead as the main timeline.
 - Word selection with click, `Shift`+click or drag; a mark uses the exact selection boundaries.
 - Selected words can be reviewed in one action with `Shift+R` when they contain defects.
 - Bookmarks: `B` remembers a place, the list returns to it and can resume from the last one.

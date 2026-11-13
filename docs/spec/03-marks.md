@@ -75,6 +75,8 @@ timeline and have word membership follow.
 - Dragging onto a neighbour merges the mark into a logical group.
 - Boundaries cannot cross or invert; minimum length is preserved.
 - Undoable and saved.
+- The active item also shows an in-panel snippet with the same handles:
+  [story 40](10-mini-timeline.md).
 
 ### Story 13 — Reviewed-state reconciliation
 
@@ -127,6 +129,7 @@ without silently reviewing new marks.
 ### Story 12
 
 - [ ] Selecting a defect/mark shows draggable boundaries.
+- [ ] The same boundaries are editable in the in-panel snippet (story 40).
 - [ ] Automatic edits go to `defectOverrides`.
 - [ ] Manual edits update marks and `wordIds`.
 - [ ] Reaching a neighbour merges.

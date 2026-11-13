@@ -7,6 +7,8 @@ import {
 } from '../src/shared/defects'
 import { buildSkipIntervals } from '../src/renderer/src/skip'
 import {
+  DEFAULT_MINI_TIMELINE_PAD_SEC,
+  normalizeMiniTimelinePad,
   normalizePlaybackSettings,
   normalizeSkipPadding
 } from '../src/shared/settings'
@@ -228,6 +230,13 @@ describe('settings normalization', () => {
     expect(rules.autoGroupGapSec).toBe(DEFAULT_RULES.autoGroupGapSec)
     expect(rules.minDurationByType.filler).toBe(0)
     expect(rules.fillerWords).toEqual(DEFAULT_RULES.fillerWords)
+  })
+
+  it('clamps the mini timeline padding', () => {
+    expect(normalizeMiniTimelinePad(undefined)).toBe(DEFAULT_MINI_TIMELINE_PAD_SEC)
+    expect(normalizeMiniTimelinePad(-2)).toBe(0)
+    expect(normalizeMiniTimelinePad(99)).toBe(15)
+    expect(normalizeMiniTimelinePad(4.5)).toBe(4.5)
   })
 
   it('clamps the automatic grouping gap', () => {

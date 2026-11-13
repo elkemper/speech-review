@@ -8,6 +8,7 @@ import {
   DEFAULT_SETTINGS,
   EXPORT_FIELDS,
   normalizeChunkTarget,
+  normalizeMiniTimelinePad,
   normalizePlaybackSettings
 } from '@shared/settings'
 import type {
@@ -66,6 +67,7 @@ export async function loadSettings(): Promise<Settings> {
       chunkTargetSec: normalizeChunkTarget(parsed.chunkTargetSec),
       export: normalizeExport(parsed.export),
       playback: normalizePlaybackSettings(parsed.playback),
+      miniTimelinePadSec: normalizeMiniTimelinePad(parsed.miniTimelinePadSec),
       hideReviewed: parsed.hideReviewed === true
     }
   } catch {

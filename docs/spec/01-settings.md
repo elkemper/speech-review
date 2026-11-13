@@ -20,7 +20,7 @@ can download/delete models and configure the recognizer in one place.
 - Three tabs: **General**, **Defects**, **Export**.
 - General: engine paths, model cards, download/delete, language, backend,
   chunk length, licenses.
-- Defects: story 2, story 3, plus rules/grouping/padding from 02 and 06.
+- Defects: story 2, story 3, plus rules/grouping/padding from 02 and 06, and the mini-timeline padding (story 40).
 - Export: [story 38](09-export.md).
 - The earlier "Recognition" tab is superseded: recognition lives in General.
 
@@ -58,6 +58,7 @@ As a user, I want to remove reviewed defects from the defect list completely.
       `.part` file.
 - [ ] Changing language/model/backend persists immediately and refreshes
       engine status.
+- [ ] Defects contains the mini-timeline context setting (default 3 s per side).
 - [ ] Export contains CSV fields, delimiter and header.
 - [ ] No separate "Recognition" tab exists.
 

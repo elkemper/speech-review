@@ -77,9 +77,11 @@ MVP limitations:
 | `src/renderer/src/skip.ts` | skip intervals and interval lookup by time |
 | `src/renderer/src/selection.ts` | word selection, manual-mark range, nearest word |
 | `src/renderer/src/timelineView.ts` | zoom, pan, LOD, ticks, defect boundaries |
-| `src/renderer/src/defectsUi.ts` | labels, colors, type ordering |
+| `src/renderer/src/defectsUi.ts` | labels, colors, type ordering, word→defect mapping for underlays |
 | `src/renderer/src/hooks/useHotkeys.ts` | hotkeys, bulk review and bookmark shortcut |
 | `src/renderer/src/components/Bookmarks.tsx` | bookmark list, notes and resume |
+| `src/renderer/src/components/MiniTimeline.tsx` | selected-defect snippet with editable boundaries |
+| `src/renderer/src/miniTimeline.ts` | mini window/zoom/pan, time↔x mapping and handle hit-testing |
 
 ## 4. Startup and security
 
@@ -220,6 +222,7 @@ Canvas waveform with zoom and pan:
 - Filters by type, "only unreviewed", counters; `settings.hideReviewed` removes reviewed items entirely.
 - A selected range with defects shows "проверить выделение" (review the selection).
 - Mark as reviewed, note, "listen", loop, delete and "split" for manual marks.
+- The active item shows a mini timeline under its text: waveform context, the defect span, draggable boundaries and the shared playhead.
 - Jump to the next unreviewed defect.
 - CSV/JSON export.
 
