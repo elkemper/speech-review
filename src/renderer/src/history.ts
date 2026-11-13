@@ -6,7 +6,9 @@ import type {
 
 export interface EditableProjectState {
   marks: ManualMark[]
-  reviewedDefectIds: string[]
+  confirmedDefectIds: string[]
+  dismissedDefectIds: string[]
+  dismissedMarks: ManualMark[]
   defectNotes: Record<string, string>
   defectOverrides: Record<string, DefectBoundsOverride>
 }
@@ -38,7 +40,12 @@ export function snapshotEditable(project: Project): EditableProjectState {
       ...mark,
       wordIds: mark.wordIds ? [...mark.wordIds] : undefined
     })),
-    reviewedDefectIds: [...project.reviewedDefectIds],
+    confirmedDefectIds: [...project.confirmedDefectIds],
+    dismissedDefectIds: [...project.dismissedDefectIds],
+    dismissedMarks: (project.dismissedMarks ?? []).map((mark) => ({
+      ...mark,
+      wordIds: mark.wordIds ? [...mark.wordIds] : undefined
+    })),
     defectNotes: { ...project.defectNotes },
     defectOverrides: Object.fromEntries(
       Object.entries(project.defectOverrides ?? {}).map(([id, bounds]) => [
@@ -56,7 +63,12 @@ export function applyEditable(project: Project, state: EditableProjectState): Pr
       ...mark,
       wordIds: mark.wordIds ? [...mark.wordIds] : undefined
     })),
-    reviewedDefectIds: [...state.reviewedDefectIds],
+    confirmedDefectIds: [...state.confirmedDefectIds],
+    dismissedDefectIds: [...state.dismissedDefectIds],
+    dismissedMarks: state.dismissedMarks.map((mark) => ({
+      ...mark,
+      wordIds: mark.wordIds ? [...mark.wordIds] : undefined
+    })),
     defectNotes: { ...state.defectNotes },
     defectOverrides: Object.fromEntries(
       Object.entries(state.defectOverrides ?? {}).map(([id, bounds]) => [id, { ...bounds }])

@@ -4,8 +4,8 @@ import {
   manualDefectIdForMark,
   markIdsForDefectId,
   mergeMarkNeighbours,
-  reconcileReviewedIds,
-  reviewIdForMark
+  reconcileConfirmedIds,
+  confirmIdForMark
 } from '../src/shared/marks'
 import type { ManualMark } from '../src/shared/types'
 
@@ -92,8 +92,8 @@ describe('logical manual marks', () => {
   })
 })
 
-describe('reviewed state when marks merge and split', () => {
-  it('keeps a merged group reviewed only when every mark was reviewed', () => {
+describe('confirmed state when marks merge and split', () => {
+  it('keeps a merged group confirmed only when every mark was confirmed', () => {
     const before = [mark('a', 1, 1.5), mark('b', 1.6, 2)]
     const merged = [
       { ...before[0], groupId: 'g' },
@@ -101,11 +101,11 @@ describe('reviewed state when marks merge and split', () => {
     ]
 
     expect(
-      reconcileReviewedIds(before, merged, ['manual-a', 'manual-b'])
+      reconcileConfirmedIds(before, merged, ['manual-a', 'manual-b'])
     ).toEqual(['manual-group-g'])
 
     expect(
-      reconcileReviewedIds(before, merged, ['manual-a'])
+      reconcileConfirmedIds(before, merged, ['manual-a'])
     ).toEqual([])
   })
 
@@ -116,26 +116,26 @@ describe('reviewed state when marks merge and split', () => {
       { ...before[1], groupId: 'g' }
     ]
     expect(
-      reconcileReviewedIds(before, merged, ['pause-1', 'manual-a', 'manual-b'])
+      reconcileConfirmedIds(before, merged, ['pause-1', 'manual-a', 'manual-b'])
     ).toEqual(['pause-1', 'manual-group-g'])
   })
 
-  it('marks every split part reviewed when the group was reviewed', () => {
+  it('confirms every split part when the group was confirmed', () => {
     const before = [
       mark('a', 1, 1.5, { groupId: 'g' }),
       mark('b', 1.6, 2, { groupId: 'g' })
     ]
     const split = before.map((item) => ({ ...item, groupId: undefined }))
-    expect(reconcileReviewedIds(before, split, ['manual-group-g'])).toEqual([
+    expect(reconcileConfirmedIds(before, split, ['manual-group-g'])).toEqual([
       'manual-a',
       'manual-b'
     ])
   })
 
-  it('never marks a newly added mark as reviewed', () => {
+  it('never confirms a newly added mark', () => {
     const before = [mark('a', 1, 1.5)]
     const after = [mark('a', 1, 1.5), mark('b', 3, 3.5)]
-    expect(reconcileReviewedIds(before, after, ['manual-a'])).toEqual(['manual-a'])
-    expect(reviewIdForMark(after[1])).toBe('manual-b')
+    expect(reconcileConfirmedIds(before, after, ['manual-a'])).toEqual(['manual-a'])
+    expect(confirmIdForMark(after[1])).toBe('manual-b')
   })
 })

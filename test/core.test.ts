@@ -195,6 +195,27 @@ describe('manual mark boundaries', () => {
     )
     expect(manual?.wordIds).toEqual([1])
   })
+
+  it('keeps dismissed manual marks in the computed list for restore and focus', () => {
+    const mark = {
+      id: 'm',
+      type: 'manual' as const,
+      start: 1.5,
+      end: 2,
+      wordIds: [1],
+      note: 'удалённая',
+      createdAt: new Date(0).toISOString()
+    }
+    const manual = detectDefects(transcript, DEFAULT_RULES, [], {
+      dismissedMarks: [mark]
+    }).find((defect) => defect.source === 'manual')
+    expect(manual).toMatchObject({
+      id: 'manual-m',
+      dismissed: true,
+      wordIds: [1],
+      note: 'удалённая'
+    })
+  })
 })
 
 describe('automatic defect boundary overrides', () => {
@@ -208,7 +229,8 @@ describe('automatic defect boundary overrides', () => {
       text: '',
       severity: 'medium',
       source: 'auto',
-      reviewed: false,
+      confirmed: false,
+      dismissed: false,
       note: ''
     },
     {
@@ -220,7 +242,8 @@ describe('automatic defect boundary overrides', () => {
       text: 'ну',
       severity: 'medium',
       source: 'auto',
-      reviewed: false,
+      confirmed: false,
+      dismissed: false,
       note: ''
     }
   ]

@@ -17,7 +17,7 @@ export const EXPORT_FIELDS: ExportField[] = [
   'type',
   'severity',
   'source',
-  'reviewed',
+  'confirmed',
   'text',
   'note'
 ]
@@ -31,7 +31,7 @@ export const EXPORT_FIELD_LABELS: Record<ExportField, string> = {
   type: 'Тип',
   severity: 'Важность',
   source: 'Источник',
-  reviewed: 'Проверено',
+  confirmed: 'Подтверждено',
   text: 'Текст',
   note: 'Заметка'
 }
@@ -61,7 +61,6 @@ export const DEFAULT_GROUP_PADDING: SkipPadding = { before: 0.15, after: 0.35 }
 
 export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
   skipEnabled: false,
-  skipScope: 'all',
   skipBeforeSec: 0.15,
   skipAfterSec: 0.35,
   paddingByType: Object.fromEntries(
@@ -95,7 +94,7 @@ export const DEFAULT_SETTINGS: Settings = {
   playback: DEFAULT_PLAYBACK_SETTINGS,
   miniTimelinePadSec: DEFAULT_MINI_TIMELINE_PAD_SEC,
   waveformContrast: DEFAULT_WAVEFORM_CONTRAST,
-  hideReviewed: false
+  showDismissed: true
 }
 
 export function normalizeMiniTimelinePad(value: unknown): number {
@@ -152,7 +151,6 @@ export function normalizePlaybackSettings(value: unknown): PlaybackSettings {
   }
   return {
     skipEnabled: raw.skipEnabled === true,
-    skipScope: raw.skipScope === 'marks' ? 'marks' : 'all',
     skipBeforeSec: clampNumber(raw.skipBeforeSec, 0, 5, DEFAULT_PLAYBACK_SETTINGS.skipBeforeSec),
     skipAfterSec: clampNumber(raw.skipAfterSec, 0, 5, DEFAULT_PLAYBACK_SETTINGS.skipAfterSec),
     paddingByType,

@@ -19,7 +19,7 @@ inventing fake words.
 
 - It needs a persisted token entity (or an extension of the transcript) with
   editable start/end.
-- Marks, review, skip and export must all handle tokens.
+- Marks, confirmation, skip and export must all handle tokens.
 - It changes the data model, unlike the rest of the timeline work.
 
 ### Proposed model (not implemented)
@@ -39,7 +39,7 @@ inventing fake words.
 - [ ] Pause tokens have editable start/end and persist in the project.
 - [ ] A mark can cover words plus pause tokens without absorbing neighbouring
       words.
-- [ ] Review, skip, boundary editing and export treat tokens consistently.
+- [ ] Confirmation, skip, boundary editing and export treat tokens consistently.
 - [ ] Undo/redo covers token edits if tokens become project state.
 - [ ] Unit tests cover token bounds and mark membership.
 

@@ -37,13 +37,13 @@ If the app crashes, an unfinished job starts over. Completed chunks could be sav
 
 ## 4. Stable defect IDs when rules change
 
-Automatic defect IDs are based on order (`auto-filler-3`). Changing the pause threshold or filler list shifts the numbering, and old "reviewed" flags/notes may end up on different defects.
+Automatic defect IDs are based on order (`auto-filler-3`). Changing the pause threshold or filler list shifts the numbering, and old confirmation/dismissal flags and notes may end up on different defects.
 
 Options:
 
 - Store flags by `(type, word/time)` instead of ID.
 - Recompute the mapping when rules change.
-- Warn the user that changing rules resets review progress.
+- Warn the user that changing rules resets confirmation progress.
 
 ## 5. Developer ID signing and notarization
 
@@ -83,10 +83,10 @@ There is no word search field. Needed:
 
 ## 10. Optimize defect recomputation
 
-`detectDefects` is recomputed on every change to `reviewedDefectIds` or notes, even though the transcript itself has not changed. For a one-hour recording that is tens of thousands of words. It should be split:
+`detectDefects` is recomputed on every change to `confirmedDefectIds`, `dismissedDefectIds` or notes, even though the transcript itself has not changed. For a one-hour recording that is tens of thousands of words. It should be split:
 
 - `autoDefects` — memoized by `(transcript, rules)`;
-- `reviewed/notes` — applied separately.
+- `confirmed/dismissed/notes` — applied separately.
 
 ## 11. Waveform performance
 
@@ -140,12 +140,12 @@ The app does not update itself. For a single user this is not critical, but mult
 
 ## 18. Tests
 
-Currently 111 tests in 9 files: parser, defects, per-type minimum duration, automatic grouping, settings normalization, chunking (including the short first chunk), WAV, peaks, word selection, bulk review, the selected-defect mini timeline, colored word underlays and the waveform contrast curve, manual and logical marks, review reconciliation, defect boundaries and overrides, timeline zoom/pan/LOD, per-type skip padding, action history, CSV export. Not covered:
+Currently 133 tests in 10 files: parser, defects, per-type minimum duration, enabled types and their id stability, the grouping toggle, settings normalization, number parsing and step snapping, chunking (including the short first chunk), WAV, peaks, word selection, bulk confirmation/deletion, the selected-defect mini timeline, colored word underlays and the waveform contrast curve, manual and logical marks, confirmation reconciliation, defect boundaries and overrides, timeline zoom/pan/LOD, per-type skip padding, action history, CSV export. Not covered:
 
 - parsing `silencedetect` and ffmpeg progress;
 - model resume and SHA-256 verification;
-- project save/load and review reset;
-- partial transcripts and review-state merging;
+- project save/load and defect-state reset;
+- partial transcripts and confirmation-state merging;
 - IPC contracts;
 - component rendering.
 

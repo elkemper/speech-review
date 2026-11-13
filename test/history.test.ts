@@ -1,19 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyEditable,
   canRedo,
   canUndo,
   createHistoryState,
   makeHistoryEntry,
   recordHistory,
+  snapshotEditable,
   stateForHistoryIndex,
   withHistoryIndex,
   type EditableProjectState
 } from '../src/renderer/src/history'
+import type { Project } from '../src/shared/types'
 
 function state(value: string): EditableProjectState {
   return {
     marks: [],
-    reviewedDefectIds: [value],
+    confirmedDefectIds: [value],
+    dismissedDefectIds: [],
+    dismissedMarks: [],
     defectNotes: {},
     defectOverrides: {}
   }
@@ -38,10 +43,10 @@ describe('action history', () => {
     expect(history.index).toBe(1)
 
     history = withHistoryIndex(history, 0)
-    expect(stateForHistoryIndex(history, history.index)?.reviewedDefectIds).toEqual(['a'])
+    expect(stateForHistoryIndex(history, history.index)?.confirmedDefectIds).toEqual(['a'])
 
     history = withHistoryIndex(history, -1)
-    expect(stateForHistoryIndex(history, -1)?.reviewedDefectIds).toEqual(['base'])
+    expect(stateForHistoryIndex(history, -1)?.confirmedDefectIds).toEqual(['base'])
     expect(canUndo(history)).toBe(false)
     expect(canRedo(history)).toBe(true)
   })
@@ -72,8 +77,8 @@ describe('action history', () => {
     )
 
     expect(history.entries).toHaveLength(1)
-    expect(history.entries[0].before.reviewedDefectIds).toEqual(['base'])
-    expect(history.entries[0].after.reviewedDefectIds).toEqual(['ab'])
+    expect(history.entries[0].before.confirmedDefectIds).toEqual(['base'])
+    expect(history.entries[0].after.confirmedDefectIds).toEqual(['ab'])
   })
 
   it('keeps separate entries for different merge keys', () => {
@@ -89,5 +94,33 @@ describe('action history', () => {
       Date.parse('2026-01-01T00:00:01.000Z')
     )
     expect(history.entries).toHaveLength(2)
+  })
+
+  it('snapshots and restores the deleted-marks archive', () => {
+    const mark = {
+      id: 'm1',
+      type: 'manual' as const,
+      start: 1,
+      end: 2,
+      wordIds: [3],
+      note: 'ошибка',
+      createdAt: '2026-01-01T00:00:00.000Z'
+    }
+    const project = {
+      marks: [],
+      confirmedDefectIds: [],
+      dismissedDefectIds: ['auto-pause-0'],
+      dismissedMarks: [mark],
+      defectNotes: {},
+      defectOverrides: {}
+    } as unknown as Project
+
+    const snapshot = snapshotEditable(project)
+    expect(snapshot.dismissedMarks).toEqual([mark])
+    expect(snapshot.dismissedMarks[0].wordIds).not.toBe(mark.wordIds)
+
+    const restored = applyEditable(project, { ...state('x'), dismissedMarks: [mark] })
+    expect(restored.dismissedMarks).toEqual([mark])
+    expect(restored.dismissedMarks[0].wordIds).not.toBe(mark.wordIds)
   })
 })

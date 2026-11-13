@@ -47,7 +47,7 @@ export default function Player({
 
   useEffect(() => {
     skipStateRef.current = null
-  }, [skipIntervals])
+  }, [skipIntervals, loop])
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -176,9 +176,7 @@ export default function Player({
         ) : null}
 
         {playback.skipEnabled ? (
-          <div className="skip-badge">
-            ⏭ пропуск {playback.skipScope === 'marks' ? 'меток' : 'дефектов'}
-          </div>
+          <div className="skip-badge">⏭ пропуск дефектов</div>
         ) : null}
 
         <div className="video-badges">
@@ -246,7 +244,7 @@ export default function Player({
           onClick={() =>
             updateSettings({ playback: { skipEnabled: !playback.skipEnabled } })
           }
-          title="Пропускать помеченные места при проигрывании"
+          title="Пропускать дефекты и метки при проигрывании"
         >
           ⏭
         </button>

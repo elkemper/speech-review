@@ -27,13 +27,13 @@ panel, and hide the defect panel completely.
 
 **Status:** Done · **Priority:** P0
 
-As a user, I want undo/redo with a log covering marks, review state, notes and
+As a user, I want undo/redo with a log covering marks, confirmation state, notes and
 defect overrides.
 
 - `Cmd+Z` / `Ctrl+Z` undo; `Shift+Cmd+Z` / `Ctrl+Y` redo.
 - History dialog lists actions with timestamps and supports jumping.
 - Same `mergeKey` within 2 s coalesces.
-- Snapshot = marks + reviewed ids + notes + overrides only.
+- Snapshot = marks + confirmed ids + dismissed ids + notes + overrides only.
 - Bookmarks, playback, selection, filters, transcript and settings excluded.
 - History resets when a project is opened/closed.
 
@@ -69,7 +69,7 @@ As a user, I want the app to stay dark-only.
 
 ### Story 32
 
-- [ ] Undo/redo works for marks, review, notes, overrides.
+- [ ] Undo/redo works for marks, confirmation, deletion, notes, overrides.
 - [ ] The dialog lists actions and jumps correctly.
 - [ ] Merge key coalesces within 2 s.
 - [ ] Only editable project state is snapshotted.

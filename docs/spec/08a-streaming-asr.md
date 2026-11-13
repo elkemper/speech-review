@@ -20,7 +20,7 @@ of waiting for the whole chunk.
 - Do not fake streaming by slicing audio into ever smaller chunks: that
   multiplies model reloads and makes timestamps worse.
 - Word ids must remain dense and stable within a transcript build.
-- Review state must not be corrupted by partial word updates.
+- Confirmation state must not be corrupted by partial word updates.
 
 ### Acceptance criteria
 

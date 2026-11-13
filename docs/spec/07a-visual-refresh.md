@@ -37,7 +37,7 @@ editor.
 - [ ] Corner radii and spacing are consistent across panels and dialogs.
 - [ ] Toolbars, splitters and panel headers read as one system.
 - [ ] Timecodes and numbers use the monospace stack.
-- [ ] Active/hover/disabled/reviewed/skipped states are visually distinct.
+- [ ] Active/hover/disabled/confirmed/skipped states are visually distinct.
 - [ ] Defect colors and waveform remain readable at all zoom levels.
 - [ ] Dark-only; no theme switcher.
 - [ ] Keyboard focus is visible; contrast is checked.

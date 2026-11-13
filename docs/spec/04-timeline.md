@@ -59,9 +59,9 @@ stays readable: [story 42](04c-waveform-contrast.md).
 As a user, I want skip ranges and bookmarks visible on the timeline.
 
 - Skip intervals use the same data as playback (story 26).
-- Reviewed items are not shown as skipped.
+- Deleted items are not shown as skipped.
 - Bookmarks render as green flags + dashed lines.
-- Overlays update when padding/review state changes.
+- Overlays update when padding or skip settings change.
 
 ### Story 17 — Arbitrary selection and pause tokens
 
@@ -103,8 +103,8 @@ Detail and acceptance criteria: [`04a-waveform-selection.md`](04a-waveform-selec
 
 - [ ] Skip intervals are a distinct translucent overlay.
 - [ ] Bookmarks are green flags with dashed lines.
-- [ ] Reviewed items are not drawn as skipped.
-- [ ] Overlays update after padding/review changes.
+- [ ] Deleted items are not drawn as skipped.
+- [ ] Overlays update after padding or skip settings change.
 - [ ] Rendering does not block word drawing.
 
 ### Story 17

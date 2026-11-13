@@ -8,7 +8,7 @@ The app helps review a webinar recording:
 
 1. extract audio and transcribe speech locally;
 2. find fillers, pauses, repetitions, elongations, false starts and vocal sounds;
-3. jump quickly to each place and mark it as reviewed;
+3. jump quickly to each place and confirm it or delete it as a false positive;
 4. add manual marks and notes;
 5. export the result to CSV/JSON.
 
@@ -69,7 +69,7 @@ MVP limitations:
 | `src/preload/index.ts` | `contextBridge.exposeInMainWorld('api', …)` |
 | `src/shared/transcript.ts` | `parseRawWords`, `buildTranscript`, segments, active word lookup |
 | `src/shared/defects.ts` | automatic rules, overrides, ordering and deduplication |
-| `src/shared/marks.ts` | logical manual marks, merging, reviewed-state reconciliation |
+| `src/shared/marks.ts` | logical manual marks, merging, confirmation-state reconciliation |
 | `src/shared/exportCsv.ts` | CSV cells, timecodes, export fields |
 | `src/renderer/src/store.ts` | single app state, actions, autosave, history |
 | `src/renderer/src/history.ts` | editable-state snapshots, undo/redo, action log |
@@ -78,7 +78,7 @@ MVP limitations:
 | `src/renderer/src/selection.ts` | word selection, manual-mark range, nearest word |
 | `src/renderer/src/timelineView.ts` | zoom, pan, LOD, ticks, defect boundaries |
 | `src/renderer/src/defectsUi.ts` | labels, colors, type ordering, word→defect mapping for underlays |
-| `src/renderer/src/hooks/useHotkeys.ts` | hotkeys, bulk review and bookmark shortcut |
+| `src/renderer/src/hooks/useHotkeys.ts` | hotkeys, bulk confirmation/deletion and bookmark shortcut |
 | `src/renderer/src/components/Bookmarks.tsx` | bookmark list, notes and resume |
 | `src/renderer/src/components/MiniTimeline.tsx` | selected-defect snippet with editable boundaries |
 | `src/renderer/src/miniTimeline.ts` | mini window/zoom/pan, time↔x mapping and handle hit-testing |
@@ -101,7 +101,7 @@ MVP limitations:
 4. The user starts transcription. The store saves the project with current settings and calls `transcribe:start`.
 5. The main process runs the job and sends `progress`, `partial`, `done`, `error`.
 6. The renderer builds defects from the transcript, rules and manual marks and shows them on the timeline, in the transcript and in the right panel.
-7. Every change to review state, notes, marks or boundaries is saved with a debounce and recorded in history.
+7. Every change to confirmation state, notes, marks or boundaries is saved with a debounce and recorded in history.
 8. Export calls `export:project`; main opens a save dialog and writes the file.
 
 ## 6. Transcription pipeline
@@ -164,7 +164,7 @@ Every automatic defect is also filtered by `rules.minDurationByType[type]`. A pa
 
 Automatic defect ID: `auto-${type}-${sequence}`, where `sequence` is the global insertion order. IDs are not stable when rules change or the recording is re-transcribed.
 
-**Automatic grouping.** When `rules.autoGroupGapSec > 0`, `groupAutoDefects` walks the sorted automatic defects and merges neighbours while the gap is within the limit and no other spoken word lies in that gap. A pause spans only the silence, so a filler immediately before it forms one group, while a filler separated by a real word does not. The group gets the id `auto-group-${firstDefectId}`, combined bounds and words, `groupIds`, `groupTypes` and the highest severity. `0` disables grouping, which is the default.
+**Automatic grouping.** When `rules.autoGroupEnabled` is true and `rules.autoGroupGapSec > 0`, `groupAutoDefects` walks the sorted automatic defects and merges neighbours while the gap is within the limit and no other spoken word lies in that gap. A pause spans only the silence, so a filler immediately before it forms one group, while a filler separated by a real word does not. The group gets the id `auto-group-${firstDefectId}`, combined bounds and words, `groupIds`, `groupTypes` and the highest severity. The gap value is kept while the toggle is off, and `0` also disables grouping at the data level.
 
 `applyDefectOverrides` applies `Project.defectOverrides` on top of automatic defects. Manual marks do not use overrides: their boundaries are stored in the marks themselves.
 
@@ -176,13 +176,15 @@ Manual marks:
 - `detectDefects` builds one `Defect` for a group with ID `manual-group-${groupId}` or `manual-${markId}` and combined `wordIds`.
 - Old marks without `wordIds` use strict interval overlap (`findWordIdsInRange`), not boundary touching.
 
-## 8. Review, history and skip
+## 8. Confirmation, history and skip
 
-- `Project.reviewedDefectIds` stores reviewed defect IDs. Manual marks use `manual-${markId}` or `manual-group-${groupId}`.
-- `reconcileReviewedIds(before, after, reviewedIds)` recomputes manual IDs after add, merge, split or move. A logical mark stays reviewed only if all its parts were reviewed before the change.
+- `Project.confirmedDefectIds` stores confirmed defect IDs. Manual marks use `manual-${markId}` or `manual-group-${groupId}`.
+- `Project.dismissedDefectIds` stores deleted automatic defects; `Project.dismissedMarks` stores deleted manual marks.
+- `detectDefects` builds active automatic groups without dismissed members and returns deleted items separately with `dismissed: true`, so the panel can show, restore and focus them.
+- `reconcileConfirmedIds(before, after, confirmedIds)` recomputes manual IDs after add, merge, split or move. A logical mark stays confirmed only if all its parts were confirmed before the change.
 - Notes are stored in `Project.defectNotes` by defect ID; for manual marks they are duplicated in `ManualMark.note`.
-- History (`src/renderer/src/history.ts`) stores snapshots of editable state only: `marks`, `reviewedDefectIds`, `defectNotes`, `defectOverrides`. Rapid changes with the same `mergeKey` within 2 seconds are coalesced. History lives in memory and is reset when a project is opened or closed.
-- `buildSkipIntervals` takes defects only, excludes `reviewed`, adds before/after padding, clamps to the duration and merges overlapping intervals. Padding comes from `playback.paddingByType[defect.type]`; a logical group (manual or automatic) uses `playback.groupPadding` instead. `skipScope: 'marks'` keeps only `source === 'manual'`. Padding settings are editable regardless of `skipEnabled`.
+- History (`src/renderer/src/history.ts`) stores snapshots of editable state only: `marks`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `defectOverrides`. Rapid changes with the same `mergeKey` within 2 seconds are coalesced. History lives in memory and is reset when a project is opened or closed.
+- `buildSkipIntervals` takes all defects, excludes `dismissed`, adds before/after padding, clamps to the duration and merges overlapping intervals. Padding comes from `playback.paddingByType[defect.type]`; a logical group (manual or automatic) uses `playback.groupPadding` instead. There is no skip scope: automatic defects and manual marks are cut together. Padding settings are editable regardless of `skipEnabled`.
 - `player.ts` jumps over an interval once so it does not fight the seek. The "listen" button temporarily disables skipping for the selected defect.
 
 ## 9. UI
@@ -205,7 +207,7 @@ Canvas waveform with zoom and pan:
 - bookmarks are drawn as green flags and dashed lines;
 - LOD: waveform and defect markers first, then word marks, boundaries and labels;
 - click seeks; `Shift`+click/drag selects words; clicking a marker selects a defect;
-- `Shift+R` reviews every defect touched by the current selection;
+- `Shift+Enter` confirms and `Shift+R` deletes every defect touched by the current selection;
 - the active defect has two draggable boundaries. An automatic defect is saved in `defectOverrides`; a manual mark updates its `start`/`end` and `wordIds`;
 - skip intervals are highlighted in yellow.
 
@@ -213,18 +215,18 @@ Canvas waveform with zoom and pan:
 
 - Virtualized segment list (`@tanstack/react-virtual`).
 - Click a word to seek; `Shift`+click and drag select; `M` creates a mark using exact boundaries.
-- A selection that contains defects can be reviewed at once with `Shift+R`; the toolbar shows the count.
+- A selection that contains defects can be confirmed with `Shift+Enter` or deleted with `Shift+R`; the toolbar shows both counts.
 - Pauses are shown as chips after a word; long sentence-boundary pauses are shown as a separate row.
-- Defect, reviewed-word and skipped-place highlighting.
+- Defect, confirmed-word and skipped-place highlighting; deleted defects are omitted from timeline markers.
 - "Only with defects", "Follow" and "Copy" buttons.
 
 ### DefectPanel
 
-- Filters by type, "only unreviewed", counters; `settings.hideReviewed` removes reviewed items entirely.
-- A selected range with defects shows "проверить выделение" (review the selection).
-- Mark as reviewed, note, "listen", loop, delete and "split" for manual marks.
+- Filters by type and counters; `settings.showDismissed` decides whether deleted cards stay visible as thin rows.
+- A selected range with defects shows confirm and delete actions.
+- A pending card has a left rail with delete and confirm buttons. A confirmed card collapses to a compact row with a right-side undo button. A deleted card is a thin row with a restore button when `showDismissed` is on. Further actions: note, "listen", loop, delete and "split" for manual marks.
 - The active item shows a mini timeline under its text: waveform context, the defect span, draggable boundaries and the shared playhead.
-- Jump to the next unreviewed defect.
+- Jump to the next unconfirmed defect.
 - CSV/JSON export.
 
 ### SettingsDialog
@@ -232,12 +234,16 @@ Canvas waveform with zoom and pan:
 Three tabs:
 
 - **General** — engine, model (download/delete), language, backend, chunk size, licenses;
-- **Defects** — skip mode, per-type and group padding, defect rules with sliders, per-type minimum duration, automatic grouping and hiding reviewed defects;
+- **Defects** — show-dismissed at the top, one row per defect type with an
+  enable checkbox, minimum duration, before/after padding and type-specific
+  controls (pause last, with threshold, critical pause and sentence-end
+  exclusion), manual/group padding, automatic-grouping toggle, timeline
+  contrast and mini-timeline padding. Skip mode lives in the player;
 - **Export** — CSV fields, delimiter, header.
 
 ### Hotkeys
 
-`useHotkeys` matches `event.code` first, so the Russian keyboard layout does not break `R`, `M`, `B`, `[`, `]`, `J`, `K`. Hotkeys are disabled in input fields. `Shift+R` reviews the selected words, `B` adds a bookmark.
+`useHotkeys` matches `event.code` first, so the Russian keyboard layout does not break `R`, `M`, `B`, `[`, `]`, `J`, `K`. Hotkeys are disabled in input fields. `Enter` confirms the active defect, `R` deletes it, `Shift+Enter`/`Shift+R` act on the selection, and `B` adds a bookmark. In skip mode these edit hotkeys work only while paused.
 
 ## 10. Export
 

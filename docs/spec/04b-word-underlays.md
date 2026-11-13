@@ -23,10 +23,10 @@ words are marked without reading the defect list.
 - The active defect's words are the strongest.
 - Other marked words (including neighbours in the mini timeline) get a faint
   colored underlay.
-- Reviewed words stay visible but dimmer.
+- Confirmed words stay visible but dimmer.
 - The underlay is drawn in the word strip/label area, not across the entire
   waveform, so the waveform and defect markers stay readable.
-- This is visual only: no change to `wordIds`, `markIds`, review or skip.
+- This is visual only: no change to `wordIds`, `markIds`, confirmation or skip.
 
 ## Acceptance criteria
 
@@ -34,11 +34,11 @@ words are marked without reading the defect list.
 - [ ] Manual marks override automatic colors for the same word.
 - [ ] Pause defects produce no word underlay.
 - [ ] The active defect's words are stronger than other marked words.
-- [ ] Reviewed words are dimmer but not invisible.
+- [ ] Confirmed words are dimmer but not invisible.
 - [ ] Neighbouring marked words in the mini timeline are faintly colored.
 - [ ] The main timeline uses the same mapping.
 - [ ] Text labels remain readable over the underlay.
-- [ ] No data model or review-state change.
+- [ ] No data model or confirmation-state change.
 - [ ] Unit test: `defectByWordId` excludes pauses and prefers manual marks.
 
 ## Verification

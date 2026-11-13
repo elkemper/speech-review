@@ -14,7 +14,8 @@ type Action =
   | 'end'
   | 'next'
   | 'prev'
-  | 'review'
+  | 'confirm'
+  | 'delete'
   | 'mark'
   | 'bookmark'
   | 'loop'
@@ -51,7 +52,10 @@ function actionFor(event: KeyboardEvent): Action | null {
     case 'KeyK':
       return 'prev'
     case 'KeyR':
-      return 'review'
+      return 'delete'
+    case 'Enter':
+    case 'NumpadEnter':
+      return 'confirm'
     case 'KeyM':
       return 'mark'
     case 'KeyB':
@@ -104,7 +108,9 @@ function actionFor(event: KeyboardEvent): Action | null {
       return 'prev'
     case 'r':
     case 'R':
-      return 'review'
+      return 'delete'
+    case 'Enter':
+      return 'confirm'
     case 'm':
     case 'M':
       return 'mark'
@@ -133,24 +139,25 @@ function actionFor(event: KeyboardEvent): Action | null {
 
 function moveDefect(defects: Defect[], direction: 1 | -1): void {
   const state = useApp.getState()
-  if (defects.length === 0) return
+  const visible = defects.filter((defect) => !defect.dismissed)
+  if (visible.length === 0) return
 
-  let index = defects.findIndex((defect) => defect.id === state.activeDefectId)
+  let index = visible.findIndex((defect) => defect.id === state.activeDefectId)
   if (index < 0) {
     if (direction > 0) {
-      index = defects.findIndex((defect) => defect.start > state.currentTime + 0.05)
+      index = visible.findIndex((defect) => defect.start > state.currentTime + 0.05)
     } else {
       index = -1
-      for (let i = 0; i < defects.length; i++) {
-        if (defects[i].start < state.currentTime - 0.05) index = i
+      for (let i = 0; i < visible.length; i++) {
+        if (visible[i].start < state.currentTime - 0.05) index = i
       }
     }
   } else {
     index += direction
   }
 
-  index = Math.max(0, Math.min(defects.length - 1, index))
-  const defect = defects[index]
+  index = Math.max(0, Math.min(visible.length - 1, index))
+  const defect = visible[index]
   if (!defect) return
   state.setActiveDefect(defect.id)
   state.setFollow(true)
@@ -208,6 +215,14 @@ export function useHotkeys(defects: Defect[]): void {
       const action = actionFor(event)
       if (!action) return
 
+      // In skip mode, editing is available only while paused. While the video
+      // is actually fast-forwarding, a stray keystroke must not confirm or
+      // delete a defect that is currently being jumped over.
+      const ffPlaying = state.settings.playback.skipEnabled && state.playing
+      if (ffPlaying && (action === 'confirm' || action === 'delete' || action === 'mark')) {
+        return
+      }
+
       const active = defects.find((defect) => defect.id === state.activeDefectId) ?? null
 
       switch (action) {
@@ -239,7 +254,7 @@ export function useHotkeys(defects: Defect[]): void {
           event.preventDefault()
           moveDefect(defects, -1)
           break
-        case 'review':
+        case 'confirm':
           event.preventDefault()
           if (event.shiftKey && state.selection) {
             const ids = defectIdsForSelection(
@@ -248,19 +263,37 @@ export function useHotkeys(defects: Defect[]): void {
               state.selection
             )
             if (ids.length > 0) {
-              state.setReviewedMany(
-                ids,
-                true,
-                `Проверено выделение: ${ids.length}`
-              )
+              state.confirmMany(ids, `Подтверждено выделение: ${ids.length}`)
             } else {
               state.notify('В выделении нет дефектов')
             }
           } else if (active) {
-            state.toggleReviewed(
-              active.id,
-              `${active.reviewed ? 'Снята отметка' : 'Проверено'}: ${active.text}`
+            if (!active.dismissed) {
+              state.confirmDefect(active.id, `Подтверждён: ${active.text}`)
+            }
+          }
+          break
+        case 'delete':
+          event.preventDefault()
+          if (event.shiftKey && state.selection) {
+            const ids = defectIdsForSelection(
+              defects,
+              state.project.transcript?.words ?? [],
+              state.selection
             )
+            if (ids.length > 0) {
+              state.removeDefects(
+                ids.map((id) => ({
+                  id,
+                  relatedIds: defects.find((defect) => defect.id === id)?.groupIds
+                }))
+              )
+              state.notify(`Удалено: ${ids.length}`)
+            } else {
+              state.notify('В выделении нет дефектов')
+            }
+          } else if (active) {
+            if (!active.dismissed) state.removeDefect(active.id, active.groupIds)
           }
           break
         case 'mark':

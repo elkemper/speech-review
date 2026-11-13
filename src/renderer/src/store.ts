@@ -6,7 +6,7 @@ import {
   markIdsForDefectId,
   manualDefectIdForMark,
   mergeMarkNeighbours,
-  reconcileReviewedIds
+  reconcileConfirmedIds
 } from '@shared/marks'
 import type {
   Bookmark,
@@ -88,7 +88,6 @@ interface AppStore {
   showSettings: boolean
   showHistory: boolean
   filter: DefectFilter
-  onlyUnreviewed: boolean
   history: HistoryState
 
   init: () => Promise<void>
@@ -104,14 +103,17 @@ interface AppStore {
   downloadModel: (id: ModelId) => Promise<void>
   updateSettings: (patch: SettingsPatch) => void
   setRules: (patch: Partial<DefectRules>) => void
-  toggleReviewed: (defectId: string, label?: string) => void
-  setReviewedMany: (defectIds: string[], reviewed?: boolean, label?: string) => void
+  confirmDefect: (defectId: string, label?: string) => void
+  confirmMany: (defectIds: string[], label?: string) => void
+  unconfirmDefect: (defectId: string, label?: string, relatedIds?: string[]) => void
+  restoreDefect: (defectId: string, relatedIds?: string[]) => void
   setNote: (defectId: string, note: string) => void
   addMark: () => void
   addBookmark: (time?: number) => void
   removeBookmark: (id: string) => void
   setBookmarkNote: (id: string, note: string) => void
-  removeDefect: (defectId: string) => void
+  removeDefect: (defectId: string, relatedIds?: string[]) => void
+  removeDefects: (items: Array<{ id: string; relatedIds?: string[] }>) => void
   splitManualGroup: (defectId: string) => void
   setDefectBounds: (defectId: string, start: number, end: number) => void
   undo: () => void
@@ -128,7 +130,6 @@ interface AppStore {
   clearSelection: () => void
   setFollow: (follow: boolean) => void
   setFilter: (filter: DefectFilter) => void
-  setOnlyUnreviewed: (value: boolean) => void
   setShowSettings: (show: boolean) => void
   setShowHistory: (show: boolean) => void
   setError: (error: string | null) => void
@@ -141,7 +142,8 @@ const FALLBACK_SETTINGS: Settings = {
     ...DEFAULT_SETTINGS.rules,
     fillerWords: [...DEFAULT_SETTINGS.rules.fillerWords],
     multiWordFillers: DEFAULT_SETTINGS.rules.multiWordFillers.map((phrase) => [...phrase]),
-    minDurationByType: { ...DEFAULT_SETTINGS.rules.minDurationByType }
+    minDurationByType: { ...DEFAULT_SETTINGS.rules.minDurationByType },
+    enabledTypes: { ...DEFAULT_SETTINGS.rules.enabledTypes }
   },
   export: { ...DEFAULT_SETTINGS.export, fields: [...DEFAULT_SETTINGS.export.fields] },
   playback: {
@@ -193,7 +195,6 @@ export const useApp = create<AppStore>((set, get) => ({
   showSettings: false,
   showHistory: false,
   filter: 'all',
-  onlyUnreviewed: false,
   history: createHistoryState(),
 
   init: async () => {
@@ -283,7 +284,6 @@ export const useApp = create<AppStore>((set, get) => ({
         selectedWordId: null,
         selection: null,
         filter: 'all',
-        onlyUnreviewed: false,
         progress: null,
         jobId: null,
         follow: true,
@@ -462,45 +462,97 @@ export const useApp = create<AppStore>((set, get) => ({
     get().updateSettings({ rules: { ...get().settings.rules, ...patch } })
   },
 
-  toggleReviewed: (defectId, label) => {
+  confirmDefect: (defectId, label) => {
     const project = get().project
     if (!project) return
+    if (project.confirmedDefectIds.includes(defectId)) return
     const before = snapshotEditable(project)
-    const reviewed = new Set(project.reviewedDefectIds)
-    const nextReviewed = !reviewed.has(defectId)
-    if (nextReviewed) reviewed.add(defectId)
-    else reviewed.delete(defectId)
-    set({ project: { ...project, reviewedDefectIds: [...reviewed] } })
-    recordProjectChange(
-      set,
-      get,
-      before,
-      label ?? (nextReviewed ? 'Отмечено проверенным' : 'Снята отметка')
-    )
+    const confirmed = new Set(project.confirmedDefectIds)
+    confirmed.add(defectId)
+    const dismissed = new Set(project.dismissedDefectIds)
+    dismissed.delete(defectId)
+    set({
+      project: {
+        ...project,
+        confirmedDefectIds: [...confirmed],
+        dismissedDefectIds: [...dismissed]
+      }
+    })
+    recordProjectChange(set, get, before, label ?? 'Дефект подтверждён')
     get().scheduleSave()
   },
 
-  setReviewedMany: (defectIds, reviewed, label) => {
+  confirmMany: (defectIds, label) => {
     const project = get().project
     if (!project || defectIds.length === 0) return
     const before = snapshotEditable(project)
-    const current = new Set(project.reviewedDefectIds)
-    const nextReviewed =
-      reviewed ?? !defectIds.every((defectId) => current.has(defectId))
+    const confirmed = new Set(project.confirmedDefectIds)
+    const dismissed = new Set(project.dismissedDefectIds)
     for (const defectId of defectIds) {
-      if (nextReviewed) current.add(defectId)
-      else current.delete(defectId)
+      confirmed.add(defectId)
+      dismissed.delete(defectId)
     }
-    set({ project: { ...project, reviewedDefectIds: [...current] } })
-    recordProjectChange(
-      set,
-      get,
-      before,
-      label ??
-        (nextReviewed
-          ? `Проверено: ${defectIds.length}`
-          : `Снята отметка: ${defectIds.length}`)
-    )
+    set({
+      project: {
+        ...project,
+        confirmedDefectIds: [...confirmed],
+        dismissedDefectIds: [...dismissed]
+      }
+    })
+    recordProjectChange(set, get, before, label ?? `Подтверждено: ${defectIds.length}`)
+    get().scheduleSave()
+  },
+
+  unconfirmDefect: (defectId, label, relatedIds = []) => {
+    const project = get().project
+    if (!project) return
+    const stale = new Set([defectId, ...relatedIds])
+    if (!project.confirmedDefectIds.some((id) => stale.has(id))) return
+    const before = snapshotEditable(project)
+    const confirmed = project.confirmedDefectIds.filter((id) => !stale.has(id))
+    set({ project: { ...project, confirmedDefectIds: confirmed } })
+    recordProjectChange(set, get, before, label ?? 'Подтверждение снято')
+    get().scheduleSave()
+  },
+
+  restoreDefect: (defectId, relatedIds = []) => {
+    const project = get().project
+    if (!project) return
+    const before = snapshotEditable(project)
+    const markIds = markIdsForDefectId(defectId, project.dismissedMarks ?? [])
+    const stale = new Set([defectId, ...relatedIds])
+    const confirmed = project.confirmedDefectIds.filter((id) => !stale.has(id))
+    const dismissedIds = project.dismissedDefectIds.filter((id) => !stale.has(id))
+
+    if (markIds.length > 0) {
+      const restoreIds = new Set(markIds)
+      const restored = (project.dismissedMarks ?? []).filter((mark) => restoreIds.has(mark.id))
+      set({
+        project: {
+          ...project,
+          marks: [...project.marks, ...restored],
+          dismissedMarks: (project.dismissedMarks ?? []).filter(
+            (mark) => !restoreIds.has(mark.id)
+          ),
+          confirmedDefectIds: confirmed.filter(
+            (id) => !markIds.some((markId) => id === `manual-${markId}`)
+          ),
+          dismissedDefectIds: dismissedIds
+        },
+        activeDefectId: defectId
+      })
+      recordProjectChange(set, get, before, 'Метка восстановлена')
+    } else {
+      set({
+        project: {
+          ...project,
+          confirmedDefectIds: confirmed,
+          dismissedDefectIds: dismissedIds
+        },
+        activeDefectId: defectId
+      })
+      recordProjectChange(set, get, before, 'Дефект восстановлен')
+    }
     get().scheduleSave()
   },
 
@@ -599,10 +651,10 @@ export const useApp = create<AppStore>((set, get) => ({
       project: {
         ...project,
         marks,
-        reviewedDefectIds: reconcileReviewedIds(
+        confirmedDefectIds: reconcileConfirmedIds(
           project.marks,
           marks,
-          project.reviewedDefectIds
+          project.confirmedDefectIds
         )
       },
       activeDefectId,
@@ -619,7 +671,7 @@ export const useApp = create<AppStore>((set, get) => ({
       : 1
     const count = range.wordIds.length
     if (groupSize > 1) {
-      get().notify(`Метки объединены в логическую (${groupSize}) — проверяется за раз`)
+      get().notify(`Метки объединены в логическую (${groupSize}) — подтверждается за раз`)
     } else {
       get().notify(
         count > 1
@@ -629,29 +681,73 @@ export const useApp = create<AppStore>((set, get) => ({
     }
   },
 
-  removeDefect: (defectId) => {
+  removeDefect: (defectId, relatedIds = []) => {
+    get().removeDefects([{ id: defectId, relatedIds }])
+  },
+
+  removeDefects: (items) => {
     const project = get().project
-    if (!project) return
-    const markIds = markIdsForDefectId(defectId, project.marks)
-    if (markIds.length === 0) return
+    if (!project || items.length === 0) return
     const before = snapshotEditable(project)
     const notes = { ...project.defectNotes }
-    delete notes[defectId]
-    for (const markId of markIds) delete notes[`manual-${markId}`]
-    const reviewed = project.reviewedDefectIds.filter(
-      (id) =>
-        id !== defectId && !markIds.some((markId) => id === `manual-${markId}`)
-    )
+    const confirmed = new Set(project.confirmedDefectIds)
+    const dismissed = new Set(project.dismissedDefectIds)
+    const dismissedMarks = [...(project.dismissedMarks ?? [])]
+    const archivedIds = new Set(dismissedMarks.map((mark) => mark.id))
+    const overrides = { ...project.defectOverrides }
+    const removedMarkIds = new Set<string>()
+    let manualCount = 0
+
+    for (const item of items) {
+      const markIds = markIdsForDefectId(item.id, project.marks)
+      const stale = new Set([item.id, ...(item.relatedIds ?? [])])
+      for (const id of stale) {
+        delete notes[id]
+        delete overrides[id]
+        confirmed.delete(id)
+        dismissed.delete(id)
+      }
+      if (markIds.length > 0) {
+        manualCount++
+        for (const markId of markIds) {
+          removedMarkIds.add(markId)
+          const mark = project.marks.find((candidate) => candidate.id === markId)
+          if (mark && !archivedIds.has(mark.id)) {
+            dismissedMarks.push(mark)
+            archivedIds.add(mark.id)
+          }
+          const singleId = `manual-${markId}`
+          delete notes[singleId]
+          confirmed.delete(singleId)
+          dismissed.delete(singleId)
+        }
+      } else {
+        for (const id of stale) dismissed.add(id)
+      }
+    }
+
     set({
       project: {
         ...project,
-        marks: project.marks.filter((mark) => !markIds.includes(mark.id)),
-        reviewedDefectIds: reviewed,
-        defectNotes: notes
+        marks:
+          removedMarkIds.size > 0
+            ? project.marks.filter((mark) => !removedMarkIds.has(mark.id))
+            : project.marks,
+        confirmedDefectIds: [...confirmed],
+        dismissedDefectIds: [...dismissed],
+        dismissedMarks,
+        defectNotes: notes,
+        defectOverrides: overrides
       },
       activeDefectId: null
     })
-    recordProjectChange(set, get, before, 'Удалена метка')
+    const label =
+      items.length === 1
+        ? manualCount > 0
+          ? 'Удалена метка'
+          : 'Удалён дефект'
+        : `Удалено: ${items.length}`
+    recordProjectChange(set, get, before, label)
     get().scheduleSave()
   },
 
@@ -669,10 +765,10 @@ export const useApp = create<AppStore>((set, get) => ({
     const marks = project.marks.map((mark) =>
       markIds.includes(mark.id) ? { ...mark, groupId: undefined } : mark
     )
-    const reviewed = reconcileReviewedIds(
+    const confirmed = reconcileConfirmedIds(
       project.marks,
       marks,
-      project.reviewedDefectIds
+      project.confirmedDefectIds
     )
     for (const mark of groupMarks) {
       const singleId = `manual-${mark.id}`
@@ -682,7 +778,7 @@ export const useApp = create<AppStore>((set, get) => ({
       project: {
         ...project,
         marks,
-        reviewedDefectIds: reviewed,
+        confirmedDefectIds: confirmed,
         defectNotes: notes
       },
       activeDefectId: `manual-${groupMarks[0].id}`
@@ -737,13 +833,13 @@ export const useApp = create<AppStore>((set, get) => ({
       marks = mergeMarkNeighbours(marks, changedIds)
       const changedId = changedIds[0]
       const activeId = manualDefectIdForMark(marks, changedId) ?? defectId
-      const reviewed = reconcileReviewedIds(
+      const confirmed = reconcileConfirmedIds(
         project.marks,
         marks,
-        project.reviewedDefectIds
+        project.confirmedDefectIds
       )
       set({
-        project: { ...project, marks, reviewedDefectIds: reviewed },
+        project: { ...project, marks, confirmedDefectIds: confirmed },
         activeDefectId: activeId
       })
     } else {
@@ -828,7 +924,6 @@ export const useApp = create<AppStore>((set, get) => ({
   clearSelection: () => set({ selectedWordId: null, selection: null }),
   setFollow: (follow) => set({ follow }),
   setFilter: (filter) => set({ filter }),
-  setOnlyUnreviewed: (value) => set({ onlyUnreviewed: value }),
   setShowSettings: (show) => set({ showSettings: show }),
   setShowHistory: (show) => set({ showHistory: show }),
   setError: (error) => set({ error }),
@@ -888,7 +983,6 @@ async function createFromMedia(
     activeDefectId: null,
     selectedWordId: null,
     filter: 'all',
-    onlyUnreviewed: false,
     progress: null,
     jobId: null,
     follow: true,
@@ -966,9 +1060,13 @@ function attachListeners(
         defectOverrides: keepReview
           ? state.project.defectOverrides
           : partial.project.defectOverrides,
-        reviewedDefectIds: keepReview
-          ? state.project.reviewedDefectIds
-          : partial.project.reviewedDefectIds,
+        confirmedDefectIds: keepReview
+          ? state.project.confirmedDefectIds
+          : partial.project.confirmedDefectIds,
+        dismissedDefectIds: keepReview
+          ? state.project.dismissedDefectIds
+          : partial.project.dismissedDefectIds,
+        dismissedMarks: state.project.dismissedMarks,
         defectNotes: keepReview ? state.project.defectNotes : partial.project.defectNotes
       },
       peaks: partial.peaks ?? state.peaks,
@@ -988,7 +1086,9 @@ function attachListeners(
           marks: state.project.marks,
           bookmarks: state.project.bookmarks ?? done.project.bookmarks ?? [],
           defectOverrides: state.project.defectOverrides,
-          reviewedDefectIds: state.project.reviewedDefectIds,
+          confirmedDefectIds: state.project.confirmedDefectIds,
+          dismissedDefectIds: state.project.dismissedDefectIds,
+          dismissedMarks: state.project.dismissedMarks,
           defectNotes: state.project.defectNotes
         },
         peaks: done.peaks ?? state.peaks,

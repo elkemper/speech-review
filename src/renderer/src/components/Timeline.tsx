@@ -59,11 +59,16 @@ export default function Timeline({
 
   const duration = Math.max(0.1, project?.duration ?? 0)
   const words = project?.transcript?.words ?? []
-  const activeDefect = useMemo(
-    () => defects.find((defect) => defect.id === activeDefectId) ?? null,
-    [defects, activeDefectId]
+  // Deleted defects keep their card in the panel but never mark the timeline.
+  const visibleDefects = useMemo(
+    () => defects.filter((defect) => !defect.dismissed),
+    [defects]
   )
-  const wordDefectMap = useMemo(() => defectByWordId(defects), [defects])
+  const activeDefect = useMemo(
+    () => visibleDefects.find((defect) => defect.id === activeDefectId) ?? null,
+    [visibleDefects, activeDefectId]
+  )
+  const wordDefectMap = useMemo(() => defectByWordId(visibleDefects), [visibleDefects])
   const activeWordIds = useMemo(
     () => new Set(activeDefect?.wordIds ?? []),
     [activeDefect]
@@ -76,8 +81,8 @@ export default function Timeline({
   const selectedRange = useMemo(() => rangeForSelection(words, selection), [words, selection])
   const skipIntervals = useMemo(
     () =>
-      buildSkipIntervals(defects, playback, project?.duration ?? 0),
-    [defects, project?.marks, project?.duration, playback]
+      buildSkipIntervals(visibleDefects, playback, project?.duration ?? 0),
+    [visibleDefects, project?.marks, project?.duration, playback]
   )
 
   const draggingRef = useRef(false)
@@ -227,14 +232,14 @@ export default function Timeline({
         const wordDefect = wordDefectMap.get(word.id)
         const activeWord = activeWordIds.has(word.id)
         const type = activeWord && activeDefect ? activeDefect.type : wordDefect?.type
-        const reviewed = wordDefect?.reviewed ?? false
+        const confirmed = wordDefect?.confirmed ?? false
         const color = type ? DEFECT_COLORS[type] : null
 
-        // Colored backing for marked words. Reviewed words stay visible but
+        // Colored backing for marked words. Confirmed words stay visible but
         // dimmer; the active defect's words are the strongest.
         if (color) {
           ctx.save()
-          ctx.globalAlpha = activeWord ? 0.24 : reviewed ? 0.09 : 0.15
+          ctx.globalAlpha = activeWord ? 0.24 : confirmed ? 0.09 : 0.15
           ctx.fillStyle = color
           ctx.fillRect(x1, barTop - 1, Math.max(1, wordWidth - 1), HEIGHT - barTop + 1)
           ctx.restore()
@@ -260,7 +265,7 @@ export default function Timeline({
         const y = barTop + 5 + row * 12
         if (color) {
           ctx.save()
-          ctx.globalAlpha = activeWord ? 0.28 : reviewed ? 0.1 : 0.17
+          ctx.globalAlpha = activeWord ? 0.28 : confirmed ? 0.1 : 0.17
           ctx.fillStyle = color
           ctx.fillRect(x1, y, wordWidth - 1, 11)
           ctx.restore()
@@ -276,12 +281,12 @@ export default function Timeline({
     // Defect markers are the first layer of detail: show them even when the
     // whole recording is zoomed out, before word boundaries appear.
     {
-      for (const defect of defects) {
+      for (const defect of visibleDefects) {
         if (defect.end < view.start || defect.start > view.end) continue
         const x = toX(defect.start)
         const color = DEFECT_COLORS[defect.type]
         const active = defect.id === activeDefectId
-        ctx.globalAlpha = defect.reviewed ? 0.18 : active ? 0.95 : 0.6
+        ctx.globalAlpha = defect.confirmed ? 0.18 : active ? 0.95 : 0.6
         ctx.fillStyle = color
         if (defect.type === 'pause') {
           const endX = toX(Math.min(view.end, defect.end))
@@ -395,7 +400,7 @@ export default function Timeline({
   }, [
     width,
     peaks,
-    defects,
+    visibleDefects,
     currentTime,
     loop,
     activeDefectId,
@@ -429,7 +434,7 @@ export default function Timeline({
     const px = clientX - rect.left
     let nearest: Defect | null = null
     let best = 7
-    for (const defect of defects) {
+    for (const defect of visibleDefects) {
       const x = ((defect.start - viewRef.current.start) / span) * rect.width
       const distance = Math.abs(x - px)
       if (distance < best) {
@@ -512,7 +517,8 @@ export default function Timeline({
 
     if (boundaryRef.current) {
       const current =
-        defects.find((defect) => defect.id === boundaryRef.current?.defectId) ?? activeDefect
+        visibleDefects.find((defect) => defect.id === boundaryRef.current?.defectId) ??
+        activeDefect
       if (!current) {
         boundaryRef.current = null
         return

@@ -32,7 +32,7 @@ fillers, coughs and repetitions do not flood the list.
 - `0` means no limit.
 - Pause measures the silence; repetition measures the shorter repeated word;
   other types measure the defect span.
-- UI in Defects → advanced block (story 2 supplies the slider control).
+- UI: the per-type row in Defects, next to the type name (story 43).
 
 ### Story 6 — Automatic grouping of neighbours
 
@@ -64,6 +64,27 @@ pause defect.
 - Ordinary long pauses that are not sentence boundaries remain pause defects
   and get no extra transcript decoration.
 
+### Story 44 — Enable/disable a defect type and automatic grouping
+
+**Status:** Done · **Priority:** P1
+
+As a user, I want to switch a whole defect type off for the project, and to
+switch automatic grouping on and off with a checkbox, without losing the
+values I already set.
+
+- Field: `rules.enabledTypes: Record<DefectType, boolean>`. Missing entries
+  mean on, except `unclear`, which stays off while the engine writes
+  `confidence: 0` (presentation is also marked "в разработке").
+- `manual` is never filtered: manual marks are explicit user work.
+- A disabled type produces no defects, but the detection sequence still
+  advances, so ids of the other types do not shift.
+- Field: `rules.autoGroupEnabled: boolean` plus the existing
+  `rules.autoGroupGapSec`.
+- Old rules with `autoGroupGapSec > 0` migrate to enabled; storing an explicit
+  `false` keeps the gap for when grouping is turned on again.
+- The UI is a checkbox per type and a checkbox plus gap slider for grouping
+  (story 43).
+
 ## Acceptance criteria
 
 ### Story 4
@@ -91,7 +112,7 @@ pause defect.
 - [ ] A filler directly before a pause groups; a filler separated by a word
       does not.
 - [ ] Group counts contribute to every type in `groupTypes`.
-- [ ] Group is reviewed/skipped as one item.
+- [ ] Group is confirmed/skipped as one item.
 - [ ] Regression tests cover gap limit, word blocker and counts.
 
 ### Story 7
@@ -101,8 +122,21 @@ pause defect.
 - [ ] Non-sentence long pauses are pause defects with no special styling.
 - [ ] The fixture pause after "пользу." stays excluded.
 
+### Story 44
+
+- [ ] A disabled type produces no defects of that type.
+- [ ] Manual marks are still detected when `enabledTypes.manual` is false.
+- [ ] Turning a type off does not renumber the other automatic defects.
+- [ ] Old rules without `enabledTypes` load with every usable type enabled and
+      `unclear` off.
+- [ ] Grouping runs only when `autoGroupEnabled` is true and the gap is positive.
+- [ ] Turning grouping off keeps `autoGroupGapSec` for the next enable.
+- [ ] Old rules with a positive gap migrate to enabled.
+- [ ] Regression tests cover on/off, id stability and migration.
+
 ## Verification
 
 - `test/core.test.ts` — fixture, rule counts, sentence pause.
-- `test/grouping.test.ts` — minimum duration, grouping, normalization.
+- `test/grouping.test.ts` — minimum duration, grouping, enabled types,
+  normalization.
 - Real recognition still needs a macOS run.

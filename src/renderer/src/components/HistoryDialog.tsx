@@ -78,7 +78,7 @@ export default function HistoryDialog() {
         <div className="modal-body history-body">
           {entries.length === 0 ? (
             <div className="panel-empty">
-              Добавьте метку, отметьте дефект проверенным или измените границы — действия
+              Добавьте метку, подтвердите или удалите дефект либо измените границы — действия
               появятся здесь.
             </div>
           ) : (

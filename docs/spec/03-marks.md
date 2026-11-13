@@ -1,4 +1,4 @@
-# 03 — Manual marks and review
+# 03 — Manual marks and confirmation
 
 [Index](../SPEC.md) · Prev: [02 — Defects](02-defects.md) · Next:
 [04 — Timeline](04-timeline.md)
@@ -34,34 +34,35 @@ As a user, I want to select several words and create one mark over all of them.
 - Click selects one word; `Shift`+click extends; dragging selects a range.
 - Selection works in the transcript and on the timeline.
 - `M` creates one mark with all selected ids.
-- The selection badge shows the count and offers mark/review actions.
+- The selection badge shows the count and offers confirm/delete actions.
 
 ### Story 10 — Logical marks
 
 **Status:** Done · **Priority:** P0
 
 As a user, I want adjacent marks to become one logical mark that can be
-reviewed once, split back, and merged again when a boundary reaches another
+confirmed once, split back, and merged again when a boundary reaches another
 mark.
 
 - Shared `groupId`; id `manual-group-${groupId}`.
 - Merge on add and on boundary move only.
 - Split removes `groupId`, keeps words and copies the group note to each mark.
-- Delete removes the whole group, its notes and review ids.
+- Delete removes the whole group, its notes and confirmation ids.
 - Old adjacent marks do not merge until one is added/moved.
 
-### Story 11 — Bulk review of a selection
+### Story 11 — Bulk confirmation and deletion of a selection
 
 **Status:** Done · **Priority:** P1
 
-As a user, I want to mark every defect in a word selection as reviewed in one
+As a user, I want to confirm or delete every defect in a word selection in one
 action.
 
-- `Shift+R` reviews all defects touched by the selection (transcript or
+- `Shift+Enter` confirms all defects touched by the selection (transcript or
   timeline).
-- Toolbar and defect panel show the count and an explicit button.
+- `Shift+R` deletes all defects touched by the selection.
+- Toolbar and defect panel show both counts and explicit buttons.
 - A selection with no defects reports that.
-- One history entry for the whole action.
+- Each bulk action is one history entry.
 
 ### Story 12 — Manual boundary editing and overrides
 
@@ -78,19 +79,48 @@ timeline and have word membership follow.
 - The active item also shows an in-panel snippet with the same handles:
   [story 40](10-mini-timeline.md).
 
-### Story 13 — Reviewed-state reconciliation
+### Story 13 — Confirmation-state reconciliation
 
 **Status:** Done · **Priority:** P0
 
-As a user, I want reviewed state to survive merge, split and boundary moves
-without silently reviewing new marks.
+As a user, I want confirmed state to survive merge, split and boundary moves
+without silently confirming new marks.
 
-- `reconcileReviewedIds(before, after, reviewedIds)`.
-- New mark is never reviewed.
-- Merged reviewed + unreviewed = unreviewed group.
-- Split reviewed group = all parts reviewed.
-- Removing a mark removes its review ids and notes.
+- `reconcileConfirmedIds(before, after, confirmedIds)`.
+- New mark is never confirmed.
+- Merged confirmed + unconfirmed = unconfirmed group.
+- Split confirmed group = all parts confirmed.
+- Removing a mark removes its confirmation ids and notes.
 - Automatic ids are never removed by manual reconciliation.
+
+### Story 45 — Defect card confirmation and deletion
+
+**Status:** Done · **Priority:** P1
+
+As a user, I want each defect card to have explicit **delete** and **confirm**
+actions, so I can decide the fate of a defect without treating the checkmark as
+"not a defect".
+
+- Every unconfirmed card has a left rail with a red trash button and a green
+  check button; delete sits above confirm.
+- `Enter` confirms the active defect, `R` deletes it. `Shift+Enter` / `Shift+R`
+  apply the same action to the selection.
+- Confirming collapses the card into a compact row: time, type, duration, plus a
+  right-side undo button. The item stays in the project and export and is cut in
+  skip mode like every non-deleted item.
+- Deleting a manual mark moves it to `Project.dismissedMarks`; deleting an
+  automatic defect adds its ID to `Project.dismissedDefectIds`. Deleted items
+  are excluded from export and skip mode but remain as thin cards with a
+  restore button when `showDismissed` is on.
+- The card header is time · type — duration (up to two decimals, `с.`). The
+  separate severity/confidence badge and the boundary hints are removed.
+- The mini-timeline loses its "границы дефекта" label and the zoom percentage;
+  zoom stays on −/+ and resets on double-click.
+- In skip mode, cards keep their actions. Pending cards retain the left rail;
+  confirmed and deleted cards retain the right-side undo button. While playback
+  is running, confirm/delete/mark hotkeys are blocked; on pause they work again.
+- The panel's "только непроверенные" checkbox is removed. Settings has
+  `showDismissed` for deleted cards only.
 
 ## Acceptance criteria
 
@@ -114,17 +144,18 @@ without silently reviewing new marks.
 
 - [ ] Adding next to an existing mark shares a `groupId`.
 - [ ] Moving a boundary onto another mark merges.
-- [ ] Group is reviewed/deleted as a whole.
+- [ ] Group is confirmed/deleted as a whole.
 - [ ] Split preserves words and notes.
 - [ ] Old adjacent marks do not re-merge on render.
 
 ### Story 11
 
-- [ ] `Shift+R` reviews every touched defect.
-- [ ] The toolbar count and button match.
-- [ ] The panel offers the same action.
+- [ ] `Shift+Enter` confirms every touched defect.
+- [ ] `Shift+R` deletes every touched defect.
+- [ ] The toolbar counts and buttons match.
+- [ ] The panel offers the same actions.
 - [ ] No defects in the selection gives feedback.
-- [ ] Bulk review is one history entry.
+- [ ] Each bulk action is one history entry.
 
 ### Story 12
 
@@ -138,11 +169,24 @@ without silently reviewing new marks.
 
 ### Story 13
 
-- [ ] New marks are unreviewed.
-- [ ] Merge reviewed + unreviewed = unreviewed.
-- [ ] Split reviewed = all parts reviewed.
-- [ ] Delete removes review id and notes.
-- [ ] Automatic review ids are untouched.
+- [ ] New marks are unconfirmed.
+- [ ] Merge confirmed + unconfirmed = unconfirmed.
+- [ ] Split confirmed = all parts confirmed.
+- [ ] Delete removes confirmation id and notes.
+- [ ] Automatic confirmation ids are untouched.
+
+### Story 45
+
+- [ ] Each unconfirmed card has delete and confirm buttons in a left rail.
+- [ ] `Enter` / `R` confirm/delete the active defect.
+- [ ] `Shift+Enter` / `Shift+R` confirm/delete the selection.
+- [ ] A confirmed card collapses to a compact row and stays in export/skip.
+- [ ] A deleted automatic defect is stored in `dismissedDefectIds` and is undoable.
+- [ ] A deleted manual mark is stored in `dismissedMarks` and is undoable.
+- [ ] The header shows time · type — duration with up to two decimals.
+- [ ] Skip mode keeps card actions and does not collapse cards.
+- [ ] Confirm/delete/mark hotkeys work in skip mode only while paused.
+- [ ] The panel no longer has "только непроверенные"; `showDismissed` remains in Settings.
 
 ## Verification
 

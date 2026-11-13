@@ -47,7 +47,7 @@ Speech Review/
 | `playback` | see below | skip mode and padding |
 | `miniTimelinePadSec` | `3` | context on each side of the selected defect in the mini timeline |
 | `waveformContrast` | `55` | display-only waveform contrast, 0 = linear |
-| `hideReviewed` | `false` | hide reviewed defects from the defect list |
+| `showDismissed` | `true` | show deleted defects as thin cards with restore |
 
 `DEFAULT_RULES` (`src/shared/defects.ts`):
 
@@ -65,11 +65,14 @@ Speech Review/
   lowConfidenceThreshold: 0.45,
   minDurationByType: { filler: 0, pause: 0, repetition: 0, elongation: 0,
                        false_start: 0, vocal_sound: 0, unclear: 0, manual: 0 },
+  enabledTypes: { filler: true, pause: true, repetition: true, elongation: true,
+                  false_start: true, vocal_sound: true, unclear: false, manual: true },
+  autoGroupEnabled: false,
   autoGroupGapSec: 0
 }
 ```
 
-`minDurationByType` sets the shortest reported defect for each type. For `pause` it is the silence length, for `repetition` the shorter of the two repeated words; `0` means no limit. `autoGroupGapSec` is the largest gap at which neighbouring automatic defects become one group; `0` disables grouping.
+`minDurationByType` sets the shortest reported defect for each type. For `pause` it is the silence length, for `repetition` the shorter of the two repeated words; `0` means no limit. `enabledTypes` turns a whole automatic type off for the project; missing entries mean on, and `manual` is never filtered. `autoGroupEnabled` is the grouping switch; `autoGroupGapSec` is the largest gap at which neighbouring automatic defects become one group. The gap value is kept while grouping is off, and `0` also disables grouping at the data level.
 
 `export`:
 
@@ -80,7 +83,6 @@ Speech Review/
 `playback`:
 
 - `skipEnabled` — `false` by default;
-- `skipScope` — `all` or `marks`;
 - `skipBeforeSec` / `skipAfterSec` — global fallback, 0–5 s, defaults 0.15 / 0.35;
 - `paddingByType` — `Record<DefectType, { before, after }>`; defaults give a pause `0/0` and a filler `0.1/0.2`;
 - `groupPadding` — `{ before, after }` for a logical group, default 0.15 / 0.35.
@@ -92,11 +94,11 @@ Padding is resolved when skip intervals are built and does not depend on `skipEn
 - an unknown `modelId`/`backend` is replaced with the default;
 - `rules` is merged with missing `DEFAULT_RULES` fields;
 - `chunkTargetSec` is rounded and clamped to 120–900;
-- `export.fields` is filtered to known fields; an empty list is replaced with the full list;
+- `export.fields` is filtered to known fields; an empty list is replaced with the full list; the legacy `reviewed` field is migrated to `confirmed`;
 - `playback` is normalized by `normalizePlaybackSettings`: every per-type padding entry is filled from the defaults and values are clamped to 0–5 s;
 - `miniTimelinePadSec` is clamped to 0–15 s (`normalizeMiniTimelinePad`);
 - `waveformContrast` is rounded and clamped to 0–100 (`normalizeWaveformContrast`);
-- `rules` is normalized by `normalizeRules`: missing `minDurationByType` entries and `autoGroupGapSec` are added, and values are clamped.
+- `rules` is normalized by `normalizeRules`: missing `minDurationByType` entries and `autoGroupGapSec` are added, values are clamped, missing `enabledTypes` entries default to on, and old rules with a positive gap migrate to `autoGroupEnabled: true`.
 
 `saveSettings` writes `settings.json.tmp`, then renames it to `settings.json`. Format — JSON with 2-space indentation.
 
@@ -118,7 +120,9 @@ Padding is resolved when skip intervals are built and does not depend on `skipEn
 | `marks` | `ManualMark[]` | manual marks |
 | `rules` | `DefectRules` | rules at project time |
 | `defectOverrides` | `Record<string, {start,end}>` | edited automatic defect boundaries |
-| `reviewedDefectIds` | string[] | reviewed defect IDs |
+| `confirmedDefectIds` | string[] | defects/marks confirmed as real |
+| `dismissedDefectIds` | string[] | automatic defects deleted as false positives |
+| `dismissedMarks` | `ManualMark[]` | deleted manual marks kept for restore |
 | `defectNotes` | `Record<string, string>` | notes by defect ID |
 | `bookmarks` | `Bookmark[]` | navigation markers: `id`, `time`, `note`, `createdAt` |
 | `transcriptComplete` | boolean | whether the transcript is final |
@@ -129,12 +133,14 @@ Project creation:
 1. `projects:create` checks ffmpeg, the audio track and the duration;
 2. name is `basename(path, extname(path))`;
 3. `rules`, `language`, `modelId`, `backend` come from current settings;
-4. `marks`, `defectOverrides`, `reviewedDefectIds`, `defectNotes` and `bookmarks` are empty;
+4. `marks`, `defectOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes` and `bookmarks` are empty;
 5. `transcriptComplete: false`.
 
 Loading:
 
-- missing `marks`, `defectOverrides`, `reviewedDefectIds`, `defectNotes`, `bookmarks`, `transcriptComplete` are filled with safe values;
+- missing `marks`, `defectOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `bookmarks`, `transcriptComplete` are filled with safe values;
+- a project written before this lifecycle change has `reviewedDefectIds` and no new fields. Those ids migrate to `dismissedDefectIds` (automatic) and `dismissedMarks` (manual) because the old checkmark meant "checked and considered not a defect"; `confirmedDefectIds` starts empty;
+- manual ids that were stored in `dismissedDefectIds` by an intermediate build are moved to `dismissedMarks`;
 - `rules` is merged with `DEFAULT_RULES`;
 - `transcript.json` is read separately; if it is missing or broken, `transcript` is not set and `transcriptComplete` is forced to `false`;
 - `peaks.json` is read separately; on error `peaks = null`.
@@ -203,9 +209,12 @@ interface Peaks {
 `Defect` is a computed representation and is not stored in `project.json`. It is assembled in the renderer:
 
 ```ts
-detectDefects(transcript, rules, marks)
+detectDefects(transcript, rules, marks, {
+  dismissedIds: project.dismissedDefectIds,
+  dismissedMarks: project.dismissedMarks
+})
   → applyDefectOverrides(defects, project.defectOverrides)
-  → inject reviewed/note from project.reviewedDefectIds / project.defectNotes
+  → inject confirmed/dismissed/note from the project sets
 ```
 
 Fields:
@@ -222,9 +231,13 @@ Fields:
 | `text` | defect text/note |
 | `severity` | `low`, `medium`, `high` |
 | `source` | `auto` or `manual` |
-| `reviewed`, `note` | filled in by the renderer |
+| `confirmed` | confirmed as a real defect; does not affect skip |
+| `dismissed` | deleted as a false positive; excluded from skip and export |
+| `note` | filled in by the renderer |
 
 Automatic IDs are **not stable**: `sequence` is the global insertion order. Changing rules or re-transcribing can shift the numbering. This is a known limitation; see `docs/BACKLOG.md`.
+
+`dismissedDefectIds` and `dismissedMarks` are applied inside `detectDefects`. Active automatic defects are grouped without dismissed members; deleted automatic and manual items are returned separately with `dismissed: true` so their thin cards can be restored and focused from the transcript. A deleted automatic group stores both the group ID and member IDs.
 
 `applyDefectOverrides`:
 
@@ -253,12 +266,12 @@ Rules:
 - `mergeMarkNeighbours` merges only **changed** marks with those they touch within a gap of ≤ 0.2 s. Merging happens on add and on boundary move.
 - If a changed mark no longer touches its group, it leaves the group (`groupId = undefined`). Old adjacent marks that the user explicitly split do not merge by themselves.
 - `splitManualGroup` removes `groupId` from every mark in the group. The group note is copied to each single mark.
-- `removeDefect` deletes all marks in the group, their notes and review IDs.
+- `removeDefect` moves all marks in a manual group to `dismissedMarks`, removes their confirmation IDs and clears their notes map entry (the mark itself keeps `note`). Deleting an automatic defect adds its ID (and group member IDs) to `dismissedDefectIds`.
 - `groupManualMarks` groups by `groupId` and computes combined `start`, `end`, `wordIds`, `note`.
-- Automatic defects are grouped by `groupAutoDefects` before manual defects are appended. A group gets the id `auto-group-${firstDefectId}`, combined bounds/words and `groupTypes`. It is used by the list, the transcript, review state and skip mode (which applies `playback.groupPadding`).
+- Automatic defects are grouped by `groupAutoDefects` before manual defects are appended. A group gets the id `auto-group-${firstDefectId}`, combined bounds/words and `groupTypes`. It is used by the list, the transcript, confirmation state and skip mode (which applies `playback.groupPadding`).
 - Old marks without `wordIds` use strict interval overlap: a word that only touches the boundary is not included.
 
-## 8. Review and note IDs
+## 8. Confirmation, dismissal and note IDs
 
 | Entity | ID |
 |---|---|
@@ -270,14 +283,17 @@ Rules:
 
 Details:
 
-- `reviewedDefectIds` stores both automatic and manual IDs.
+- `confirmedDefectIds` stores both automatic and manual IDs.
+- `dismissedDefectIds` stores automatic IDs only; deleted manual marks live in `dismissedMarks`.
 - A manual mark's note is written to both `defectNotes` and `ManualMark.note` on every mark in the group. This keeps export and reload consistent.
-- `reconcileReviewedIds(before, after, reviewedIds)`:
+- `reconcileConfirmedIds(before, after, confirmedIds)`:
   - removes all old `manual-*` IDs;
   - leaves automatic IDs untouched;
-  - adds a group review ID only if **every** mark in it was reviewed before the change;
-  - a new mark never becomes reviewed automatically.
-- When a reviewed logical mark is split, all parts remain reviewed. When a reviewed and an unreviewed mark are merged, the new group is considered unreviewed.
+  - adds a group confirmation ID only if **every** mark in it was confirmed before the change;
+  - a new mark never becomes confirmed automatically.
+- When a confirmed logical mark is split, all parts remain confirmed. When a confirmed and an unconfirmed mark are merged, the new group is considered unconfirmed.
+- Skip mode produces intervals for every non-dismissed item; confirmation does not affect playback.
+- Restoring removes the id from the appropriate dismissed store; restoring a manual mark moves it from `dismissedMarks` back to `marks`.
 
 ## 9. Action history
 
@@ -288,7 +304,9 @@ History is stored only in renderer memory and is reset when a project is opened 
 ```ts
 {
   marks: ManualMark[]
-  reviewedDefectIds: string[]
+  confirmedDefectIds: string[]
+  dismissedDefectIds: string[]
+  dismissedMarks: ManualMark[]
   defectNotes: Record<string, string>
   defectOverrides: Record<string, DefectBoundsOverride>
 }
@@ -301,7 +319,7 @@ History is stored only in renderer memory and is reset when a project is opened 
 - `undo`/`redo`/`jumpHistory` apply a snapshot to the project and schedule a save.
 - History does not include: playhead position, speed, loop, selection, filters, bookmarks, transcript or settings.
 
-## 10. Writes and review reset
+## 10. Writes and defect-state reset
 
 - `store.scheduleSave()` uses a 500 ms debounce; `flushSave()` is called when switching or closing a project.
 - Settings without a model/language/backend change are saved with a 450 ms debounce; a model/language/backend change is saved immediately and refreshes engine status.
@@ -309,16 +327,17 @@ History is stored only in renderer memory and is reset when a project is opened 
 - `writeTranscript(id, transcript, complete, resetReview)`:
   - always writes `transcript.json`;
   - updates `transcriptComplete` and `updatedAt` in `project.json`;
-  - when `resetReview = true`, clears `reviewedDefectIds`, `defectNotes` and `defectOverrides`.
+  - when `resetReview = true`, clears `confirmedDefectIds`, `dismissedDefectIds`, `defectNotes` and `defectOverrides`; `marks` and `dismissedMarks` survive.
 - During transcription, the first partial result is written with `resetReview = true` because automatic IDs may have changed. Later partial results use `resetReview = false` so the user's edits in the already visible prefix are not lost. Manual marks are never reset.
-- On the first partial, the renderer replaces review state with the on-disk state and resets history; on later partials and `done`, it keeps local `marks`, `reviewedDefectIds`, `defectNotes`, `defectOverrides`.
+- On the first partial, the renderer replaces automatic confirmation state with the on-disk state and resets history; on later partials and `done`, it keeps local `marks`, `dismissedMarks`, `confirmedDefectIds`, `dismissedDefectIds`, `defectNotes`, `defectOverrides`.
 
 ## 11. Backward compatibility
 
 There is no explicit project schema version. Compatibility is provided by defaults at load time:
 
-- missing `marks`, `defectOverrides`, `reviewedDefectIds`, `defectNotes`, `bookmarks` → empty objects/arrays;
-- missing `rules` fields, including `minDurationByType` and `autoGroupGapSec` → values from `normalizeRules`/`DEFAULT_RULES`;
+- missing `marks`, `defectOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `bookmarks` → empty objects/arrays;
+- a legacy project with `reviewedDefectIds` and no new fields migrates automatic IDs to `dismissedDefectIds` and manual marks to `dismissedMarks`; `confirmedDefectIds` starts empty;
+- missing `rules` fields, including `minDurationByType`, `enabledTypes`, `autoGroupEnabled` and `autoGroupGapSec` → values from `normalizeRules`/`DEFAULT_RULES`;
 - old marks without `wordIds` → strict time overlap;
 - old marks without `groupId` → single marks;
 - missing/broken `transcript.json` → project without a transcript, `transcriptComplete = false`;

@@ -5,8 +5,8 @@
 **Status:** Backlog / Decision needed · **Priority:** P2
 
 This is a logically autonomous part of story 29. It is separated because it
-changes the semantics of skipping and conflicts with the "never skip reviewed"
-invariant if it is presented as the same mode.
+changes the semantics of skipping and already overlaps with the current
+"cut every non-dismissed item" review skip.
 
 ## Story 29 (detail) — Clean playback
 
@@ -17,30 +17,29 @@ file.
 ### Semantics
 
 - Separate, explicitly named mode (for example "чистое прослушивание").
-- It may skip **all selected defects/marks**, including reviewed ones.
-- It must not change review skip (story 25): review skip still never skips
-  reviewed items.
+- It may skip **all selected defects/marks**, including unconfirmed ones.
+- It must not change review skip (story 25): review skip already cuts every
+  non-dismissed item.
 - Implemented as seek-based playback over a cut list, like the current skip
   loop, not as a rendered proxy.
 - Per-cut padding prevents words from gluing together.
 
 ### Conflicts / decision needed
 
-Invariant 6 says review skip never skips reviewed items. This mode is allowed
-only because it is a *different* mode with a different purpose (listening to a
-clean version vs reviewing). The spec must be updated with the final mode name
-and the exact scope (all defects? manual marks only? reviewed only?) before
-implementation.
+Invariant 6 already makes review skip cut every non-dismissed item. A separate
+mode is only needed if the scope must differ (for example including deleted
+items, or changing padding independently). The spec must be updated with the
+final mode name and exact scope before implementation.
 
 ### Acceptance criteria
 
 - [ ] A separate mode is visible and named differently from fast-forward.
-- [ ] It skips all places in the selected scope, including reviewed ones if
+- [ ] It skips all places in the selected scope, including deleted ones if
       that is the approved scope.
 - [ ] Per-cut padding is configurable and clamped.
 - [ ] No proxy, transcode or new media file is created.
 - [ ] Review skip behaviour is unchanged (invariant 6).
-- [ ] The mode can be turned off without losing review state or position.
+- [ ] The mode can be turned off without losing confirmation state or position.
 - [ ] The UI shows what is being skipped.
 - [ ] Playback recovers from seeking errors and never freezes.
 

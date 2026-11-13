@@ -18,7 +18,8 @@ function defect(overrides: Partial<Defect> = {}): Defect {
     text: 'ну',
     severity: 'low',
     source: 'auto',
-    reviewed: false,
+    confirmed: false,
+    dismissed: false,
     note: 'убрать; вместе с "ээ"',
     ...overrides
   }
@@ -57,14 +58,14 @@ describe('CSV export', () => {
       'type',
       'severity',
       'source',
-      'reviewed',
+      'confirmed',
       'text',
       'note'
     ] as const
     for (const field of fields) {
-      expect(exportValue(defect({ reviewed: true }), field)).not.toBeUndefined()
+      expect(exportValue(defect({ confirmed: true }), field)).not.toBeUndefined()
     }
-    expect(exportValue(defect(), 'reviewed')).toBe('нет')
-    expect(exportValue(defect({ reviewed: true }), 'reviewed')).toBe('да')
+    expect(exportValue(defect(), 'confirmed')).toBe('нет')
+    expect(exportValue(defect({ confirmed: true }), 'confirmed')).toBe('да')
   })
 })

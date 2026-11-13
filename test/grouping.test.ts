@@ -50,7 +50,6 @@ function transcriptOf(words: Word[], duration = 60): Transcript {
 
 const basePlayback: PlaybackSettings = {
   skipEnabled: true,
-  skipScope: 'all',
   skipBeforeSec: 0.15,
   skipAfterSec: 0.35
 }
@@ -65,7 +64,8 @@ function defect(id: string, start: number, end: number, extra: Partial<Defect> =
     text: id,
     severity: 'medium',
     source: 'auto',
-    reviewed: false,
+    confirmed: false,
+    dismissed: false,
     note: '',
     ...extra
   }
@@ -149,10 +149,45 @@ describe('automatic defect grouping', () => {
       word(0, 1, 1.5, 'ну', 'filler'),
       word(1, 4, 4.5, 'да')
     ])
-    const rules = normalizeRules({ ...DEFAULT_RULES, autoGroupGapSec: 0.3 })
+    const rules = normalizeRules({
+      ...DEFAULT_RULES,
+      autoGroupEnabled: true,
+      autoGroupGapSec: 0.3
+    })
     const defects = detectDefects(transcript, rules)
     const group = defects.find((item) => item.groupIds && item.groupIds.length > 1)
     expect(group?.groupTypes).toEqual(['filler', 'pause'])
+  })
+
+  it('marks dismissed automatic defects and keeps the active group separate', () => {
+    const transcript = transcriptOf([
+      word(0, 1, 1.5, 'ну', 'filler'),
+      word(1, 4, 4.5, 'да')
+    ])
+    const rules = normalizeRules({
+      ...DEFAULT_RULES,
+      autoGroupEnabled: true,
+      autoGroupGapSec: 0.3
+    })
+    const all = detectDefects(transcript, rules)
+    expect(all.some((item) => item.groupIds && item.groupIds.length > 1)).toBe(true)
+    const pauseId = detectDefects(
+      transcript,
+      normalizeRules({ ...DEFAULT_RULES })
+    ).find((item) => item.type === 'pause')?.id
+
+    const withDismissed = detectDefects(transcript, rules, [], {
+      dismissedIds: ['auto-filler-0']
+    })
+    expect(
+      withDismissed.find((item) => item.id === 'auto-filler-0')?.dismissed
+    ).toBe(true)
+    expect(
+      withDismissed.some((item) => !item.dismissed && item.groupIds && item.groupIds.length > 1)
+    ).toBe(false)
+    const pause = withDismissed.find((item) => item.type === 'pause')
+    expect(pause?.id).toBe(pauseId)
+    expect(pause?.dismissed).toBe(false)
   })
 })
 
@@ -200,16 +235,106 @@ describe('per-type skip padding', () => {
   })
 })
 
+describe('enabled defect types', () => {
+  const transcript = transcriptOf([
+    word(0, 1, 1.5, 'ну', 'filler'),
+    word(1, 4, 4.4, 'да')
+  ])
+
+  it('does not detect a disabled type', () => {
+    const rules = normalizeRules({
+      ...DEFAULT_RULES,
+      enabledTypes: { filler: false }
+    })
+    const defects = detectDefects(transcript, rules)
+    expect(defects.some((item) => item.type === 'filler')).toBe(false)
+    expect(defects.some((item) => item.type === 'pause')).toBe(true)
+  })
+
+  it('keeps the ids of other types stable when one type is turned off', () => {
+    const all = detectDefects(transcript, normalizeRules(DEFAULT_RULES))
+    const noFillers = detectDefects(
+      transcript,
+      normalizeRules({ ...DEFAULT_RULES, enabledTypes: { filler: false } })
+    )
+    const pauseWithFillers = all.find((item) => item.type === 'pause')
+    const pauseWithoutFillers = noFillers.find((item) => item.type === 'pause')
+    expect(pauseWithoutFillers?.id).toBe(pauseWithFillers?.id)
+  })
+
+  it('never filters manual marks', () => {
+    const rules = normalizeRules({
+      ...DEFAULT_RULES,
+      enabledTypes: { manual: false }
+    })
+    const marks = [
+      {
+        id: 'mark-1',
+        type: 'manual' as const,
+        start: 1,
+        end: 1.5,
+        wordIds: [0],
+        note: '',
+        createdAt: '2026-01-01T00:00:00.000Z'
+      }
+    ]
+    const defects = detectDefects(transcript, rules, marks)
+    expect(defects.some((item) => item.source === 'manual')).toBe(true)
+  })
+
+  it('recognises old rules without enabledTypes with every usable type on', () => {
+    const rules = normalizeRules({ pauseThresholdSec: 0.9 })
+    for (const type of [
+      'filler',
+      'pause',
+      'repetition',
+      'elongation',
+      'false_start',
+      'vocal_sound',
+      'manual'
+    ] as const) {
+      expect(rules.enabledTypes[type]).toBe(true)
+    }
+    expect(rules.enabledTypes.unclear).toBe(false)
+  })
+})
+
+describe('automatic grouping toggle', () => {
+  const transcript = transcriptOf([
+    word(0, 1, 1.5, 'ну', 'filler'),
+    word(1, 4, 4.5, 'да')
+  ])
+
+  it('does not group when the toggle is off even with a gap value', () => {
+    const rules = normalizeRules({
+      ...DEFAULT_RULES,
+      autoGroupEnabled: false,
+      autoGroupGapSec: 0.5
+    })
+    const defects = detectDefects(transcript, rules)
+    expect(defects.some((item) => item.groupIds && item.groupIds.length > 1)).toBe(false)
+  })
+
+  it('migrates old rules with a positive gap to enabled', () => {
+    expect(normalizeRules({ autoGroupGapSec: 0.4 }).autoGroupEnabled).toBe(true)
+    expect(normalizeRules({ autoGroupGapSec: 0 }).autoGroupEnabled).toBe(false)
+  })
+
+  it('keeps an explicit off flag while remembering the gap', () => {
+    const rules = normalizeRules({ autoGroupEnabled: false, autoGroupGapSec: 0.4 })
+    expect(rules.autoGroupEnabled).toBe(false)
+    expect(rules.autoGroupGapSec).toBe(0.4)
+  })
+})
+
 describe('settings normalization', () => {
   it('fills every per-type padding entry', () => {
     const playback = normalizePlaybackSettings({
       skipEnabled: true,
-      skipScope: 'marks',
       skipBeforeSec: 0.2,
       skipAfterSec: 0.3,
       paddingByType: { filler: { before: 0.1, after: 0.4 } }
     })
-    expect(playback.skipScope).toBe('marks')
     expect(playback.paddingByType?.filler).toEqual({ before: 0.1, after: 0.4 })
     expect(playback.paddingByType?.pause).toEqual({ before: 0, after: 0 })
     expect(playback.groupPadding?.before).toBeGreaterThan(0)

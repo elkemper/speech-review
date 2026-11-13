@@ -53,8 +53,8 @@ export function exportValue(defect: Defect, field: ExportField): string | number
       return SEVERITY_LABEL[defect.severity] ?? defect.severity
     case 'source':
       return defect.source
-    case 'reviewed':
-      return defect.reviewed ? 'да' : 'нет'
+    case 'confirmed':
+      return defect.confirmed ? 'да' : 'нет'
     case 'text':
       return defect.text
     case 'note':

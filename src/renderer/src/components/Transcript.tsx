@@ -25,7 +25,9 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
   const selectRange = useApp((state) => state.selectRange)
   const clearSelection = useApp((state) => state.clearSelection)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
-  const setReviewedMany = useApp((state) => state.setReviewedMany)
+  const setFilter = useApp((state) => state.setFilter)
+  const confirmMany = useApp((state) => state.confirmMany)
+  const removeDefects = useApp((state) => state.removeDefects)
   const notify = useApp((state) => state.notify)
   const playback = useApp((state) => state.settings.playback)
 
@@ -161,7 +163,10 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
     const isActive = activeWord?.id === word.id
     const isSelected = selectedIds.has(word.id)
     const isFocus = selection?.focusId === word.id
-    const reviewed = list.length > 0 && list.every((defect) => defect.reviewed)
+    const activeList = list.filter((defect) => !defect.dismissed)
+    const confirmed =
+      activeList.length > 0 && activeList.every((defect) => defect.confirmed)
+    const primary = activeList[0] ?? list[0]
     const skipped = isSkippedRange(word.start, word.end)
 
     const classes = ['word']
@@ -170,7 +175,7 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
     if (list.length > 0) {
       classes.push('has-defect')
       if (list.some((defect) => defect.severity === 'high')) classes.push('high')
-      if (reviewed) classes.push('reviewed')
+      if (confirmed) classes.push('confirmed')
     }
     if (isActive) classes.push('active')
     if (isSelected) classes.push('selected')
@@ -183,7 +188,11 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
             .map(
               (defect) =>
                 `${DEFECT_LABELS[defect.type]} · ${SEVERITY_LABELS[defect.severity]}${
-                  defect.reviewed ? ' · проверено' : ''
+                  defect.dismissed
+                    ? ' · удалён'
+                    : defect.confirmed
+                      ? ' · подтверждено'
+                      : ''
                 }`
             )
             .join('\n') + (skipped ? '\nпропускается в режиме быстрого просмотра' : '')
@@ -197,7 +206,7 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
           className={classes.join(' ')}
           title={title}
           style={
-            list[0] && !reviewed ? { borderBottomColor: DEFECT_COLORS[list[0].type] } : undefined
+            primary && !confirmed ? { borderBottomColor: DEFECT_COLORS[primary.type] } : undefined
           }
           onPointerDown={(event) => {
             if (event.button !== 0) return
@@ -244,18 +253,26 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
             seekTo(word.start)
             selectWord(word.id)
             setFollow(true)
-            if (list[0]) setActiveDefect(list[0].id)
+            if (primary) {
+              // A deleted card can be under a type filter other than its own.
+              if (primary.dismissed) setFilter('all')
+              setActiveDefect(primary.id)
+            }
           }}
         >
           {word.text}
         </span>
         {pause ? (
           <button
-            className={`pause-chip ${pause.severity} ${pause.reviewed ? 'reviewed' : ''} ${
+            className={`pause-chip ${pause.severity} ${pause.confirmed ? 'confirmed' : ''} ${
               isSkippedRange(pause.start, pause.end) ? 'skipped' : ''
             }`}
             title={`${DEFECT_LABELS.pause} · ${(pause.end - pause.start).toFixed(2)} c${
-              pause.reviewed ? ' · проверено' : ''
+              pause.dismissed
+                ? ' · удалён'
+                : pause.confirmed
+                  ? ' · подтверждено'
+                  : ''
             }${
               isSkippedRange(pause.start, pause.end)
                 ? ' · пропускается в режиме быстрого просмотра'
@@ -263,6 +280,7 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
             }`}
             onClick={(event) => {
               event.stopPropagation()
+              if (pause.dismissed) setFilter('all')
               setActiveDefect(pause.id)
               seekTo(Math.max(0, pause.start - 0.2))
               setFollow(true)
@@ -290,15 +308,30 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
                   <button
                     className="link-btn"
                     onClick={() =>
-                      setReviewedMany(
+                      confirmMany(
                         selectedDefectIds,
-                        true,
-                        `Проверено выделение: ${selectedDefectIds.length}`
+                        `Подтверждено выделение: ${selectedDefectIds.length}`
                       )
                     }
-                    title="Отметить все дефекты в выделении проверенными"
+                    title="Подтвердить все дефекты в выделении (Shift+Enter)"
                   >
-                    <kbd>Shift+R</kbd> проверено ({selectedDefectIds.length})
+                    <kbd>Shift+Enter</kbd> подтвердить ({selectedDefectIds.length})
+                  </button>{' '}
+                  ·{' '}
+                  <button
+                    className="link-btn danger"
+                    onClick={() => {
+                      removeDefects(
+                        selectedDefectIds.map((id) => ({
+                          id,
+                          relatedIds: defects.find((defect) => defect.id === id)?.groupIds
+                        }))
+                      )
+                      notify(`Удалено: ${selectedDefectIds.length}`)
+                    }}
+                    title="Удалить все дефекты в выделении (Shift+R)"
+                  >
+                    <kbd>Shift+R</kbd> удалить ({selectedDefectIds.length})
                   </button>{' '}
                   ·{' '}
                 </>

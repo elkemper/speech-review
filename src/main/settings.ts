@@ -47,8 +47,17 @@ function validBackend(value: unknown): value is Backend {
 
 function normalizeExport(value: unknown): ExportSettings {
   const raw = (value ?? {}) as Partial<ExportSettings>
+  // Older settings stored the confirmation column as `reviewed`.
+  const rawFields = Array.isArray(raw.fields) ? (raw.fields as string[]) : []
+  const migrated = rawFields.map((field) => (field === 'reviewed' ? 'confirmed' : field))
   const fields = Array.isArray(raw.fields)
-    ? [...new Set(raw.fields.filter((field): field is ExportField => EXPORT_FIELDS.includes(field)))]
+    ? [
+        ...new Set(
+          migrated.filter((field): field is ExportField =>
+            EXPORT_FIELDS.includes(field as ExportField)
+          )
+        )
+      ]
     : []
   return {
     fields: fields.length > 0 ? fields : [...DEFAULT_EXPORT_SETTINGS.fields],
@@ -70,7 +79,7 @@ export async function loadSettings(): Promise<Settings> {
       playback: normalizePlaybackSettings(parsed.playback),
       miniTimelinePadSec: normalizeMiniTimelinePad(parsed.miniTimelinePadSec),
       waveformContrast: normalizeWaveformContrast(parsed.waveformContrast),
-      hideReviewed: parsed.hideReviewed === true
+      showDismissed: parsed.showDismissed !== false
     }
   } catch {
     return {

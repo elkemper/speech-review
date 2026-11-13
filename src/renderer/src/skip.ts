@@ -26,8 +26,8 @@ export function paddingFor(defect: Defect, settings: PlaybackSettings): SkipPadd
  * both sides so cuts do not glue words together; overlapping ranges are merged
  * so a single jump never lands inside the next cut.
  *
- * Reviewed items are never skipped: once the user has approved a defect or a
- * manual mark, fast-forward should play through it normally.
+ * Skip mode cuts every defect and manual mark except items the user deleted.
+ * Confirmation is a review marker and does not affect playback.
  */
 export function buildSkipIntervals(
   defects: Defect[],
@@ -35,13 +35,9 @@ export function buildSkipIntervals(
   duration: number
 ): SkipInterval[] {
   if (!settings.skipEnabled || duration <= 0) return []
-  const source =
-    settings.skipScope === 'marks'
-      ? defects.filter((defect) => defect.source === 'manual')
-      : defects
 
-  const padded = source
-    .filter((defect) => !defect.reviewed)
+  const padded = defects
+    .filter((defect) => !defect.dismissed)
     .map((defect) => {
       const padding = paddingFor(defect, settings)
       return {

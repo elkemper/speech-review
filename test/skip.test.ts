@@ -4,7 +4,6 @@ import type { Defect, PlaybackSettings } from '../src/shared/types'
 
 const settings: PlaybackSettings = {
   skipEnabled: true,
-  skipScope: 'all',
   skipBeforeSec: 0.2,
   skipAfterSec: 0.3
 }
@@ -24,7 +23,8 @@ function defect(
     text: id,
     severity: 'medium',
     source: 'auto',
-    reviewed: false,
+    confirmed: false,
+    dismissed: false,
     note: '',
     ...options
   }
@@ -40,34 +40,27 @@ describe('skip intervals', () => {
     expect(intervals).toEqual([{ start: 9.8, end: 12.3 }])
   })
 
-  it('uses only manual defects in marks mode', () => {
-    const intervals = buildSkipIntervals(
-      [
-        defect('a', 10, 11),
-        defect('m', 20, 21, { source: 'manual', type: 'manual' })
-      ],
-      { ...settings, skipScope: 'marks' },
-      60
-    )
-    expect(intervals).toEqual([{ start: 19.8, end: 21.3 }])
-  })
-
-  it('never skips reviewed defects or marks', () => {
-    expect(
-      buildSkipIntervals(
-        [defect('a', 10, 11, { reviewed: true }), defect('b', 20, 21)],
-        settings,
-        60
-      )
-    ).toEqual([{ start: 19.8, end: 21.3 }])
-
+  it('skips automatic and manual defects regardless of confirmation', () => {
     expect(
       buildSkipIntervals(
         [
-          defect('m', 10, 11, { source: 'manual', type: 'manual', reviewed: true }),
-          defect('n', 20, 21, { source: 'manual', type: 'manual' })
+          defect('a', 10, 11),
+          defect('m', 20, 21, { source: 'manual', type: 'manual', confirmed: true })
         ],
-        { ...settings, skipScope: 'marks' },
+        settings,
+        60
+      )
+    ).toEqual([
+      { start: 9.8, end: 11.3 },
+      { start: 19.8, end: 21.3 }
+    ])
+  })
+
+  it('never skips dismissed defects', () => {
+    expect(
+      buildSkipIntervals(
+        [defect('a', 10, 11, { dismissed: true }), defect('b', 20, 21)],
+        settings,
         60
       )
     ).toEqual([{ start: 19.8, end: 21.3 }])

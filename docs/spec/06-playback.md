@@ -14,11 +14,12 @@
 
 **Status:** Done · **Priority:** P0
 
-As a user, I want fast-forward to skip only unreviewed items, never reviewed
-ones, and to treat a logical group as one item.
+As a user, I want fast-forward to cut every defect and manual mark except
+deleted ones, and to treat a logical group as one item.
 
-- `buildSkipIntervals` filters `reviewed`.
-- `skipScope: 'marks'` keeps only manual marks.
+- `buildSkipIntervals` uses every non-dismissed defect and manual mark.
+- Confirmation does not affect playback.
+- Deleted automatic defects and manual marks are absent from the cut list.
 - Disabled mode yields no intervals.
 - Logical manual/automatic groups are already one defect and one interval.
 
@@ -87,10 +88,10 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 
 ### Story 25
 
-- [ ] Only unreviewed defects/marks are skipped.
-- [ ] Reviewed items play normally.
+- [ ] Every non-dismissed defect and manual mark is skipped.
+- [ ] Confirmation does not change the cut list.
+- [ ] Deleted items are not in the cut list.
 - [ ] Logical group is skipped/played as one.
-- [ ] `marks` scope keeps only manual marks.
 - [ ] Disabled mode returns `[]`.
 
 ### Story 26
@@ -99,7 +100,7 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 - [ ] Padding is clamped to duration.
 - [ ] Overlapping ranges merge.
 - [ ] Changing padding while paused affects the next skip.
-- [ ] Reviewed items remain unskipped.
+- [ ] Deleted items remain unskipped.
 - [ ] Controls work while skip is off.
 
 ### Story 27
@@ -137,6 +138,6 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 
 ## Verification
 
-- `test/skip.test.ts` covers padding, reviewed filtering, merging, lookup.
+- `test/skip.test.ts` covers padding, dismissed filtering, merging, lookup.
 - Add a pure "next target" helper test for story 28.
 - Real playback and listen need a macOS run.

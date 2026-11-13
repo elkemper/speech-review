@@ -12,6 +12,7 @@ let skipBypassUntil = -1
 
 export function attachVideo(video: HTMLVideoElement | null): void {
   element = video
+  skipBypassUntil = -1
   if (video) video.playbackRate = useApp.getState().rate
 }
 

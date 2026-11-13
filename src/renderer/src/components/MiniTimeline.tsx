@@ -95,13 +95,19 @@ export default function MiniTimeline({
     () => buildWaveLut(waveStats, waveContrast),
     [waveStats, waveContrast]
   )
-  const wordDefectMap = useMemo(() => defectByWordId(defects), [defects])
+  const wordDefectMap = useMemo(
+    () => defectByWordId(defects.filter((item) => !item.dismissed)),
+    [defects]
+  )
   const activeWordIds = useMemo(() => new Set(defect.wordIds), [defect.wordIds])
   const nearbyDefects = useMemo(
     () =>
       defects.filter(
         (item) =>
-          item.id !== defect.id && item.end >= view.start && item.start <= view.end
+          !item.dismissed &&
+          item.id !== defect.id &&
+          item.end >= view.start &&
+          item.start <= view.end
       ),
     [defects, defect.id, view.start, view.end]
   )
@@ -310,9 +316,9 @@ export default function MiniTimeline({
         const activeWord = activeWordIds.has(word.id)
         if (wordDefect || activeWord) {
           const type = activeWord ? defect.type : wordDefect!.type
-          const reviewed = wordDefect?.reviewed ?? false
+          const confirmed = wordDefect?.confirmed ?? false
           ctx.save()
-          ctx.globalAlpha = activeWord ? 0.42 : reviewed ? 0.12 : 0.22
+          ctx.globalAlpha = activeWord ? 0.42 : confirmed ? 0.12 : 0.22
           ctx.fillStyle = DEFECT_COLORS[type]
           ctx.fillRect(x1, barTop - 2, Math.max(1, wordWidth - 1), HEIGHT - barTop + 2)
           ctx.restore()
@@ -530,43 +536,18 @@ export default function MiniTimeline({
       }`}
       onClick={(event) => event.stopPropagation()}
     >
-      <div className="mini-timeline-head">
-        <span>{defect.source === 'manual' ? 'границы метки' : 'границы дефекта'}</span>
-        <span className="mini-zoom">
-          <button
-            type="button"
-            onClick={() => zoomStep(-1)}
-            disabled={zoom <= MINI_ZOOM_MIN + 1e-6}
-            title="Отдалить (минимум 1×)"
-          >
-            −
-          </button>
-          <button
-            type="button"
-            className="mini-zoom-value"
-            onClick={resetZoom}
-            title="Сбросить масштаб"
-          >
-            {Math.round(zoom * 100)}%
-          </button>
-          <button
-            type="button"
-            onClick={() => zoomStep(1)}
-            disabled={zoom >= MINI_ZOOM_MAX - 1e-6}
-            title="Приблизить (до 2×)"
-          >
-            +
-          </button>
-        </span>
-      </div>
       <div
         className="mini-timeline-canvas"
         ref={wrapRef}
-        title={`${rangeLabel}. Потяните края; Ctrl/⌘+колесо — масштаб, Shift+колесо — прокрутка.`}
+        title={`${rangeLabel}. Потяните края; Ctrl/⌘+колесо — масштаб, Shift+колесо — прокрутка. Двойной клик — сбросить масштаб.`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onDoubleClick={(event) => {
+          event.stopPropagation()
+          resetZoom()
+        }}
         onPointerLeave={() => {
           if (!dragRef.current && !scrubRef.current) setHoverEdge(null)
         }}
@@ -594,8 +575,23 @@ export default function MiniTimeline({
       ) : null}
       <div className="mini-timeline-foot">
         <span>{formatTimecode(defect.start, true)}</span>
-        <span className="muted">
-          {zoomed ? `видно ${Math.round(visibleFraction * 100)}%` : 'потяните края'}
+        <span className="mini-zoom">
+          <button
+            type="button"
+            onClick={() => zoomStep(-1)}
+            disabled={zoom <= MINI_ZOOM_MIN + 1e-6}
+            title="Отдалить (минимум 1×)"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomStep(1)}
+            disabled={zoom >= MINI_ZOOM_MAX - 1e-6}
+            title="Приблизить (до 4×)"
+          >
+            +
+          </button>
         </span>
         <span>{formatTimecode(defect.end, true)}</span>
       </div>

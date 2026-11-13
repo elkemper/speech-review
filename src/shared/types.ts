@@ -67,7 +67,10 @@ export interface Defect {
   text: string
   severity: Severity
   source: 'auto' | 'manual'
-  reviewed: boolean
+  /** Confirmed as a real defect. Does not affect skip mode. */
+  confirmed: boolean
+  /** Deleted as a false positive. Excluded from skip mode and export. */
+  dismissed: boolean
   note: string
 }
 
@@ -101,6 +104,10 @@ export interface DefectRules {
   lowConfidenceThreshold: number
   /** Minimum duration for each automatically detected defect type. */
   minDurationByType: Record<DefectType, number>
+  /** Automatic defect types that are detected at all. Missing entries mean on. */
+  enabledTypes: Record<DefectType, boolean>
+  /** Whether neighbouring automatic defects are merged into groups. */
+  autoGroupEnabled: boolean
   /** Group neighbouring automatic defects when the gap is at most this value. 0 disables grouping. */
   autoGroupGapSec: number
 }
@@ -140,7 +147,12 @@ export interface Project {
   rules: DefectRules
   /** User-adjusted boundaries for automatically detected defects, keyed by defect id. */
   defectOverrides: Record<string, DefectBoundsOverride>
-  reviewedDefectIds: string[]
+  /** Defects and marks the user confirmed as real. */
+  confirmedDefectIds: string[]
+  /** Automatically detected defects the user deleted as false positives. */
+  dismissedDefectIds: string[]
+  /** Manual marks the user deleted. Kept so the card can be restored. */
+  dismissedMarks: ManualMark[]
   defectNotes: Record<string, string>
   /** Explicit navigation markers. Not part of undo/redo history. */
   bookmarks: Bookmark[]
@@ -188,7 +200,7 @@ export type ExportField =
   | 'type'
   | 'severity'
   | 'source'
-  | 'reviewed'
+  | 'confirmed'
   | 'text'
   | 'note'
 
@@ -198,8 +210,6 @@ export interface ExportSettings {
   includeHeader: boolean
 }
 
-export type SkipScope = 'marks' | 'all'
-
 export interface SkipPadding {
   before: number
   after: number
@@ -207,7 +217,6 @@ export interface SkipPadding {
 
 export interface PlaybackSettings {
   skipEnabled: boolean
-  skipScope: SkipScope
   /** Global fallback padding used when a type has no explicit entry. */
   skipBeforeSec: number
   skipAfterSec: number
@@ -229,8 +238,8 @@ export interface Settings {
   miniTimelinePadSec: number
   /** Display-only waveform contrast (0 = linear, 100 = strongest). */
   waveformContrast: number
-  /** Hide reviewed defects from the defect list completely. */
-  hideReviewed: boolean
+  /** Show deleted defects as thin cards so they can be restored. */
+  showDismissed: boolean
 }
 
 export type TranscribePhase =

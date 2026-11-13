@@ -11,7 +11,7 @@ npm run typecheck     # checks main/preload/shared and renderer types separately
 npm run build         # checks that the production build succeeds
 ```
 
-Current state: **111 tests in 9 files**. A run takes less than a second in the Linux container.
+Current state: **133 tests in 10 files**. A run takes less than a second in the Linux container.
 
 ## 2. Configuration
 
@@ -36,14 +36,15 @@ Current state: **111 tests in 9 files**. A run takes less than a second in the L
 
 | File | Tests | What it checks |
 |---|---:|---|
-| `test/core.test.ts` | 18 | `words.json` parser, trailing comma, real fixture, `buildTranscript`, confidence, event classification, active word/segment, automatic defects, sentence-boundary pauses, manual marks, exact word boundaries, old marks without `wordIds`, overrides, logical marks |
+| `test/core.test.ts` | 19 | `words.json` parser, trailing comma, real fixture, `buildTranscript`, confidence, event classification, active word/segment, automatic defects, sentence-boundary pauses, manual marks, exact word boundaries, old marks without `wordIds`, overrides, logical marks |
 | `test/engine.test.ts` | 8 | chunk planner (short recording, silence, max size, short first chunk, target), WAV reading, slicing, waveform |
 | `test/export.test.ts` | 4 | CSV field order, escaping, delimiter/header, all fields |
-| `test/grouping.test.ts` | 19 | per-type minimum duration, automatic grouping rules and limits, per-type/group skip padding, settings normalization (padding, mini timeline, waveform contrast) |
-| `test/history.test.ts` | 4 | undo/redo by index, redo branch truncation, `mergeKey` coalescing, different keys |
-| `test/marks.test.ts` | 9 | merge on add and move, split, logical mark ID, combined bounds/words/notes, reviewed reconciliation on merge/split, new marks |
-| `test/selection.test.ts` | 35 | selection range in both directions, exact mark boundaries, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, defect boundary dragging, bulk review of a selection, mini timeline zoom/pan and colored word mapping |
-| `test/skip.test.ts` | 5 | padding and interval merging, "marks only" mode, reviewed items, clamp/disabled, interval lookup |
+| `test/format.test.ts` | 11 | number parsing (dot/comma/empty/partial), step snapping, float noise, display formatting, slider fill |
+| `test/grouping.test.ts` | 27 | per-type minimum duration, automatic grouping rules and limits, enabled types and id stability, grouping toggle and migration, per-type/group skip padding, settings normalization (padding, mini timeline, waveform contrast) |
+| `test/history.test.ts` | 5 | undo/redo by index, redo branch truncation, `mergeKey` coalescing, different keys, deleted-marks archive snapshot |
+| `test/marks.test.ts` | 9 | merge on add and move, split, logical mark ID, combined bounds/words/notes, confirmation reconciliation on merge/split, new marks |
+| `test/selection.test.ts` | 36 | selection range in both directions, exact mark boundaries, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, defect boundary dragging, bulk confirmation/deletion of a selection, mini timeline zoom/pan and colored word mapping |
+| `test/skip.test.ts` | 5 | padding and interval merging, all non-dismissed items, dismissed filtering, clamp/disabled, interval lookup |
 | `test/waveform.test.ts` | 9 | waveform statistics (noise floor, loud reference, degenerate input), contrast lookup table (linear mode, gamma lift, gate, monotonicity), signed mapping |
 
 ## 4. Fixtures
@@ -67,8 +68,8 @@ Expectations that must not be changed without replacing the fixture:
 
 - parsing `silencedetect` output and ffmpeg progress;
 - model download/resume and SHA-256 verification;
-- project save/load/delete and review reset;
-- partial transcripts and review-state merging in the renderer;
+- project save/load/delete and defect-state reset;
+- partial transcripts and confirmation-state merging in the renderer;
 - IPC contracts and preload;
 - React components, canvas timeline rendering, transcript virtualization;
 - real `audiocpp_cli` and Metal execution;
@@ -91,7 +92,7 @@ These are deliberate MVP limitations. When improving these areas, extract a pure
 - [ ] `npm test` passes; the test count did not decrease without a reason.
 - [ ] `npm run build` passes.
 - [ ] The new rule/branch has a regression test.
-- [ ] If IDs, review state, grouping, minimum duration, skip padding or boundaries changed, tests in `core`, `marks`, `selection`, `skip` or `grouping` are updated.
+- [ ] If IDs, confirmation state, grouping, minimum duration, skip padding or boundaries changed, tests in `core`, `marks`, `selection`, `skip` or `grouping` are updated.
 - [ ] If the parser/chunking/WAV changed, `core` or `engine` is updated.
 - [ ] If CSV changed, `export` is updated.
 

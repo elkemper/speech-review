@@ -165,17 +165,51 @@ export default function Workspace() {
 
   const baseDefects = useMemo<Defect[]>(() => {
     if (!project?.transcript) return []
-    return detectDefects(project.transcript, project.rules, project.marks)
-  }, [project?.transcript, project?.rules, project?.marks])
+    return detectDefects(
+      project.transcript,
+      project.rules,
+      project.marks,
+      {
+        dismissedIds: project.dismissedDefectIds,
+        dismissedMarks: project.dismissedMarks
+      }
+    )
+  }, [
+    project?.transcript,
+    project?.rules,
+    project?.marks,
+    project?.dismissedDefectIds,
+    project?.dismissedMarks
+  ])
 
   const defects = useMemo<Defect[]>(() => {
     if (!project) return []
-    return applyDefectOverrides(baseDefects, project.defectOverrides).map((defect) => ({
-      ...defect,
-      reviewed: project.reviewedDefectIds.includes(defect.id),
-      note: project.defectNotes[defect.id] ?? defect.note
-    }))
-  }, [baseDefects, project?.defectOverrides, project?.reviewedDefectIds, project?.defectNotes])
+    const confirmedIds = new Set(project.confirmedDefectIds)
+    const dismissedIds = new Set(project.dismissedDefectIds)
+    return applyDefectOverrides(baseDefects, project.defectOverrides).map((defect) => {
+      const groupDismissed =
+        defect.groupIds && defect.groupIds.length > 0
+          ? defect.groupIds.every((id) => dismissedIds.has(id))
+          : false
+      const dismissed = defect.dismissed || dismissedIds.has(defect.id) || groupDismissed
+      const groupConfirmed =
+        defect.groupIds && defect.groupIds.length > 0
+          ? defect.groupIds.every((id) => confirmedIds.has(id))
+          : false
+      return {
+        ...defect,
+        dismissed,
+        confirmed: !dismissed && (confirmedIds.has(defect.id) || groupConfirmed),
+        note: project.defectNotes[defect.id] ?? defect.note
+      }
+    })
+  }, [
+    baseDefects,
+    project?.defectOverrides,
+    project?.confirmedDefectIds,
+    project?.dismissedDefectIds,
+    project?.defectNotes
+  ])
 
   useHotkeys(defects)
 
@@ -184,12 +218,14 @@ export default function Workspace() {
   const spec = MODEL_SPECS[settings.modelId]
   const modelReady = status?.modelReady && status.modelId === settings.modelId
   const words = project.transcript?.words.length ?? 0
-  const unreviewed = defects.filter((defect) => !defect.reviewed).length
+  const unconfirmed = defects.filter(
+    (defect) => !defect.dismissed && !defect.confirmed
+  ).length
 
   const onTranscribe = (): void => {
     if (project.transcript) {
       const confirmed = window.confirm(
-        'Перераспознать запись? Текущий транскрипт и отметки «проверено» будут заменены. Ручные метки сохранятся.'
+        'Перераспознать запись? Транскрипт, подтверждения, заметки и удалённые автоматические дефекты будут сброшены. Ручные метки, включая удалённые, сохранятся.'
       )
       if (!confirmed) return
     }
@@ -208,7 +244,7 @@ export default function Workspace() {
           </div>
           <div className="workspace-meta">
             {formatDuration(project.duration)} · {project.transcript ? `${words} слов` : 'без транскрипта'}
-            {project.transcript ? ` · ${unreviewed} непроверенных` : ''}
+            {project.transcript ? ` · ${unconfirmed} неподтверждённых` : ''}
             {project.transcript && !project.transcriptComplete ? (
               <span className="badge live small-badge">частичный</span>
             ) : null}
@@ -359,8 +395,9 @@ export default function Workspace() {
         <span><kbd>Space</kbd> играть</span>
         <span><kbd>←</kbd><kbd>→</kbd> ±2 c</span>
         <span><kbd>[</kbd><kbd>]</kbd> дефект</span>
-        <span><kbd>R</kbd> проверено</span>
-        <span><kbd>⇧R</kbd> выделение</span>
+        <span><kbd>Enter</kbd> подтвердить</span>
+        <span><kbd>R</kbd> удалить</span>
+        <span><kbd>⇧Enter</kbd>/<kbd>⇧R</kbd> выделение</span>
         <span><kbd>M</kbd> метка</span>
         <span><kbd>B</kbd> закладка</span>
         <span><kbd>L</kbd> цикл</span>

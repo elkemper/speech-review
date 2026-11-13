@@ -36,8 +36,8 @@ hunting for it on the main timeline.
 - Above 1× the visible part can be panned horizontally inside the base window
   with the scrollbar, `Shift`+wheel or two-finger horizontal scroll. At 1× the
   view hits the edges and cannot scroll further.
-- `Ctrl`/`Cmd`+wheel or trackpad pinch zooms around the pointer; the percentage
-  button resets to 100%.
+- `Ctrl`/`Cmd`+wheel or trackpad pinch zooms around the pointer; a double-click
+  on the snippet resets zoom to 100%.
 - Other defects/marks inside the window are drawn faintly for context. Their
   boundaries are lighter than the active ones but still faint. They are never
   interactive and cannot be dragged from this snippet.
@@ -64,7 +64,7 @@ hunting for it on the main timeline.
 - [ ] The snippet does not hijack the list item click/selection.
 - [ ] Interaction works with a narrow panel (≥ 280 px).
 - [ ] Default context is ±3 s on both sides, configurable in Defects.
-- [ ] Zoom is clamped to 1×–4×; the percentage is shown and resettable.
+- [ ] Zoom is clamped to 1×–4×; a double-click resets it to 100%.
 - [ ] At 1× the whole base window is visible, the scrollbar is hidden and the
       view cannot pan past the edges.
 - [ ] At >1× the content is enlarged and can be panned with a horizontal
@@ -74,7 +74,7 @@ hunting for it on the main timeline.
 - [ ] Neighbouring defect boundaries are lighter than the active handles but
       still faint and non-interactive.
 - [ ] Marked words have a colored underlay; active words are stronger, other
-      marked words are faint, reviewed words are dimmer.
+      marked words are faint, confirmed words are dimmer.
 - [ ] The waveform contrast matches the main timeline for the same window.
 - [ ] `Ctrl`/`Cmd`+wheel or pinch zooms around the pointer; plain wheel keeps
       scrolling the list unless it is a horizontal gesture.

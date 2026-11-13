@@ -32,6 +32,18 @@ export const DEFAULT_MIN_DURATION_BY_TYPE: Record<DefectType, number> = {
   manual: 0
 }
 
+/** Every type is detected by default; `unclear` stays off until confidence is real. */
+export const DEFAULT_ENABLED_TYPES: Record<DefectType, boolean> = {
+  filler: true,
+  pause: true,
+  repetition: true,
+  elongation: true,
+  false_start: true,
+  vocal_sound: true,
+  unclear: false,
+  manual: true
+}
+
 export const DEFAULT_RULES: DefectRules = {
   fillerWords: [
     'э',
@@ -63,6 +75,8 @@ export const DEFAULT_RULES: DefectRules = {
   detectLexicalFillers: true,
   lowConfidenceThreshold: 0.45,
   minDurationByType: { ...DEFAULT_MIN_DURATION_BY_TYPE },
+  enabledTypes: { ...DEFAULT_ENABLED_TYPES },
+  autoGroupEnabled: false,
   autoGroupGapSec: 0
 }
 
@@ -83,6 +97,17 @@ export function normalizeRules(value: unknown): DefectRules {
   for (const type of DEFECT_TYPE_ORDER) {
     minDuration[type] = clampNumber(rawMin[type], 0, 10, DEFAULT_MIN_DURATION_BY_TYPE[type])
   }
+  const enabledTypes: Record<DefectType, boolean> = { ...DEFAULT_ENABLED_TYPES }
+  const rawEnabled = (raw.enabledTypes ?? {}) as Partial<Record<DefectType, boolean>>
+  for (const type of DEFECT_TYPE_ORDER) {
+    if (typeof rawEnabled[type] === 'boolean') enabledTypes[type] = rawEnabled[type]
+  }
+  // Older rules only had the gap. A positive gap meant "grouping is on".
+  const autoGroupGapSec = clampNumber(raw.autoGroupGapSec, 0, 10, DEFAULT_RULES.autoGroupGapSec)
+  const autoGroupEnabled =
+    typeof raw.autoGroupEnabled === 'boolean'
+      ? raw.autoGroupEnabled
+      : autoGroupGapSec > 0
   return {
     ...DEFAULT_RULES,
     ...raw,
@@ -96,7 +121,9 @@ export function normalizeRules(value: unknown): DefectRules {
         )
       : DEFAULT_RULES.multiWordFillers.map((phrase) => [...phrase]),
     minDurationByType: minDuration,
-    autoGroupGapSec: clampNumber(raw.autoGroupGapSec, 0, 10, DEFAULT_RULES.autoGroupGapSec)
+    enabledTypes,
+    autoGroupEnabled,
+    autoGroupGapSec
   }
 }
 
@@ -170,7 +197,8 @@ function mergeAutoGroup(group: Defect[]): Defect {
       .join(' · '),
     severity: mergedSeverity(group),
     source: 'auto',
-    reviewed: false,
+    confirmed: false,
+    dismissed: false,
     note: ''
   }
 }
@@ -215,14 +243,60 @@ export function groupAutoDefects(
   return result
 }
 
+export interface DetectDefectsOptions {
+  /** Automatic defect IDs deleted by the user. */
+  dismissedIds?: Iterable<string>
+  /** Manual marks deleted by the user, kept so their cards can be restored. */
+  dismissedMarks?: ManualMark[]
+}
+
+/** Manual defects built from marks, shared by active and dismissed lists. */
+export function buildManualDefects(words: Word[], marks: ManualMark[]): Defect[] {
+  const wordById = new Map(words.map((word) => [word.id, word]))
+  return groupManualMarks(marks).map((group) => {
+    const wordIds = [
+      ...new Set(
+        group.marks.flatMap((mark) => {
+          const stored = Array.isArray(mark.wordIds)
+            ? mark.wordIds.filter((id) => wordById.has(id))
+            : []
+          return stored.length > 0 ? stored : findWordIdsInRange(words, mark.start, mark.end)
+        })
+      )
+    ]
+    const selectedText = wordIds
+      .map((id) => wordById.get(id)?.text ?? '')
+      .filter(Boolean)
+      .join(' ')
+    return {
+      id: group.groupId
+        ? `manual-group-${group.groupId}`
+        : `manual-${group.marks[0].id}`,
+      type: group.marks[0].type,
+      start: group.start,
+      end: Math.max(group.start, group.end),
+      wordIds,
+      markIds: group.marks.map((mark) => mark.id),
+      text: group.note.trim() || selectedText || 'Ручная метка',
+      severity: 'medium',
+      source: 'manual',
+      confirmed: false,
+      dismissed: false,
+      note: group.note
+    }
+  })
+}
+
 export function detectDefects(
   transcript: Transcript,
   rules: DefectRules = DEFAULT_RULES,
-  marks: ManualMark[] = []
+  marks: ManualMark[] = [],
+  options: DetectDefectsOptions = {}
 ): Defect[] {
   const words = transcript.words
   const auto: Defect[] = []
   const claimed = new Set<number>()
+  const dismissed = new Set(options.dismissedIds ?? [])
   let sequence = 0
 
   const add = (
@@ -234,10 +308,14 @@ export function detectDefects(
     severity: Severity,
     measuredSec = Math.max(start, end) - start
   ): void => {
+    // The sequence advances even for disabled types so that turning one type
+    // off does not renumber every later automatic defect.
+    const id = `auto-${type}-${sequence++}`
+    if (rules.enabledTypes?.[type] === false) return
     const min = rules.minDurationByType?.[type] ?? 0
     if (measuredSec + 1e-9 < min) return
     auto.push({
-      id: `auto-${type}-${sequence++}`,
+      id,
       type,
       start,
       end: Math.max(start, end),
@@ -245,7 +323,8 @@ export function detectDefects(
       text,
       severity,
       source: 'auto',
-      reviewed: false,
+      confirmed: false,
+      dismissed: false,
       note: ''
     })
   }
@@ -358,42 +437,22 @@ export function detectDefects(
     }
   }
 
-  const wordById = new Map(words.map((word) => [word.id, word]))
-  const manual: Defect[] = groupManualMarks(marks).map((group) => {
-    const wordIds = [
-      ...new Set(
-        group.marks.flatMap((mark) => {
-          const stored = Array.isArray(mark.wordIds)
-            ? mark.wordIds.filter((id) => wordById.has(id))
-            : []
-          return stored.length > 0 ? stored : findWordIdsInRange(words, mark.start, mark.end)
-        })
-      )
-    ]
-    const selectedText = wordIds
-      .map((id) => wordById.get(id)?.text ?? '')
-      .filter(Boolean)
-      .join(' ')
-    return {
-      id: group.groupId
-        ? `manual-group-${group.groupId}`
-        : `manual-${group.marks[0].id}`,
-      type: group.marks[0].type,
-      start: group.start,
-      end: Math.max(group.start, group.end),
-      wordIds,
-      markIds: group.marks.map((mark) => mark.id),
-      text: group.note.trim() || selectedText || 'Ручная метка',
-      severity: 'medium',
-      source: 'manual',
-      reviewed: false,
-      note: group.note
-    }
-  })
+  const activeManual = buildManualDefects(words, marks)
+  const dismissedManual = buildManualDefects(words, options.dismissedMarks ?? []).map(
+    (defect) => ({ ...defect, dismissed: true })
+  )
 
   const seen = new Set<string>()
-  const grouped = groupAutoDefects(auto, rules.autoGroupGapSec ?? 0, words)
-  return [...grouped, ...manual]
+  const groupGap = rules.autoGroupEnabled ? rules.autoGroupGapSec ?? 0 : 0
+  const activeAuto = auto.filter((defect) => !dismissed.has(defect.id))
+  const dismissedAuto = auto
+    .filter((defect) => dismissed.has(defect.id))
+    .map((defect) => ({ ...defect, dismissed: true }))
+  const groupedActive = groupAutoDefects(activeAuto, groupGap, words)
+  const groupedDismissed = groupAutoDefects(dismissedAuto, groupGap, words).map(
+    (defect) => ({ ...defect, dismissed: true })
+  )
+  return [...groupedActive, ...groupedDismissed, ...activeManual, ...dismissedManual]
     .filter((defect) => {
       const key =
         defect.source === 'manual'

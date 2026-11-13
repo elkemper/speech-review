@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react'
-import { AUTO_DEFECT_TYPES, DEFAULT_RULES } from '@shared/defects'
 import { formatBytes } from '@shared/format'
 import { MODEL_ORDER, MODEL_SPECS } from '@shared/models'
 import {
-  DEFAULT_GROUP_PADDING,
-  DEFAULT_SKIP_PADDING_BY_TYPE,
   EXPORT_FIELDS,
   EXPORT_FIELD_LABELS,
   MAX_CHUNK_TARGET_SEC,
@@ -14,16 +11,10 @@ import {
   MIN_MINI_TIMELINE_PAD_SEC,
   MIN_WAVEFORM_CONTRAST
 } from '@shared/settings'
-import type {
-  DefectType,
-  ExportField,
-  ModelId,
-  ModelStateInfo,
-  SkipPadding,
-  SkipScope
-} from '@shared/types'
-import { DEFECT_LABELS } from '../defectsUi'
+import type { ExportField, ModelId, ModelStateInfo } from '@shared/types'
 import { useApp } from '../store'
+import DefectRulesSection from './DefectRulesSection'
+import { RangeField } from './SettingsRangeField'
 
 type SettingsTab = 'general' | 'defects' | 'export'
 
@@ -32,100 +23,6 @@ const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'defects', label: 'Дефекты' },
   { id: 'export', label: 'Экспорт' }
 ]
-
-const PADDING_TYPES: DefectType[] = [...AUTO_DEFECT_TYPES, 'manual']
-
-function RangeField({
-  label,
-  value,
-  min,
-  max,
-  step,
-  suffix,
-  disabled,
-  onChange
-}: {
-  label: string
-  value: number
-  min: number
-  max: number
-  step: number
-  suffix?: string
-  disabled?: boolean
-  onChange: (value: number) => void
-}) {
-  const clampValue = (next: number): number => Math.min(max, Math.max(min, next))
-  return (
-    <div className={`range-field ${disabled ? 'disabled' : ''}`}>
-      <div className="range-head">
-        <span className="range-label">{label}</span>
-        <span className="range-number">
-          <input
-            type="number"
-            min={min}
-            max={max}
-            step={step}
-            value={value}
-            disabled={disabled}
-            onChange={(event) => {
-              const next = Number(event.target.value)
-              if (Number.isFinite(next)) onChange(clampValue(next))
-            }}
-          />
-          {suffix ? <span className="muted small">{suffix}</span> : null}
-        </span>
-      </div>
-      <input
-        className="range-slider"
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(clampValue(Number(event.target.value)))}
-      />
-    </div>
-  )
-}
-
-function PaddingField({
-  label,
-  value,
-  disabled,
-  onChange
-}: {
-  label: string
-  value: SkipPadding
-  disabled?: boolean
-  onChange: (value: SkipPadding) => void
-}) {
-  return (
-    <div className="padding-field">
-      <div className="padding-title">{label}</div>
-      <RangeField
-        label="до"
-        value={value.before}
-        min={0}
-        max={5}
-        step={0.05}
-        suffix="с"
-        disabled={disabled}
-        onChange={(before) => onChange({ ...value, before })}
-      />
-      <RangeField
-        label="после"
-        value={value.after}
-        min={0}
-        max={5}
-        step={0.05}
-        suffix="с"
-        disabled={disabled}
-        onChange={(after) => onChange({ ...value, after })}
-      />
-    </div>
-  )
-}
 
 function PathRow({
   label,
@@ -477,72 +374,36 @@ export default function SettingsDialog() {
           {tab === 'defects' ? (
             <>
               <section className="settings-section">
-                <h3>Просмотр</h3>
+                <h3>Список дефектов</h3>
                 <label className="check">
                   <input
                     type="checkbox"
-                    checked={playback.skipEnabled}
+                    checked={settings.showDismissed}
                     onChange={(event) =>
-                      updateSettings({ playback: { skipEnabled: event.target.checked } })
+                      updateSettings({ showDismissed: event.target.checked })
                     }
                   />
-                  Пропускать непроверенные дефекты при проигрывании
-                </label>
-                <label className="field">
-                  <span>Что пропускать</span>
-                  <select
-                    value={playback.skipScope}
-                    onChange={(event) =>
-                      updateSettings({
-                        playback: { skipScope: event.target.value as SkipScope }
-                      })
-                    }
-                  >
-                    <option value="all">Все дефекты и метки</option>
-                    <option value="marks">Только ручные метки</option>
-                  </select>
-                </label>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={settings.hideReviewed}
-                    onChange={(event) =>
-                      updateSettings({ hideReviewed: event.target.checked })
-                    }
-                  />
-                  Убирать проверенные дефекты из списка полностью
+                  Показывать удалённые дефекты в списке
                 </label>
                 <div className="hint">
-                  Проверенные дефекты и метки не пропускаются. Отступы оставляют базовую паузу по
-                  краям, чтобы вырезанное место не склеивалось вплотную. Видео не перекодируется.
+                  Удалённые дефекты и метки остаются тонкой карточкой с кнопкой
+                  возврата и не участвуют в пропуске и экспорте. Если галочка снята,
+                  карточки скрыты — включите её снова, чтобы вернуть их в список.
                 </div>
               </section>
 
-              <section className="settings-section">
-                <h3>Мини-таймлайн</h3>
-                <div className="range-grid">
-                  <RangeField
-                    label="Отступ вокруг метки"
-                    value={settings.miniTimelinePadSec}
-                    min={MIN_MINI_TIMELINE_PAD_SEC}
-                    max={MAX_MINI_TIMELINE_PAD_SEC}
-                    step={0.5}
-                    suffix="с"
-                    onChange={(value) => updateSettings({ miniTimelinePadSec: value })}
-                  />
-                </div>
-                <div className="hint">
-                  Сколько секунд показывать слева и справа от выбранной метки в маленьком
-                  таймлайне. По умолчанию ±3 с. Внутри этого окна можно приближать до 400% и
-                  прокручивать.
-                </div>
-              </section>
+              <DefectRulesSection
+                rules={rules}
+                playback={playback}
+                setRules={setRules}
+                updateSettings={updateSettings}
+              />
 
               <section className="settings-section">
-                <h3>Осциллограмма</h3>
-                <div className="range-grid">
+                <h3>Таймлайн</h3>
+                <div className="range-grid single">
                   <RangeField
-                    label="Контраст"
+                    label="Контраст осциллограммы"
                     value={settings.waveformContrast}
                     min={MIN_WAVEFORM_CONTRAST}
                     max={MAX_WAVEFORM_CONTRAST}
@@ -559,181 +420,22 @@ export default function SettingsDialog() {
               </section>
 
               <section className="settings-section">
-                <div className="section-title-row">
-                  <h3>Отступы при пропуске</h3>
-                  <button
-                    className="link-btn"
-                    onClick={() =>
-                      updateSettings({
-                        playback: {
-                          paddingByType: Object.fromEntries(
-                            Object.entries(DEFAULT_SKIP_PADDING_BY_TYPE).map(
-                              ([type, padding]) => [type, { ...padding }]
-                            )
-                          ),
-                          groupPadding: { ...DEFAULT_GROUP_PADDING }
-                        }
-                      })
-                    }
-                  >
-                    сбросить
-                  </button>
-                </div>
-                <div className="hint">
-                  Отступы настраиваются отдельно для каждого типа и не зависят от включённого
-                  режима пропуска. Для паузы по умолчанию отступов нет.
-                </div>
-                <div className="padding-grid">
-                  {PADDING_TYPES.map((type) => (
-                    <PaddingField
-                      key={type}
-                      label={DEFECT_LABELS[type]}
-                      value={
-                        playback.paddingByType?.[type] ?? {
-                          before: playback.skipBeforeSec,
-                          after: playback.skipAfterSec
-                        }
-                      }
-                      onChange={(value) =>
-                        updateSettings({
-                          playback: {
-                            paddingByType: {
-                              ...(playback.paddingByType ?? {}),
-                              [type]: value
-                            }
-                          }
-                        })
-                      }
-                    />
-                  ))}
-                  <PaddingField
-                    label="группа дефектов"
-                    value={playback.groupPadding ?? DEFAULT_GROUP_PADDING}
-                    onChange={(value) =>
-                      updateSettings({ playback: { groupPadding: value } })
-                    }
-                  />
-                </div>
-                <div className="hint">
-                  Если дефекты объединены в группу, применяются отступы группы, а не каждого
-                  элемента внутри.
-                </div>
-              </section>
-
-              <section className="settings-section">
-                <div className="section-title-row">
-                  <h3>Правила дефектов</h3>
-                  <button className="link-btn" onClick={() => setRules(DEFAULT_RULES)}>
-                    сбросить
-                  </button>
-                </div>
-
-                <div className="range-grid">
+                <h3>Мини-таймлайн</h3>
+                <div className="range-grid single">
                   <RangeField
-                    label="Пауза от"
-                    value={rules.pauseThresholdSec}
-                    min={0.3}
-                    max={5}
-                    step={0.1}
-                    suffix="с"
-                    onChange={(value) => setRules({ pauseThresholdSec: value })}
-                  />
-                  <RangeField
-                    label="Критичная пауза"
-                    value={rules.pauseHighSec}
-                    min={0.5}
-                    max={10}
-                    step={0.1}
-                    suffix="с"
-                    onChange={(value) => setRules({ pauseHighSec: value })}
-                  />
-                  <RangeField
-                    label="Окно повторов"
-                    value={rules.repetitionWindowSec}
-                    min={0.5}
-                    max={10}
+                    label="Отступ вокруг метки"
+                    value={settings.miniTimelinePadSec}
+                    min={MIN_MINI_TIMELINE_PAD_SEC}
+                    max={MAX_MINI_TIMELINE_PAD_SEC}
                     step={0.5}
                     suffix="с"
-                    onChange={(value) => setRules({ repetitionWindowSec: value })}
-                  />
-                  <RangeField
-                    label="Растяжка, повторов буквы"
-                    value={rules.elongationMinRepeats}
-                    min={2}
-                    max={10}
-                    step={1}
-                    onChange={(value) => setRules({ elongationMinRepeats: value })}
-                  />
-                  <RangeField
-                    label="Автообъединение: макс. пауза"
-                    value={rules.autoGroupGapSec}
-                    min={0}
-                    max={2}
-                    step={0.05}
-                    suffix="с"
-                    onChange={(value) => setRules({ autoGroupGapSec: value })}
+                    onChange={(value) => updateSettings({ miniTimelinePadSec: value })}
                   />
                 </div>
-
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={rules.excludePauseAfterSentenceEnd}
-                    onChange={(event) =>
-                      setRules({ excludePauseAfterSentenceEnd: event.target.checked })
-                    }
-                  />
-                  Не считать паузой остановку после точки, вопроса или многоточия
-                </label>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={rules.detectLexicalFillers}
-                    onChange={(event) => setRules({ detectLexicalFillers: event.target.checked })}
-                  />
-                  Искать слова-филлеры: «ну», «вот», «типа», «как бы» и т.п.
-                </label>
-                <label className="check disabled">
-                  <input type="checkbox" disabled />
-                  Неразборчивые слова по confidence
-                  <span className="badge">в разработке</span>
-                </label>
-
-                <details className="settings-advanced">
-                  <summary>Минимальная длительность по типам</summary>
-                  <div className="hint">
-                    Дефект короче указанного значения не попадает в список. Для повтора
-                    учитывается длительность повторяемого слова, для паузы — длина тишины.
-                    0 — без ограничения.
-                  </div>
-                  <div className="range-grid">
-                    {AUTO_DEFECT_TYPES.map((type) => (
-                      <RangeField
-                        key={type}
-                        label={DEFECT_LABELS[type]}
-                        value={rules.minDurationByType?.[type] ?? 0}
-                        min={0}
-                        max={type === 'pause' ? 10 : 3}
-                        step={0.05}
-                        suffix="с"
-                        onChange={(value) =>
-                          setRules({
-                            minDurationByType: {
-                              ...rules.minDurationByType,
-                              [type]: value
-                            }
-                          })
-                        }
-                      />
-                    ))}
-                  </div>
-                </details>
-
                 <div className="hint">
-                  Правила применяются к открытому проекту сразу, пересчитывать транскрипт не нужно.
-                  Автообъединение склеивает соседние дефекты, если между ними нет других слов и
-                  пауза не больше указанной; 0 — выключено. Границы выбранного дефекта можно
-                  двигать мышкой на таймлайне.
+                  Сколько секунд показывать слева и справа от выбранной метки в маленьком
+                  таймлайне. По умолчанию ±3 с. Внутри этого окна можно приближать до 400% и
+                  прокручивать.
                 </div>
               </section>
             </>

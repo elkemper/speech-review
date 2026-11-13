@@ -116,6 +116,9 @@ export function defectIdsForSelection(
   if (!range) return []
   const selected = new Set(range.wordIds)
   return defects
-    .filter((defect) => defect.wordIds.some((wordId) => selected.has(wordId)))
+    .filter(
+      (defect) =>
+        !defect.dismissed && defect.wordIds.some((wordId) => selected.has(wordId))
+    )
     .map((defect) => defect.id)
 }

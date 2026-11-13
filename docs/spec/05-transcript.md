@@ -32,8 +32,9 @@ to the matching item in the right defect list.
 - The list scrolls the active item into view (`scrollIntoView`).
 - Selecting an item in the list selects/highlights the matching word(s) in the
   transcript.
-- If a filter or hide-reviewed would hide the item, reveal it or switch the
-  filter so it is visible.
+- A deleted card focused from the transcript switches the type filter to
+  «все», so the thin card is visible. If `showDismissed` is off, deleted cards
+  stay hidden by the user's choice.
 - Logical groups and automatic groups work the same way.
 
 ### Story 20 — Follow mode
@@ -77,10 +78,10 @@ As a user, I want items skipped by fast-forward to look disabled/dimmed in the
 transcript and defect list.
 
 - Words and pause chips inside skip intervals get a dimmed/disabled style.
-- Matching defect list items get the same style.
-- Reviewed items are not dimmed (they are not skipped).
+- The defect panel itself is not dimmed; cards stay interactive in skip mode.
+- Every non-deleted item is dimmed when it is skipped.
 - Turning fast-forward off restores normal style.
-- Visual only; review state is not mutated.
+- Visual only; confirmation state is not mutated.
 
 ### Story 24 — Partial transcript visibility
 
@@ -91,8 +92,8 @@ analyzed.
 
 - After each chunk, transcript + peaks update.
 - User can seek, click, mark and review during the job.
-- Later partials keep marks, bookmarks, notes, overrides, reviewed ids.
-- First partial resets automatic review state (invariant 11).
+- Later partials keep marks, bookmarks, notes, overrides, confirmed/dismissed ids.
+- First partial resets automatic confirmation state (invariant 11).
 - "partial" badge stays until the final transcript.
 
 ## Acceptance criteria
@@ -113,6 +114,7 @@ analyzed.
 - [ ] The list scrolls the active item into view.
 - [ ] Selecting a list item highlights the matching transcript word(s).
 - [ ] Hidden-by-filter items are revealed or the filter is adjusted.
+- [ ] A word covered only by a deleted card focuses its thin card.
 - [ ] Logical/automatic groups sync correctly.
 - [ ] Pause defects sync with their chip.
 
@@ -141,8 +143,8 @@ analyzed.
 ### Story 23
 
 - [ ] Words and pause chips inside skip intervals are dimmed.
-- [ ] Defect list items inside skip intervals are dimmed.
-- [ ] Reviewed items are not dimmed.
+- [ ] The defect panel is not dimmed in skip mode.
+- [ ] Deleted items are not dimmed as skipped.
 - [ ] Disabling skip restores normal style.
 - [ ] No review mutation from styling.
 
@@ -151,7 +153,7 @@ analyzed.
 - [ ] Partial transcript and peaks appear after each chunk.
 - [ ] Review/seek/mark works during the job.
 - [ ] Later partials preserve local edits for the visible prefix.
-- [ ] First partial resets automatic review state.
+- [ ] First partial resets automatic confirmation state.
 - [ ] Partial badge is visible until done.
 
 ## Verification

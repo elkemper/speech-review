@@ -208,7 +208,8 @@ describe('reviewing a word selection', () => {
       text: 'Привет',
       severity: 'low',
       source: 'auto',
-      reviewed: false,
+      confirmed: false,
+      dismissed: false,
       note: ''
     },
     {
@@ -220,7 +221,8 @@ describe('reviewing a word selection', () => {
       text: 'мир … пауза',
       severity: 'high',
       source: 'auto',
-      reviewed: false,
+      confirmed: false,
+      dismissed: false,
       note: ''
     }
   ]
@@ -236,6 +238,21 @@ describe('reviewing a word selection', () => {
     expect(defectIdsForSelection(defects, words, { anchorId: 2, focusId: 2 })).toEqual([
       'd2'
     ])
+  })
+
+  it('ignores dismissed defects for bulk confirmation and deletion', () => {
+    const withDismissed = [
+      ...defects,
+      {
+        ...defects[0],
+        id: 'd3',
+        wordIds: [0, 1, 2],
+        dismissed: true
+      }
+    ]
+    expect(
+      defectIdsForSelection(withDismissed, words, { anchorId: 0, focusId: 2 })
+    ).toEqual(['d0', 'd2'])
   })
 
   it('returns nothing without a selection or transcript', () => {
@@ -344,7 +361,8 @@ describe('colored word underlays', () => {
     start: 1,
     end: 2,
     severity: 'low' as const,
-    reviewed: false,
+    confirmed: false,
+    dismissed: false,
     note: '',
     text: ''
   }

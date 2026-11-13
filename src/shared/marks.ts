@@ -56,35 +56,35 @@ export function manualDefectIdForMark(marks: ManualMark[], markId: string): stri
   return mark.groupId ? `manual-group-${mark.groupId}` : `manual-${mark.id}`
 }
 
-/** Defect id used to store the reviewed flag for a single mark. */
-export function reviewIdForMark(mark: ManualMark): string {
+/** Defect id used to store the confirmed flag for a single mark. */
+export function confirmIdForMark(mark: ManualMark): string {
   return mark.groupId ? `manual-group-${mark.groupId}` : `manual-${mark.id}`
 }
 
 /**
- * Rebuild the reviewed ids for manual marks after they were added, merged,
+ * Rebuild the confirmed ids for manual marks after they were added, merged,
  * split or moved.
  *
- * A logical mark counts as reviewed only when every mark inside it was
- * reviewed before the change. New marks are never reviewed. Reviewed ids of
+ * A logical mark counts as confirmed only when every mark inside it was
+ * confirmed before the change. New marks are never confirmed. Confirmed ids of
  * automatic defects are left untouched. This also drops stale ids of marks
  * that were merged into a new group.
  */
-export function reconcileReviewedIds(
+export function reconcileConfirmedIds(
   before: ManualMark[],
   after: ManualMark[],
-  reviewedIds: string[]
+  confirmedIds: string[]
 ): string[] {
   const beforeById = new Map(before.map((mark) => [mark.id, mark]))
-  const wasReviewed = (mark: ManualMark): boolean => {
+  const wasConfirmed = (mark: ManualMark): boolean => {
     const previous = beforeById.get(mark.id)
     if (!previous) return false
-    return reviewedIds.includes(reviewIdForMark(previous))
+    return confirmedIds.includes(confirmIdForMark(previous))
   }
 
-  const next = new Set(reviewedIds.filter((id) => !id.startsWith('manual-')))
+  const next = new Set(confirmedIds.filter((id) => !id.startsWith('manual-')))
   for (const group of groupManualMarks(after)) {
-    if (group.marks.every(wasReviewed)) next.add(reviewIdForMark(group.marks[0]))
+    if (group.marks.every(wasConfirmed)) next.add(confirmIdForMark(group.marks[0]))
   }
   return [...next]
 }
