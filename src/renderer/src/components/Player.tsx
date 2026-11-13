@@ -34,7 +34,7 @@ export default function Player({
   const addBookmark = useApp((state) => state.addBookmark)
   const setError = useApp((state) => state.setError)
   const playback = useApp((state) => state.settings.playback)
-  const updateSettings = useApp((state) => state.updateSettings)
+  const toggleSkip = useApp((state) => state.toggleSkip)
 
   const skipIntervals = useMemo(
     () =>
@@ -241,10 +241,8 @@ export default function Player({
         </button>
         <button
           className={`ctrl ${playback.skipEnabled ? 'active' : ''}`}
-          onClick={() =>
-            updateSettings({ playback: { skipEnabled: !playback.skipEnabled } })
-          }
-          title="Пропускать дефекты и метки при проигрывании"
+          onClick={toggleSkip}
+          title="Пропускать дефекты и метки при проигрывании (K)"
         >
           ⏭
         </button>

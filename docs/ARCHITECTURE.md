@@ -1,24 +1,29 @@
 # Architecture
 
-This document describes the current MVP implementation, not the desired state. Deferred improvements are listed in `docs/BACKLOG.md`, and consolidated requirements with status/acceptance criteria are in `docs/SPEC.md`.
+This document describes **how the current MVP is built**: processes, modules, data flow and runtime constraints. It does not own product behavior.
+
+| Question | Owner |
+|---|---|
+| What must the app do, and what is its status? | `docs/SPEC.md` and `docs/spec/` |
+| Where is data stored, and which IDs are stable? | `docs/DATA_MODEL.md` |
+| What is deferred? | `docs/BACKLOG.md` |
+| How are the pieces wired together? | this document |
+
+If a sentence describes a user scenario, it belongs in the spec. If it names a field, an ID or a file on disk, it belongs in `DATA_MODEL.md`. Keep this file focused on processes, modules, ordering and implementation constraints.
 
 ## 1. Purpose and scope
 
-The app helps review a webinar recording:
+Speech Review is a local macOS app for reviewing webinar recordings: it extracts audio, transcribes it with CrisperWhisper 2.0 through `audiocpp_cli`, detects speech defects and supports a review workflow with export.
 
-1. extract audio and transcribe speech locally;
-2. find fillers, pauses, repetitions, elongations, false starts and vocal sounds;
-3. jump quickly to each place and confirm it or delete it as a false positive;
-4. add manual marks and notes;
-5. export the result to CSV/JSON.
+MVP constraints:
 
-MVP limitations:
+- macOS 13+ on Apple Silicon is the only verified target.
+- Everything is local: only the model and engine/ffmpeg downloads use the network.
+- One project per window, no background job queue.
+- Dark theme only.
+- `unclear` / word-level confidence stays disabled while the engine writes `confidence: 0`.
 
-- macOS 13+ on Apple Silicon;
-- Russian is the default language (English can be selected, but quality has not been verified);
-- one active project per window, no background job queue;
-- dark theme only;
-- word-level confidence and the `unclear` type are disabled until audio.cpp provides real values.
+User-facing features are listed in `README.md`; the requirement index is `docs/SPEC.md`.
 
 ## 2. Processes and layers
 
@@ -46,88 +51,65 @@ MVP limitations:
 └──────────────────────────────────────────────────────────────┘
 ```
 
-`src/shared` is a common layer with no Electron or Node dependencies: types, defect rules, transcript parsing, manual marks, CSV and formatting. It is used by main, renderer and Vitest.
+`src/shared` is a dependency-free layer used by main, renderer and Vitest: types, transcript parsing, defect rules, manual marks, CSV and formatting. It must not import Electron, Node-only APIs or renderer code.
 
 ## 3. Module map
 
-| Module | Responsibility |
-|---|---|
-| `src/main/index.ts` | app lifecycle, single-instance mode, window, menu, `app-media://` |
-| `src/main/ipc.ts` | IPC handlers, dialogs, engine status, projects, export |
-| `src/main/jobs.ts` | `TranscriptionManager`: start, cancel, progress, partial and final events |
-| `src/main/projects.ts` | create/load/save/delete projects, write transcript and peaks |
-| `src/main/settings.ts` | load/save settings, normalize old and broken values |
-| `src/main/paths.ts` | `userData`, `resources`, model, project and temporary job paths |
-| `src/main/mediaServer.ts` | privileged `app-media://` scheme with Range support |
-| `src/main/export.ts` | save dialog and CSV/JSON writing |
-| `src/main/engine/ffmpeg.ts` | probe, 16 kHz mono WAV extraction, `silencedetect` |
-| `src/main/engine/chunks.ts` | silence-aware chunk plan with a shorter first chunk |
-| `src/main/engine/wav.ts` | WAV parsing, slicing by seconds, waveform peaks |
-| `src/main/engine/models.ts` | model download, resume, SHA-256, delete, state |
-| `src/main/engine/crisperwhisper.ts` | `audiocpp_cli` invocation, `words.json` parsing, sample offset |
-| `src/main/engine/proc.ts` | child processes, stdout/stderr collection, `AbortSignal` cancellation |
-| `src/preload/index.ts` | `contextBridge.exposeInMainWorld('api', …)` |
-| `src/shared/transcript.ts` | `parseRawWords`, `buildTranscript`, segments, active word lookup |
-| `src/shared/defects.ts` | automatic rules, overrides, ordering and deduplication |
-| `src/shared/marks.ts` | logical manual marks, merging, confirmation-state reconciliation |
-| `src/shared/exportCsv.ts` | CSV cells, timecodes, export fields |
-| `src/renderer/src/store.ts` | single app state, actions, autosave, history |
-| `src/renderer/src/history.ts` | editable-state snapshots, undo/redo, action log |
-| `src/renderer/src/player.ts` | `<video>` control, seek, loop, skip bypass |
-| `src/renderer/src/skip.ts` | skip intervals and interval lookup by time |
-| `src/renderer/src/selection.ts` | word selection, exact time range, manual-mark range, nearest word |
-| `src/renderer/src/timelineView.ts` | zoom, pan, LOD, ticks, defect boundaries |
-| `src/renderer/src/defectsUi.ts` | labels, colors, type ordering, word→defect mapping for underlays |
-| `src/renderer/src/hooks/useHotkeys.ts` | hotkeys, bulk confirmation/deletion and bookmark shortcut |
-| `src/renderer/src/components/Bookmarks.tsx` | bookmark list, notes and resume |
-| `src/renderer/src/components/MiniTimeline.tsx` | selected-defect snippet with editable boundaries |
-| `src/renderer/src/miniTimeline.ts` | mini window/zoom/pan, time↔x mapping and handle hit-testing |
-| `src/renderer/src/waveform.ts` | display-only waveform statistics and contrast lookup table |
+| Area | Modules | Responsibility |
+|---|---|---|
+| App shell | `src/main/index.ts`, `src/preload/index.ts`, `src/renderer/src/App.tsx`, `src/renderer/src/components/Welcome.tsx`, `src/renderer/src/components/Workspace.tsx` | lifecycle, window, menu, typed bridge, entry screen and main grid |
+| IPC and persistence | `src/main/ipc.ts`, `src/main/projects.ts`, `src/main/settings.ts`, `src/main/paths.ts`, `src/main/export.ts` | handlers and dialogs, project files, settings normalization, paths, export writing |
+| Media | `src/main/mediaServer.ts` | privileged `app-media://` scheme with Range support |
+| Engine | `src/main/engine/ffmpeg.ts`, `chunks.ts`, `wav.ts`, `models.ts`, `crisperwhisper.ts`, `proc.ts` | probe/extract/silence, chunk plan, WAV slicing/peaks, model state, CLI invocation, child processes |
+| Shared domain | `src/shared/types.ts`, `transcript.ts`, `defects.ts`, `marks.ts`, `settings.ts`, `models.ts`, `exportCsv.ts`, `format.ts`, `ipc.ts`, `api.ts` | canonical types, pure rules, parsing, export and formatting |
+| Renderer state | `src/renderer/src/store.ts`, `history.ts`, `settingsHistory.ts` | app state, save orchestration, undo/redo snapshots and settings labels |
+| Renderer logic | `src/renderer/src/player.ts`, `skip.ts`, `selection.ts`, `timelineView.ts`, `defectsUi.ts`, `defectCardView.ts`, `miniTimeline.ts`, `waveform.ts`, `hooks/useHotkeys.ts` | playback control, intervals, selection, timeline math, labels/cards, mini window, waveform, hotkeys |
+| UI components | `src/renderer/src/components/Player.tsx`, `Timeline.tsx`, `Transcript.tsx`, `DefectPanel.tsx`, `SettingsDialog.tsx`, `DefectRulesSection.tsx`, `SettingsRangeField.tsx`, `HistoryDialog.tsx`, `Bookmarks.tsx`, `MiniTimeline.tsx` | rendering and user interaction |
 
-## 4. Startup and security
+`AGENTS.md` contains the full repository tree; this table is the responsibility map.
+
+## 4. Startup, security and media
 
 - `app.requestSingleInstanceLock()` prevents a second window; a second launch focuses the existing one.
 - `BrowserWindow` uses `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false`. The renderer has no direct Node access.
 - Preload exposes only `window.api`, described in `src/shared/api.ts`.
-- External links open through `shell.openExternal`; window navigation to `http(s)` is blocked.
-- Video is served not through a local HTTP server but through the privileged `app-media://media/<token>` scheme. The token is a SHA-1 of the absolute path. `mediaServer.ts` supports `HEAD`, normal responses and `Range` (including suffix ranges), so `<video>` can seek in large files.
+- External links open through `shell.openExternal`; navigation to `http(s)` inside the window is blocked.
+- Video is served through the privileged `app-media://media/<token>` scheme, not a local HTTP server. The token is a SHA-1 of the absolute path. `mediaServer.ts` supports `HEAD`, normal responses and `Range` (including suffix ranges), so `<video>` can seek in large files.
 - CSP is not relaxed for external sources; `bypassCSP` is needed only for the `app-media` scheme.
 
-## 5. User flow
+## 5. End-to-end flow
 
-1. **Welcome** shows the project list and an open-file button. A file can be dropped into the window.
-2. `media:open` or `media:open-path` validates the extension and returns `MediaInfo`.
-3. `projects:create` uses ffmpeg to check for an audio track and the duration, then creates `project.json`.
-4. The user starts transcription. The store saves the project with current settings and calls `transcribe:start`.
-5. The main process runs the job and sends `progress`, `partial`, `done`, `error`.
-6. The renderer builds defects from the transcript, rules and manual marks and shows them on the timeline, in the transcript and in the right panel.
-7. Every change to confirmation state, notes, marks or boundaries is saved with a debounce and recorded in history.
-8. Export calls `export:project`; main opens a save dialog and writes the file.
+1. **Welcome** lists projects and opens a file (button or drop). `media:open` / `media:open-path` validates the extension and returns `MediaInfo`.
+2. `projects:create` probes the audio track and duration with ffmpeg, then writes `project.json`.
+3. The store saves the project with the current settings and calls `transcribe:start`.
+4. Main runs the job and emits `progress`, `partial`, `done` or `error`.
+5. The renderer derives defects from the transcript, project rules and manual marks, and updates the timeline, transcript and defect panel.
+6. Editable changes are debounced to disk and recorded in history. Export calls `export:project`; main opens a save dialog and writes the file.
+
+Behavior of each screen and action is defined in the spec files listed in §10.
 
 ## 6. Transcription pipeline
 
 `TranscriptionManager.start` creates a job with an `AbortController`. Only one job per project is allowed at a time.
 
-Phases (`TranscribeProgress.phase`):
-
 | Phase | What happens | Progress |
 |---|---|---|
-| `prepare` | load project, check paths, model, engine | 1–3% |
+| `prepare` | load project, check paths, model and engine | 1–3% |
 | `audio` | `probeMedia`, extract 16 kHz mono PCM WAV | 4–30% |
-| `silence` | `silencedetect` to find pauses | indeterminate |
-| `peaks` | waveform at 20 peaks/s, `peaks.json` | 33–44%, indeterminate |
-| `transcribe` | slice and transcribe chunks | 0–100% by duration |
-| `merge` | sort words, build final transcript | 98%, indeterminate |
+| `silence` | `silencedetect` to find pauses | 31%, indeterminate |
+| `peaks` | waveform at 20 peaks/s, write `peaks.json` | 33–44%, indeterminate |
+| `transcribe` | slice and transcribe chunks | 0–100% by processed duration |
+| `merge` | sort words, build the final transcript | 98%, indeterminate |
 | `done` | `done` event | 100% |
 
 Details:
 
-1. **Model check.** `ensureModel` verifies size and SHA-256. The result is cached in `<model>.sha256` so 1.7 GB is not hashed on every launch.
-2. **Audio extraction.** ffmpeg: `-vn -map 0:a:0 -ac 1 -ar 16000 -c:a pcm_s16le`; progress is read from `-progress pipe:1`.
-3. **Pauses.** `silencedetect=noise=-38dB:d=0.45`. Intervals are used only for chunking.
+1. **Model check.** `ensureModel` verifies size and SHA-256. The result is cached in `<model>.sha256`, so the 1.7 GB file is not hashed on every launch.
+2. **Audio extraction.** ffmpeg runs `-vn -map 0:a:0 -ac 1 -ar 16000 -c:a pcm_s16le`; progress is read from `-progress pipe:1`.
+3. **Pauses.** `silencedetect=noise=-38dB:d=0.45`. The intervals are used only for chunking.
 4. **Peaks.** `computePeaks` reads the 16-bit WAV in blocks and stores min/max per bucket. A peaks failure does not fail transcription: `peaks` stays `null`.
-5. **Chunk plan.** `planChunks` cuts at silence midpoints near the target length. The first chunk is shorter (up to 3 minutes) so the first words appear sooner. The target length is configured in settings (2–15 minutes); min/max are 0.5×/1.5× of the target.
-6. **WAV slicing.** `sliceWav` copies the selected frames and writes a new 44-byte header. Words are not cut in the middle when a pause is nearby.
+5. **Chunk plan.** `planChunks` cuts at silence midpoints near the target length. The target is configurable (120–900 s, default 600); min/max are 0.5×/1.5× of the target. The first chunk is `clamp(30% of target, 90–180 s)` so the first words appear sooner.
+6. **WAV slicing.** `sliceWav` copies the selected frames and writes a new 44-byte header. Cuts prefer a nearby pause so words are not split.
 7. **Chunk transcription.** `audiocpp_cli` runs for each chunk:
    ```
    --task asr --family crisperwhisper --model <gguf> --backend metal
@@ -137,126 +119,46 @@ Details:
    --text-out <chunk.txt> --words-out <chunk.json> --log
    ```
    The model is reloaded for each chunk — a deliberate MVP trade-off.
-8. **Time offset.** `words.json` contains `start_sample`/`end_sample` at 16 kHz. `transcribeChunk` adds `offsetSec * 16000` so words land on the global recording timeline.
-9. **Partial result.** After each chunk, `buildTranscript` builds the prefix, `writeTranscript(..., complete=false, resetReview=firstPartial)` writes `transcript.json`, and the renderer receives `partial`.
-10. **Final result.** Words are sorted by `start_sample`, the full transcript is written with `transcriptComplete: true`, then `done` is emitted.
+8. **Time offset.** `words.json` contains `start_sample`/`end_sample` at 16 kHz. `transcribeChunk` adds `offsetSec * 16000`, so words land on the global recording timeline.
+9. **Partial and final results.** After each chunk, the recognized prefix is written and emitted as `partial`; the first partial resets the review mapping because automatic IDs may change, later partials preserve edits in the visible prefix. Final words are sorted by `start_sample`, written with `transcriptComplete: true`, then `done` is emitted. The reset rules live in `DATA_MODEL.md` §10.
+10. **Cancellation.** `cancel(jobId)` / `cancelProject(projectId)` aborts the controller. `runProcess` sends `SIGTERM`, then `SIGKILL` after 3 seconds. `userData/tmp/jobs/<jobId>` is removed in `finally`.
 
-Cancellation: `cancel(jobId)` or `cancelProject(projectId)` calls `AbortController.abort()`. `runProcess` sends `SIGTERM`, then `SIGKILL` after 3 seconds. The temporary folder `userData/tmp/jobs/<jobId>` is removed in `finally`.
+## 7. Derived review state
 
-## 7. Defects and manual marks
+The defect list is computed, never stored. The renderer applies one ordered pipeline:
 
-`detectDefectsWithCandidates(transcript, rules, marks, options)` is a pure function. It returns `{ defects, candidates }` sorted by time, type and severity; `detectDefects` is a wrapper returning only defects. Automatic defects are filtered by `minDurationByType`, optionally merged by `groupAutoDefects`, and manual marks are appended. A match below a minimum is kept as a `DefectCandidate` with the same ID, and `options.promotedIds` turns it back into a real defect.
+```
+transcript + rules + marks
+  → detectDefectsWithCandidates   (automatic rules, minimum-duration candidates,
+                                   auto grouping, manual defects, dismissed members)
+  → applyDefectOverrides          (edited automatic boundaries)
+  → confirmed / dismissed / notes injected from Project
+  → Defect[] shown by the UI and used by skip intervals
+```
 
-Automatic rules (`DEFAULT_RULES`):
+- `src/shared/defects.ts` owns detection, grouping and overrides. `src/shared/marks.ts` owns logical marks and confirmation reconciliation. Both are pure and tested without Electron.
+- `Project` is the source of truth for editable state: marks, overrides, confirmed IDs, dismissed IDs/marks, notes, rules and skip padding.
+- History (`history.ts`) snapshots only that editable state; `skipEnabled` is player state. See `docs/SPEC.md` (story 32/47) and `DATA_MODEL.md` §9.
+- `skip.ts` derives intervals from every non-dismissed defect, applies per-type or group padding, clamps them to the duration and merges overlaps. It does not mutate project state.
+- A revealed minimum-duration candidate is computed from the active ID and disappears when selection changes; only an explicit edit promotes it into project state.
 
-| Type | Condition |
-|---|---|
-| `filler` | event `[UH]`, `[UM]`, `[ER]`, `[HM]`, `[AH]`, `[EH]`, `[MM]` |
-| `filler` | lexical fillers from `fillerWords` and `multiWordFillers` |
-| `pause` | gap between adjacent words ≥ `pauseThresholdSec`; after `.?!…` it can be excluded |
-| `repetition` | identical normalized words within `repetitionWindowSec` |
-| `elongation` | 3+ identical letters in a row (threshold configurable) |
-| `false_start` | word longer than 2 characters ends with `-` |
-| `vocal_sound` | events `[LAUGHTER]`, `[COUGH]`, etc. |
-| `unclear` | confidence below the threshold; effectively disabled while the engine writes `0` |
+The rules themselves — thresholds, enable flags, grouping conditions, candidate promotion and confirmation semantics — are specified in `docs/spec/02-defects.md` and `docs/spec/03-marks.md` and stored as described in `DATA_MODEL.md` §6–8. Do not restate them here.
 
-Every automatic defect is also filtered by `rules.minDurationByType[type]`. A pause measures the silence, a repetition the shorter of the repeated words. A suppressed match becomes a candidate; the renderer reveals one candidate at a time when its ID becomes active.
+## 8. Renderer architecture
 
-Automatic defect ID: `auto-${type}-${sequence}`, where `sequence` is the global insertion order. IDs are not stable when rules change or the recording is re-transcribed.
+- `Workspace` is a grid: video and timeline on top, transcript on the left, defect panel on the right. Panel visibility/width and the two vertical sizes persist in `localStorage` (`sr.panelVisible`, `sr.panelWidth`, `sr.videoHeight`, `sr.timelineHeight`).
+- `Player` wraps `<video src="app-media://…">` with custom controls. A `requestAnimationFrame` loop syncs `currentTime`, loop and skip. A codec error is shown to the user but does not block transcription, because ffmpeg reads the file independently.
+- `Timeline` draws a canvas waveform. `timelineView.ts` owns zoom/pan, ticks and level-of-detail thresholds; `waveform.ts` owns the display-only contrast lookup table. The timeline reads defects, selection and skip intervals from the store rather than deriving its own.
+- `Transcript` uses `@tanstack/react-virtual` for the segment list. Word selection and exact time selection stay separate: the transcript is word-based, the timeline is exact-time based.
+- `DefectPanel` renders computed `Defect` objects; `defectCardView.ts` derives card layout from the defect and skip state. The mini timeline reuses the shared playhead and the same `setDefectBounds` action as the main timeline.
+- `SettingsDialog` owns the tabbed settings UI. While a recognition job runs, the tabs and body sit inside an `inert` flex container; the scroll body keeps its constrained layout.
+- `useHotkeys` matches `event.code` first, so hotkeys keep working on the Russian keyboard layout. They are disabled in text fields.
 
-**Automatic grouping.** When `rules.autoGroupEnabled` is true and `rules.autoGroupGapSec > 0`, `groupAutoDefects` walks the sorted automatic defects and merges neighbours while the gap is within the limit and no other spoken word lies in that gap. A pause spans only the silence, so a filler immediately before it forms one group, while a filler separated by a real word does not. The group gets the id `auto-group-${firstDefectId}`, combined bounds and words, `groupIds`, `groupTypes` and the highest severity. The gap value is kept while the toggle is off, and `0` also disables grouping at the data level.
+Interaction details, acceptance criteria and statuses are defined in the spec files below; this section only names the implementation boundary of each component.
 
-`applyDefectOverrides` applies `Project.defectOverrides` on top of automatic defects. Manual marks do not use overrides: their boundaries are stored in the marks themselves.
+## 9. Persistence, export and IPC
 
-Manual marks:
-
-- `ManualMark` contains exact `wordIds`, `start`, `end`, an optional `groupId`, a note and `createdAt`.
-- `groupManualMarks` groups by `groupId`; a mark without a group is treated as a single mark.
-- `mergeMarkNeighbours` merges only changed marks with those they touch (gap ≤ 0.2 s). This happens on add and on boundary move, not on every render.
-- `detectDefects` builds one `Defect` for a group with ID `manual-group-${groupId}` or `manual-${markId}` and combined `wordIds`.
-- Old marks without `wordIds` use strict interval overlap (`findWordIdsInRange`), not boundary touching.
-
-## 8. Confirmation, history and skip
-
-- `Project.confirmedDefectIds` stores confirmed defect IDs. Manual marks use `manual-${markId}` or `manual-group-${groupId}`.
-- `Project.dismissedDefectIds` stores deleted automatic defects; `Project.dismissedMarks` stores deleted manual marks.
-- `detectDefects` builds active automatic groups without dismissed members and returns deleted items separately with `dismissed: true`, so the panel can show, restore and focus them.
-- `reconcileConfirmedIds(before, after, confirmedIds)` recomputes manual IDs after add, merge, split or move. A logical mark stays confirmed only if all its parts were confirmed before the change.
-- Notes are stored in `Project.defectNotes` by defect ID; for manual marks they are duplicated in `ManualMark.note`.
-- History (`src/renderer/src/history.ts`) stores snapshots of editable state only: `marks`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `defectOverrides`. Rapid changes with the same `mergeKey` within 2 seconds are coalesced. History lives in memory and is reset when a project is opened or closed.
-- `buildSkipIntervals` takes all defects, excludes `dismissed`, adds before/after padding, clamps to the duration and merges overlapping intervals. A revealed candidate is in `defects` only while active, so it is cut only for that preview. Padding comes from `playback.paddingByType[defect.type]`; a logical group (manual or automatic) uses `playback.groupPadding` instead. There is no skip scope: automatic defects and manual marks are cut together. Padding settings are editable regardless of `skipEnabled`.
-- `player.ts` jumps over an interval once so it does not fight the seek. The "listen" button temporarily disables skipping for the selected defect.
-
-## 9. UI
-
-`Workspace` is the main grid: video and timeline on top, transcript on the left, defect panel on the right. The panel can be hidden and resized; width and visibility are stored in `localStorage` (`sr.panelWidth`, `sr.panelVisible`). Two horizontal splitters resize the video area (`sr.videoHeight`) and the timeline (`sr.timelineHeight`); the transcript takes the remaining height. A bookmarks popover lists `project.bookmarks` and seeks to them.
-
-### Player
-
-- `<video src="app-media://…">`, custom controls, speed 0.5–2×, volume, fullscreen.
-- `requestAnimationFrame` updates `currentTime`, handles loop and skip.
-- A codec error is shown to the user but does not prevent transcription: ffmpeg reads the file independently.
-
-### Timeline
-
-Canvas waveform with zoom and pan:
-
-- `Ctrl`/`Cmd` + wheel zooms around the cursor, normal wheel pans;
-- `+`, `−`, `⤢` buttons;
-- `follow` keeps the playhead visible until the user starts panning;
-- bookmarks are drawn as green flags and dashed lines;
-- LOD: waveform and defect markers first, then word marks, boundaries and labels;
-- click seeks; `Shift`+click/drag selects an exact time range; clicking a marker selects a defect;
-- the range is not snapped to words; `M` creates a manual mark with exact `start`/`end`;
-- `Shift+Enter` confirms and `Shift+R` deletes every defect touched by the word selection or exact time range;
-- the active defect has two draggable boundaries. An automatic defect is saved in `defectOverrides`; a manual mark updates its `start`/`end` and `wordIds`;
-- skip intervals are highlighted in yellow.
-
-### Transcript
-
-- Virtualized segment list (`@tanstack/react-virtual`).
-- Click a word to seek; `Shift`+click and drag select; `M` creates a mark using exact boundaries.
-- A selection that contains defects can be confirmed with `Shift+Enter` or deleted with `Shift+R`; the toolbar shows both counts.
-- Pauses are shown as chips after a word; long sentence-boundary pauses are shown as a separate row.
-- Defect, confirmed-word and skipped-place highlighting; deleted defects are omitted from timeline markers.
-- "Only with defects", "Follow" and "Copy" buttons.
-
-### DefectPanel
-
-- Filters by type and counters; `settings.showDismissed` decides whether deleted cards stay visible as thin rows.
-- A selected range with defects shows confirm and delete actions.
-- A pending card has a left rail with delete and confirm buttons. A confirmed card collapses to a compact row with a right-side undo button. A deleted card is a thin row with a restore button when `showDismissed` is on. Further actions: note, "listen", loop, delete and "split" for manual marks.
-- `defectCardView` derives the card layout. Skip mode does not expand compact cards: confirming or deleting in skip mode collapses the card exactly like outside it. The automatic group marker stays visible, while a compact card never exposes its hidden text.
-- A revealed minimum-duration candidate is a normal pending card with a «кандидат» badge. It is excluded from progress counters and export until promoted.
-- The active item shows a mini timeline under its text: waveform context, the defect span, draggable boundaries and the shared playhead.
-- Jump to the next unconfirmed defect.
-- CSV/JSON export.
-
-### SettingsDialog
-
-Three tabs:
-
-- **General** — engine, model (download/delete), language, backend, chunk size, licenses;
-- **Defects** — show-dismissed at the top, one row per defect type with an
-  enable checkbox, minimum duration, before/after padding and type-specific
-  controls (pause last, with threshold, critical pause and sentence-end
-  exclusion), manual/group padding, automatic-grouping toggle, timeline
-  contrast and mini-timeline padding. Skip mode lives in the player;
-- **Export** — CSV fields, delimiter, header.
-
-### Hotkeys
-
-`useHotkeys` matches `event.code` first, so the Russian keyboard layout does not break `R`, `M`, `B`, `[`, `]`, `J`, `K`. Hotkeys are disabled in input fields. `Enter` confirms the active defect, `R` deletes it, `Shift+Enter`/`Shift+R` act on the selection, and `B` adds a bookmark. In skip mode these edit hotkeys work only while paused.
-
-## 10. Export
-
-- CSV: selected fields in the configured order, delimiter `;` or `,`, BOM `\uFEFF`, CRLF. Fixed-width `HH:MM:SS.mmm` timecodes.
-- JSON: project metadata, `counts` by type, full `defects` and `marks` arrays.
-- The file is written to the selected path; the dialog defaults to Downloads.
-
-## 11. Persistence and IPC
-
-Schema, IDs and migration rules are described in `docs/DATA_MODEL.md`.
+Project, transcript, peaks and settings schemas, IDs, migrations and write ordering live in `docs/DATA_MODEL.md`. File writes are atomic (`*.tmp` + `rename`). CSV/JSON details and field selection are defined in `docs/spec/09-export.md` and `DATA_MODEL.md` §12.
 
 Main IPC groups:
 
@@ -265,16 +167,33 @@ Main IPC groups:
 | Engine/settings | `engine:status`, `settings:get`, `settings:save` |
 | Media | `media:open`, `media:open-path`, `media:register` |
 | Projects | `projects:list`, `projects:create`, `projects:load`, `projects:save`, `projects:delete` |
-| Transcription | `transcribe:start`, `transcribe:cancel`, `transcribe:progress`, `transcribe:partial`, `transcribe:done`, `transcribe:error` |
-| Models | `models:download`, `models:state`, `models:delete`, `models:progress` |
+| Transcription | `transcribe:start`, `transcribe:cancel`; events: `transcribe:progress`, `transcribe:partial`, `transcribe:done`, `transcribe:error` |
+| Models | `models:download`, `models:state`, `models:delete`; event: `models:progress` |
 | Export/shell | `export:project`, `shell:show-item` |
 
-## 12. Known limitations
+`invoke` channels return a result and fail through a rejected promise. Progress, partial, done, error and model-progress channels are main→renderer events and are subscribed to through preload.
 
-- The model is reloaded between chunks.
-- Interrupted transcription cannot be resumed.
-- Automatic IDs depend on order, so changing rules resets the review mapping.
+## 10. Spec map
+
+| Subsystem | Spec files |
+|---|---|
+| Settings, model management, recognition placement | [`01-settings.md`](spec/01-settings.md) |
+| Defect rules, minimum duration, candidates, grouping | [`02-defects.md`](spec/02-defects.md) |
+| Manual marks, selection, confirmation, defect cards | [`03-marks.md`](spec/03-marks.md), [`10-mini-timeline.md`](spec/10-mini-timeline.md) |
+| Timeline, waveform, exact time selection, underlays, contrast | [`04-timeline.md`](spec/04-timeline.md), [`04a`](spec/04a-waveform-selection.md), [`04b`](spec/04b-word-underlays.md), [`04c`](spec/04c-waveform-contrast.md) |
+| Transcript, seeking, sync, follow, partials | [`05-transcript.md`](spec/05-transcript.md) |
+| Playback, skip/padding, listen, bookmarks, clean playback | [`06-playback.md`](spec/06-playback.md), [`06a`](spec/06a-clean-playback.md) |
+| Layout, undo/redo, visual language | [`07-layout-history-visual.md`](spec/07-layout-history-visual.md), [`07a`](spec/07a-visual-refresh.md) |
+| Progress, chunk length, streaming ASR | [`08-processing-progress.md`](spec/08-processing-progress.md), [`08a`](spec/08a-streaming-asr.md) |
+| CSV and JSON export | [`09-export.md`](spec/09-export.md) |
+
+Status triage and cross-cutting product invariants are in [`SPEC.md`](SPEC.md).
+
+## 11. Known limitations
+
+- The model is reloaded between chunks, and interrupted transcription cannot be resumed.
+- Automatic IDs depend on detection order, so changing rules can reset the review mapping.
 - No diarization, transcript search, SRT/VTT or light theme.
-- No e2e tests and no real Electron/engine verification in the Linux container.
+- No e2e tests; Electron, real media playback, the engine and packaging are not verified in the Linux development container.
 
-Full list — `docs/BACKLOG.md`.
+Full deferred list — `docs/BACKLOG.md`; platform and test limits — `docs/TESTING.md` and `docs/DEVELOPMENT.md`.

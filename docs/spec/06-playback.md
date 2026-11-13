@@ -24,6 +24,7 @@ deleted ones, and to treat a logical group as one item.
 - Deleted automatic defects and manual marks are absent from the cut list.
 - Disabled mode yields no intervals.
 - Logical manual/automatic groups are already one defect and one interval.
+- `K` toggles the mode from the workspace.
 
 ### Story 26 — Per-type and group padding
 
@@ -37,6 +38,8 @@ fast-forward is on.
 - Defaults: pause `0/0`, filler `0.1/0.2`, group `0.15/0.35`.
 - Padding is clamped to 0–5 s and to the recording.
 - Settings remain editable when `skipEnabled` is false.
+- Padding changes are undoable together with the skip intervals they produce
+  (story 47).
 
 ### Story 27 — Listen starts playback
 
@@ -96,6 +99,7 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 - [ ] Deleted items are not in the cut list.
 - [ ] Logical group is skipped/played as one.
 - [ ] Disabled mode returns `[]`.
+- [ ] `K` toggles fast-forward and the player button state follows.
 
 ### Story 26
 
@@ -105,6 +109,7 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 - [ ] Changing padding while paused affects the next skip.
 - [ ] Deleted items remain unskipped.
 - [ ] Controls work while skip is off.
+- [ ] Undo/redo restores padding and recalculates intervals.
 
 ### Story 27
 

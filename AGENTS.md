@@ -36,7 +36,7 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 - **Word confidence / `unclear` is backlog.** `audiocpp_cli` currently writes `confidence: 0`. The parser stores `null` when no positive confidence exists and the `unclear` rule is disabled. Do not enable it by default or treat `0` as a low-confidence signal.
 - **Skip mode cuts every defect and manual mark except dismissed ones.** Confirmation is a review marker only and does not affect playback. See `src/renderer/src/skip.ts`.
 - **Do not silently change defect-lifecycle semantics.** Automatic defect IDs are order-based; manual marks have explicit group IDs; confirmed state is reconciled when marks merge/split; deleted manual marks live in `dismissedMarks`, deleted automatic IDs in `dismissedDefectIds`. See `docs/DATA_MODEL.md`.
-- **History is for editable project state only:** marks, confirmed IDs, dismissed IDs, dismissed marks, notes, defect overrides. Do not put playback position, filters, selection or transcript data into undo/redo snapshots.
+- **History is for editable project state only:** marks, confirmed IDs, dismissed IDs, dismissed marks, notes, defect overrides, the project defect rules and the skip padding that drives recalculation. Do not put skip mode, playback position, filters, selection, transcript, model/language/export or UI-only settings into undo/redo snapshots. While the settings dialog is open, undo is limited to settings changes made since it was opened.
 - **Do not commit generated or binary artifacts:** `out/`, `dist/`, `resources/engine/`, `resources/ffmpeg/`, `node_modules/`, `node_modules_linux/` are ignored.
 
 ## Repository map
@@ -92,7 +92,7 @@ test/                     Vitest suites and fixtures
 | Command | What it does | Works in this Linux container? |
 |---|---|---|
 | `npm run typecheck` | `tsc --noEmit` for node and web configs | Yes |
-| `npm test` | Vitest run (150 tests / 12 files) | Yes |
+| `npm test` | Vitest run (160 tests / 13 files) | Yes |
 | `npm run test:watch` | Vitest watch mode | Yes |
 | `npm run build` | electron-vite production build into `out/` | Yes |
 | `npm run dev` | electron-vite dev + Electron | **No** (needs macOS + macOS Electron) |

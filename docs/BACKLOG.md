@@ -140,7 +140,7 @@ The app does not update itself. For a single user this is not critical, but mult
 
 ## 18. Tests
 
-Currently 150 tests in 12 files: parser, defects, minimum-duration candidates, per-type minimum duration, enabled types and their id stability, the grouping toggle, settings normalization, number parsing and step snapping, chunking (including the short first chunk), WAV, peaks, word selection, exact time selection, bulk confirmation/deletion, card layout in skip mode, the selected-defect mini timeline, colored word underlays and the waveform contrast curve, manual and logical marks, confirmation reconciliation, defect boundaries and overrides, timeline zoom/pan/LOD, per-type skip padding, action history, CSV export. Not covered:
+Currently 160 tests in 13 files: parser, defects, minimum-duration candidates, per-type minimum duration, enabled types and their id stability, the grouping toggle, settings normalization, number parsing and step snapping, chunking (including the short first chunk), WAV, peaks, word selection, exact time selection, bulk confirmation/deletion, card layout in skip mode, the selected-defect mini timeline, colored word underlays and the waveform contrast curve, manual and logical marks, confirmation reconciliation, defect boundaries and overrides, timeline zoom/pan/LOD, per-type skip padding, action history (including project settings), CSV export. Not covered:
 
 - parsing `silencedetect` and ffmpeg progress;
 - model resume and SHA-256 verification;

@@ -316,6 +316,13 @@ History is stored only in renderer memory and is reset when a project is opened 
   dismissedMarks: ManualMark[]
   defectNotes: Record<string, string>
   defectOverrides: Record<string, DefectBoundsOverride>
+  rules: DefectRules
+  playback: {
+    skipBeforeSec: number
+    skipAfterSec: number
+    paddingByType?: Partial<Record<DefectType, SkipPadding>>
+    groupPadding?: SkipPadding
+  }
 }
 ```
 
@@ -323,8 +330,15 @@ History is stored only in renderer memory and is reset when a project is opened 
 
 - A new entry after undo truncates the redo branch.
 - Entries with the same `mergeKey` within 2 seconds are coalesced (for example, note typing or boundary dragging).
-- `undo`/`redo`/`jumpHistory` apply a snapshot to the project and schedule a save.
-- History does not include: playhead position, speed, loop, selection (word or time range), filters, bookmarks, transcript or settings.
+- `undo`/`redo`/`jumpHistory` apply a snapshot to the project and the global
+  settings copy (`rules` and padding fields), then save both. `skipEnabled`
+  stays untouched.
+- While the settings dialog is open, every settings entry carries a
+  `settingsSession` id. Undo/redo ignores entries from before the dialog was
+  opened, so project edits can never be rolled back from the dialog.
+- History does not include: skip mode, playhead position, speed, loop, selection
+  (word or time range), filters, bookmarks, transcript, model/language/export or
+  UI-only settings.
 
 ## 10. Writes and defect-state reset
 

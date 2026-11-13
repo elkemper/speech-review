@@ -46,7 +46,7 @@ only the area it is working on.
 | [`05-transcript.md`](spec/05-transcript.md) | 18–24 | Seeking, sync, follow, pause rows, skipping style, partials |
 | [`06-playback.md`](spec/06-playback.md) | 25–30 | Skip rules, padding, listen, robustness, clean playback, bookmarks |
 | [`06a-clean-playback.md`](spec/06a-clean-playback.md) | 29 detail | Playback without marked places |
-| [`07-layout-history-visual.md`](spec/07-layout-history-visual.md) | 31–34 | Panels, undo/redo, visual direction, dark theme |
+| [`07-layout-history-visual.md`](spec/07-layout-history-visual.md) | 31–34, 47 | Panels, undo/redo, visual direction, dark theme, settings history |
 | [`07a-visual-refresh.md`](spec/07a-visual-refresh.md) | 33 detail | Photoshop/Audacity-style refresh |
 | [`08-processing-progress.md`](spec/08-processing-progress.md) | 35–37 | Progress semantics, chunk length, streaming |
 | [`08a-streaming-asr.md`](spec/08a-streaming-asr.md) | 37 detail | Streaming recognition |
@@ -71,8 +71,10 @@ Applies to every story.
 7. **The exact selected words define a manual mark.** Logical grouping may
    expand a *group's* span, but each underlying mark keeps its exact `wordIds`.
 8. **History is editable project state only:** marks, confirmed/dismissed ids, dismissed marks, notes,
-   defect overrides. Not playback, speed, loop, selection, filters, bookmarks,
-   settings or transcript.
+   defect overrides, project defect rules and skip padding. Not skip mode,
+   playback position, speed, loop, selection, filters, bookmarks, transcript,
+   model/language/export or UI-only settings. While the settings dialog is open,
+   undo is limited to settings changes made since it was opened.
 9. **Manual grouping is explicit.** Group on add or boundary move; do not
    regroup every render.
 10. **ID rules stay stable.** Automatic `auto-${type}-${sequence}`; manual
@@ -138,7 +140,7 @@ Applies to every story.
 
 ### Done — do not regress
 
-Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–46.
+Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–47.
 Verification only (implemented, needs a pass): 9, 24.
 
 ## Related documents

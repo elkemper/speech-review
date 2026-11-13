@@ -14,6 +14,7 @@ type Action =
   | 'end'
   | 'next'
   | 'prev'
+  | 'skip'
   | 'confirm'
   | 'delete'
   | 'mark'
@@ -27,6 +28,30 @@ function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   if (target.isContentEditable) return true
   return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+const NON_TEXT_INPUT_TYPES = new Set([
+  'range',
+  'checkbox',
+  'radio',
+  'button',
+  'submit',
+  'reset',
+  'file',
+  'color'
+])
+
+/** Range sliders and checkboxes should not swallow Cmd+Z. */
+function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target.isContentEditable) return true
+  if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+    return true
+  }
+  if (target instanceof HTMLInputElement) {
+    return !NON_TEXT_INPUT_TYPES.has(target.type)
+  }
+  return false
 }
 
 /**
@@ -46,11 +71,11 @@ function actionFor(event: KeyboardEvent): Action | null {
     case 'End':
       return 'end'
     case 'BracketRight':
-    case 'KeyJ':
       return 'next'
     case 'BracketLeft':
-    case 'KeyK':
       return 'prev'
+    case 'KeyK':
+      return 'skip'
     case 'KeyR':
       return 'delete'
     case 'Enter':
@@ -101,11 +126,12 @@ function actionFor(event: KeyboardEvent): Action | null {
     case 'End':
       return 'end'
     case ']':
-    case 'j':
       return 'next'
     case '[':
-    case 'k':
       return 'prev'
+    case 'k':
+    case 'K':
+      return 'skip'
     case 'r':
     case 'R':
       return 'delete'
@@ -168,6 +194,24 @@ export function useHotkeys(defects: Defect[]): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const state = useApp.getState()
+      const meta = event.metaKey || event.ctrlKey
+      const key = event.key.toLowerCase()
+      const undoCombo =
+        meta && !event.shiftKey && (event.code === 'KeyZ' || key === 'z')
+      const redoCombo =
+        meta &&
+        (((event.code === 'KeyZ' || key === 'z') && event.shiftKey) ||
+          event.code === 'KeyY' ||
+          key === 'y')
+
+      // Undo/redo must also work in the settings dialog and with a range
+      // slider focused; text fields keep their native undo.
+      if ((undoCombo || redoCombo) && state.project && !isTextEntry(event.target)) {
+        event.preventDefault()
+        if (undoCombo) state.undo()
+        else state.redo()
+        return
+      }
 
       if (state.showSettings) {
         if (event.key === 'Escape') {
@@ -188,20 +232,8 @@ export function useHotkeys(defects: Defect[]): void {
       if (isTyping(event.target)) return
       if (!state.project) return
 
-      const meta = event.metaKey || event.ctrlKey
       if (meta) {
-        const key = event.key.toLowerCase()
-        if ((event.code === 'KeyZ' || key === 'z') && !event.shiftKey) {
-          event.preventDefault()
-          state.undo()
-        } else if (
-          ((event.code === 'KeyZ' || key === 'z') && event.shiftKey) ||
-          event.code === 'KeyY' ||
-          key === 'y'
-        ) {
-          event.preventDefault()
-          state.redo()
-        } else if (event.code === 'KeyO' || key === 'o') {
+        if (event.code === 'KeyO' || key === 'o') {
           event.preventDefault()
           void state.openVideo()
         } else if (event.code === 'Comma' || key === ',') {
@@ -262,6 +294,10 @@ export function useHotkeys(defects: Defect[]): void {
         case 'prev':
           event.preventDefault()
           moveDefect(defects, -1)
+          break
+        case 'skip':
+          event.preventDefault()
+          state.toggleSkip()
           break
         case 'confirm':
           event.preventDefault()

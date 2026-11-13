@@ -17,7 +17,7 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Defect queue: filters, confirmation/deletion, notes, manual marks.
 - Adjacent manual marks merge into one logical mark: it can be confirmed once, split back or deleted as a whole.
 - Boundaries of the selected defect or mark can be dragged directly on the timeline; touching neighbouring marks merge.
-- Undo/redo (`⌘Z` / `⇧⌘Z`) with an action history dialog.
+- Undo/redo (`⌘Z` / `⇧⌘Z`) with an action history dialog; defect-rule and skip-padding changes roll back together with the recalculated defect list and intervals.
 - The defect panel can be resized by dragging its edge and hidden completely; the video and timeline heights are adjustable the same way.
 - The selected defect shows a mini waveform in the right panel with ±3 s context (configurable), draggable boundaries, 1–4× zoom with horizontal panning, faint neighbouring marks, colored word underlays and the same playhead as the main timeline.
 - Word selection with click, `Shift`+click or drag; a mark uses the exact selection boundaries.
@@ -92,7 +92,8 @@ Or right-click the app → **Open** → **Open**.
 | `Space` | play / pause |
 | `←` / `→` | −2 / +2 seconds |
 | `Shift` + `←` / `→` | −10 / +10 seconds |
-| `[` / `]` or `k` / `j` | previous / next defect |
+| `[` / `]` | previous / next defect |
+| `K` | toggle fast-forward (skip) mode |
 | `Enter` | confirm the active defect |
 | `R` | delete the active defect |
 | `Shift+Enter` | confirm every defect in the selection |

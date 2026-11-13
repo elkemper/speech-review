@@ -11,7 +11,7 @@ npm run typecheck     # checks main/preload/shared and renderer types separately
 npm run build         # checks that the production build succeeds
 ```
 
-Current state: **150 tests in 12 files**. A run takes less than a second in the Linux container.
+Current state: **160 tests in 13 files**. A run takes less than a second in the Linux container.
 
 ## 2. Configuration
 
@@ -43,7 +43,8 @@ Current state: **150 tests in 12 files**. A run takes less than a second in the 
 | `test/export.test.ts` | 4 | CSV field order, escaping, delimiter/header, all fields |
 | `test/format.test.ts` | 11 | number parsing (dot/comma/empty/partial), step snapping, float noise, display formatting, slider fill |
 | `test/grouping.test.ts` | 27 | per-type minimum duration, automatic grouping rules and limits, enabled types and id stability, grouping toggle and migration, per-type/group skip padding, settings normalization (padding, mini timeline, waveform contrast) |
-| `test/history.test.ts` | 5 | undo/redo by index, redo branch truncation, `mergeKey` coalescing, different keys, deleted-marks archive snapshot |
+| `test/history.test.ts` | 10 | undo/redo by index, redo branch truncation, `mergeKey` coalescing, different keys, deleted-marks archive, rules and padding snapshots, `skipEnabled` preservation, rules equality, session guard and no cross-session coalescing |
+| `test/settingsHistory.test.ts` | 5 | labels and merge keys for rule/padding changes, fallback metadata, `skipEnabled` excluded |
 | `test/marks.test.ts` | 9 | merge on add and move, split, logical mark ID, combined bounds/words/notes, confirmation reconciliation on merge/split, new marks |
 | `test/selection.test.ts` | 39 | selection range in both directions, exact mark boundaries, exact time range, defect overlap, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, defect boundary dragging, bulk confirmation/deletion of a selection, mini timeline zoom/pan and colored word mapping |
 | `test/skip.test.ts` | 6 | padding and interval merging, all non-dismissed items, dismissed and candidate filtering, clamp/disabled, interval lookup |

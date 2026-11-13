@@ -137,6 +137,10 @@ configure one type without scanning several sections.
 - [ ] A numeric field can be typed as `0,5` or `0.5`; clearing it does not
       write `0`.
 - [ ] The slider fill follows the value without native-thumb ghost frames.
+- [ ] Rule and padding changes are undoable; `Cmd+Z` works while the dialog is
+      open and is limited to changes made after opening it.
+- [ ] Without an open project the Defects tab is disabled and General is shown.
+- [ ] While recognition is active the whole settings form is disabled.
 
 ## Verification
 

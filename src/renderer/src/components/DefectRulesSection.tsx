@@ -3,6 +3,11 @@ import { DEFAULT_GROUP_PADDING, DEFAULT_SKIP_PADDING_BY_TYPE } from '@shared/set
 import { DEFAULT_RULES } from '@shared/defects'
 import type { DefectRules, DefectType, PlaybackSettings, SkipPadding } from '@shared/types'
 import { DEFECT_LABELS } from '../defectsUi'
+import {
+  PADDING_HISTORY,
+  RULES_HISTORY,
+  type SettingsHistoryMeta
+} from '../settingsHistory'
 import { InlinePadding, PaddingField, RangeField } from './SettingsRangeField'
 
 /** Pause is deliberately the last row: it carries the most extra controls. */
@@ -41,10 +46,10 @@ export default function DefectRulesSection({
 }: {
   rules: DefectRules
   playback: PlaybackSettings
-  setRules: (patch: Partial<DefectRules>) => void
+  setRules: (patch: Partial<DefectRules>, history?: SettingsHistoryMeta) => void
   updateSettings: (patch: {
     playback?: Partial<PlaybackSettings>
-  }) => void
+  }, history?: SettingsHistoryMeta) => void
 }) {
   const isEnabled = (type: DefectType): boolean =>
     type === 'unclear' ? false : rules.enabledTypes?.[type] !== false
@@ -56,39 +61,48 @@ export default function DefectRulesSection({
     }
 
   const setPadding = (type: DefectType, value: SkipPadding): void => {
-    updateSettings({
-      playback: {
-        paddingByType: {
-          ...(playback.paddingByType ?? {}),
-          [type]: value
+    updateSettings(
+      {
+        playback: {
+          paddingByType: {
+            ...(playback.paddingByType ?? {}),
+            [type]: value
+          }
         }
-      }
-    })
+      },
+      PADDING_HISTORY.type(type)
+    )
   }
 
   const setMinDuration = (type: DefectType, value: number): void => {
-    setRules({
-      minDurationByType: {
-        ...rules.minDurationByType,
-        [type]: value
-      }
-    })
+    setRules(
+      {
+        minDurationByType: {
+          ...rules.minDurationByType,
+          [type]: value
+        }
+      },
+      RULES_HISTORY.minDuration(type)
+    )
   }
 
   const setTypeEnabled = (type: DefectType, enabled: boolean): void => {
-    setRules({
-      enabledTypes: {
-        ...rules.enabledTypes,
-        [type]: enabled
-      }
-    })
+    setRules(
+      {
+        enabledTypes: {
+          ...rules.enabledTypes,
+          [type]: enabled
+        }
+      },
+      RULES_HISTORY.enabled(type)
+    )
   }
 
   return (
     <section className="settings-section">
       <div className="section-title-row">
         <h3>Правила дефектов</h3>
-        <button className="link-btn" onClick={() => setRules(DEFAULT_RULES)}>
+        <button className="link-btn" onClick={() => setRules(DEFAULT_RULES, RULES_HISTORY.reset)}>
           сбросить
         </button>
       </div>
@@ -155,7 +169,10 @@ export default function DefectRulesSection({
                         checked={rules.detectLexicalFillers}
                         disabled={!enabled}
                         onChange={(event) =>
-                          setRules({ detectLexicalFillers: event.target.checked })
+                          setRules(
+                            { detectLexicalFillers: event.target.checked },
+                            RULES_HISTORY.lexicalFillers
+                          )
                         }
                       />
                       искать слова-филлеры
@@ -172,7 +189,9 @@ export default function DefectRulesSection({
                       suffix="с"
                       disabled={!enabled}
                       compact
-                      onChange={(value) => setRules({ repetitionWindowSec: value })}
+                      onChange={(value) =>
+                        setRules({ repetitionWindowSec: value }, RULES_HISTORY.repetitionWindow)
+                      }
                     />
                   ) : null}
 
@@ -185,7 +204,12 @@ export default function DefectRulesSection({
                       step={1}
                       disabled={!enabled}
                       compact
-                      onChange={(value) => setRules({ elongationMinRepeats: value })}
+                      onChange={(value) =>
+                        setRules(
+                          { elongationMinRepeats: value },
+                          RULES_HISTORY.elongationRepeats
+                        )
+                      }
                     />
                   ) : null}
 
@@ -217,7 +241,9 @@ export default function DefectRulesSection({
                     suffix="с"
                     disabled={!enabled}
                     compact
-                    onChange={(value) => setRules({ pauseThresholdSec: value })}
+                    onChange={(value) =>
+                      setRules({ pauseThresholdSec: value }, RULES_HISTORY.pauseThreshold)
+                    }
                   />
                   <RangeField
                     label="критичная пауза"
@@ -228,7 +254,9 @@ export default function DefectRulesSection({
                     suffix="с"
                     disabled={!enabled}
                     compact
-                    onChange={(value) => setRules({ pauseHighSec: value })}
+                    onChange={(value) =>
+                      setRules({ pauseHighSec: value }, RULES_HISTORY.pauseHigh)
+                    }
                   />
                   <label className={`check ${enabled ? '' : 'disabled'}`}>
                     <input
@@ -236,7 +264,10 @@ export default function DefectRulesSection({
                       checked={rules.excludePauseAfterSentenceEnd}
                       disabled={!enabled}
                       onChange={(event) =>
-                        setRules({ excludePauseAfterSentenceEnd: event.target.checked })
+                        setRules(
+                          { excludePauseAfterSentenceEnd: event.target.checked },
+                          RULES_HISTORY.sentenceEndPause
+                        )
                       }
                     />
                     не считать после . ? ! …
@@ -262,11 +293,14 @@ export default function DefectRulesSection({
             checked={rules.autoGroupEnabled}
             onChange={(event) => {
               const enabled = event.target.checked
-              setRules({
-                autoGroupEnabled: enabled,
-                autoGroupGapSec:
-                  enabled && rules.autoGroupGapSec < 0.05 ? 0.5 : rules.autoGroupGapSec
-              })
+              setRules(
+                {
+                  autoGroupEnabled: enabled,
+                  autoGroupGapSec:
+                    enabled && rules.autoGroupGapSec < 0.05 ? 0.5 : rules.autoGroupGapSec
+                },
+                RULES_HISTORY.autoGroup
+              )
             }}
           />
           Авто объединение
@@ -284,7 +318,9 @@ export default function DefectRulesSection({
           suffix="с"
           disabled={!rules.autoGroupEnabled}
           compact
-          onChange={(value) => setRules({ autoGroupGapSec: Math.max(0.05, value) })}
+          onChange={(value) =>
+            setRules({ autoGroupGapSec: Math.max(0.05, value) }, RULES_HISTORY.autoGroupGap)
+          }
         />
       </div>
       <div className="hint">
@@ -298,17 +334,20 @@ export default function DefectRulesSection({
         <button
           className="link-btn"
           onClick={() =>
-            updateSettings({
-              playback: {
-                paddingByType: Object.fromEntries(
-                  Object.entries(DEFAULT_SKIP_PADDING_BY_TYPE).map(([type, padding]) => [
-                    type,
-                    { ...padding }
-                  ])
-                ),
-                groupPadding: { ...DEFAULT_GROUP_PADDING }
-              }
-            })
+            updateSettings(
+              {
+                playback: {
+                  paddingByType: Object.fromEntries(
+                    Object.entries(DEFAULT_SKIP_PADDING_BY_TYPE).map(([type, padding]) => [
+                      type,
+                      { ...padding }
+                    ])
+                  ),
+                  groupPadding: { ...DEFAULT_GROUP_PADDING }
+                }
+              },
+              PADDING_HISTORY.reset
+            )
           }
         >
           сбросить отступы
@@ -324,7 +363,9 @@ export default function DefectRulesSection({
         <PaddingField
           label="Отступы группы дефектов"
           value={playback.groupPadding ?? DEFAULT_GROUP_PADDING}
-          onChange={(value) => updateSettings({ playback: { groupPadding: value } })}
+          onChange={(value) =>
+            updateSettings({ playback: { groupPadding: value } }, PADDING_HISTORY.group)
+          }
         />
       </div>
       <div className="hint">

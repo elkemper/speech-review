@@ -32,10 +32,12 @@ import {
 } from './selection'
 import {
   applyEditable,
+  applySettingsSnapshot,
   canRedo,
   canUndo,
   createHistoryState,
   editableEquals,
+  isSettingsSessionEntry,
   makeHistoryEntry,
   recordHistory,
   snapshotEditable,
@@ -43,6 +45,10 @@ import {
   withHistoryIndex,
   type HistoryState
 } from './history'
+import {
+  settingsHistoryMetaForPatch,
+  type SettingsHistoryMeta
+} from './settingsHistory'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let settingsTimer: ReturnType<typeof setTimeout> | null = null
@@ -95,6 +101,8 @@ interface AppStore {
 
   showSettings: boolean
   showHistory: boolean
+  /** Identifies the settings-dialog session so undo cannot cross its opening. */
+  settingsSession: string | null
   filter: DefectFilter
   history: HistoryState
 
@@ -109,8 +117,9 @@ interface AppStore {
   startTranscription: () => Promise<void>
   cancelTranscription: () => Promise<void>
   downloadModel: (id: ModelId) => Promise<void>
-  updateSettings: (patch: SettingsPatch) => void
-  setRules: (patch: Partial<DefectRules>) => void
+  updateSettings: (patch: SettingsPatch, history?: SettingsHistoryMeta) => void
+  setRules: (patch: Partial<DefectRules>, history?: SettingsHistoryMeta) => void
+  toggleSkip: () => void
   confirmDefect: (defectId: string, label?: string) => void
   confirmMany: (defectIds: string[], label?: string) => void
   unconfirmDefect: (defectId: string, label?: string, relatedIds?: string[]) => void
@@ -204,6 +213,7 @@ export const useApp = create<AppStore>((set, get) => ({
 
   showSettings: false,
   showHistory: false,
+  settingsSession: null,
   filter: 'all',
   history: createHistoryState(),
 
@@ -436,8 +446,10 @@ export const useApp = create<AppStore>((set, get) => ({
     }
   },
 
-  updateSettings: (patch) => {
+  updateSettings: (patch, historyMeta) => {
     const current = get().settings
+    const project = get().project
+    const before = project ? snapshotEditable(project, current) : null
     const settings: Settings = {
       ...current,
       ...patch,
@@ -445,11 +457,12 @@ export const useApp = create<AppStore>((set, get) => ({
       export: { ...current.export, ...patch.export },
       playback: { ...current.playback, ...patch.playback }
     }
-    set({ settings })
 
-    const project = get().project
     if (project) {
+      // Settings and the project copy must update in one render so the defect
+      // list never sees the new rules with the old project state.
       set({
+        settings,
         project: {
           ...project,
           language: settings.language,
@@ -458,8 +471,25 @@ export const useApp = create<AppStore>((set, get) => ({
           rules: settings.rules
         }
       })
-      get().scheduleSave()
+    } else {
+      set({ settings })
     }
+
+    if (project && before) {
+      const meta = historyMeta ?? settingsHistoryMetaForPatch(patch)
+      if (meta) {
+        recordProjectChange(
+          set,
+          get,
+          before,
+          meta.label,
+          meta.mergeKey,
+          get().settingsSession ?? undefined
+        )
+      }
+    }
+
+    if (project) get().scheduleSave()
 
     if (patch.modelId || patch.language || patch.backend) {
       void window.api
@@ -471,15 +501,22 @@ export const useApp = create<AppStore>((set, get) => ({
     }
   },
 
-  setRules: (patch) => {
-    get().updateSettings({ rules: { ...get().settings.rules, ...patch } })
+  setRules: (patch, history) => {
+    get().updateSettings({ rules: patch }, history)
+  },
+
+  toggleSkip: () => {
+    const state = get()
+    state.updateSettings({
+      playback: { skipEnabled: !state.settings.playback.skipEnabled }
+    })
   },
 
   confirmDefect: (defectId, label) => {
     const project = get().project
     if (!project) return
     if (project.confirmedDefectIds.includes(defectId)) return
-    const before = snapshotEditable(project)
+    const before = snapshotEditable(project, get().settings)
     const confirmed = new Set(project.confirmedDefectIds)
     confirmed.add(defectId)
     const dismissed = new Set(project.dismissedDefectIds)
@@ -498,7 +535,7 @@ export const useApp = create<AppStore>((set, get) => ({
   confirmMany: (defectIds, label) => {
     const project = get().project
     if (!project || defectIds.length === 0) return
-    const before = snapshotEditable(project)
+    const before = snapshotEditable(project, get().settings)
     const confirmed = new Set(project.confirmedDefectIds)
     const dismissed = new Set(project.dismissedDefectIds)
     for (const defectId of defectIds) {
@@ -521,7 +558,7 @@ export const useApp = create<AppStore>((set, get) => ({
     if (!project) return
     const stale = new Set([defectId, ...relatedIds])
     if (!project.confirmedDefectIds.some((id) => stale.has(id))) return
-    const before = snapshotEditable(project)
+    const before = snapshotEditable(project, get().settings)
     const confirmed = project.confirmedDefectIds.filter((id) => !stale.has(id))
     set({ project: { ...project, confirmedDefectIds: confirmed } })
     recordProjectChange(set, get, before, label ?? 'Подтверждение снято')
@@ -531,7 +568,7 @@ export const useApp = create<AppStore>((set, get) => ({
   restoreDefect: (defectId, relatedIds = []) => {
     const project = get().project
     if (!project) return
-    const before = snapshotEditable(project)
+    const before = snapshotEditable(project, get().settings)
     const markIds = markIdsForDefectId(defectId, project.dismissedMarks ?? [])
     const stale = new Set([defectId, ...relatedIds])
     const confirmed = project.confirmedDefectIds.filter((id) => !stale.has(id))
@@ -617,7 +654,7 @@ export const useApp = create<AppStore>((set, get) => ({
   setNote: (defectId, note) => {
     const project = get().project
     if (!project) return
-    const before = snapshotEditable(project)
+    const before = snapshotEditable(project, get().settings)
     const notes = { ...project.defectNotes }
     if (note.trim()) notes[defectId] = note
     else delete notes[defectId]
@@ -641,7 +678,7 @@ export const useApp = create<AppStore>((set, get) => ({
   addMark: () => {
     const project = get().project
     if (!project) return
-    const before = snapshotEditable(project)
+    const before = snapshotEditable(project, get().settings)
     const words = project.transcript?.words ?? []
     const timeSelection = get().timeSelection
     const timeRange = markRangeForTimeSelection(words, timeSelection, project.duration)
@@ -702,7 +739,7 @@ export const useApp = create<AppStore>((set, get) => ({
   removeDefects: (items) => {
     const project = get().project
     if (!project || items.length === 0) return
-    const before = snapshotEditable(project)
+    const before = snapshotEditable(project, get().settings)
     const notes = { ...project.defectNotes }
     const confirmed = new Set(project.confirmedDefectIds)
     const dismissed = new Set(project.dismissedDefectIds)
@@ -771,7 +808,7 @@ export const useApp = create<AppStore>((set, get) => ({
     const markIds = markIdsForDefectId(defectId, project.marks)
     const groupMarks = project.marks.filter((mark) => markIds.includes(mark.id))
     if (groupMarks.length < 2) return
-    const before = snapshotEditable(project)
+    const before = snapshotEditable(project, get().settings)
     const notes = { ...project.defectNotes }
     const groupNote = notes[defectId]
     delete notes[defectId]
@@ -805,7 +842,7 @@ export const useApp = create<AppStore>((set, get) => ({
   setDefectBounds: (defectId, start, end) => {
     const project = get().project
     if (!project) return
-    const before = snapshotEditable(project)
+    const before = snapshotEditable(project, get().settings)
     const duration = Math.max(0.1, project.duration)
     const bounds = clampBounds(start, end, duration)
     const markIds = markIdsForDefectId(defectId, project.marks)
@@ -873,45 +910,62 @@ export const useApp = create<AppStore>((set, get) => ({
   },
 
   undo: () => {
-    const { project, history } = get()
+    const { project, history, showSettings, settingsSession, jobId } = get()
     if (!project || !canUndo(history)) return
+    if (showSettings && jobId) return
     const entry = history.entries[history.index]
+    // While settings are open, only roll back settings actions made since it
+    // was opened; project edits stay untouched.
+    if (showSettings && !isSettingsSessionEntry(entry, settingsSession)) return
     const target = history.index - 1
     const snapshot = stateForHistoryIndex(history, target)
     if (!entry || !snapshot) return
     set({
       project: applyEditable(project, snapshot),
+      settings: applySettingsSnapshot(get().settings, snapshot),
       history: withHistoryIndex(history, target)
     })
     get().scheduleSave()
+    scheduleSettingsSave(get)
     get().notify(`Отменено: ${entry.label}`)
   },
 
   redo: () => {
-    const { project, history } = get()
+    const { project, history, showSettings, settingsSession, jobId } = get()
     if (!project || !canRedo(history)) return
+    if (showSettings && jobId) return
     const entry = history.entries[history.index + 1]
+    if (showSettings && !isSettingsSessionEntry(entry, settingsSession)) return
     const target = history.index + 1
     const snapshot = stateForHistoryIndex(history, target)
     if (!entry || !snapshot) return
     set({
       project: applyEditable(project, snapshot),
+      settings: applySettingsSnapshot(get().settings, snapshot),
       history: withHistoryIndex(history, target)
     })
     get().scheduleSave()
+    scheduleSettingsSave(get)
     get().notify(`Повторено: ${entry.label}`)
   },
 
   jumpHistory: (index) => {
-    const { project, history } = get()
+    const { project, history, showSettings, settingsSession, jobId } = get()
     if (!project) return
+    if (showSettings && jobId) return
+    if (showSettings) {
+      const targetEntry = index >= 0 ? history.entries[index] : undefined
+      if (!isSettingsSessionEntry(targetEntry, settingsSession)) return
+    }
     const snapshot = stateForHistoryIndex(history, index)
     if (!snapshot) return
     set({
       project: applyEditable(project, snapshot),
+      settings: applySettingsSnapshot(get().settings, snapshot),
       history: withHistoryIndex(history, index)
     })
     get().scheduleSave()
+    scheduleSettingsSave(get)
   },
 
   scheduleSave: () => scheduleSave(get),
@@ -959,7 +1013,18 @@ export const useApp = create<AppStore>((set, get) => ({
     set({ selectedWordId: null, selection: null, timeSelection: null }),
   setFollow: (follow) => set({ follow }),
   setFilter: (filter) => set({ filter }),
-  setShowSettings: (show) => set({ showSettings: show }),
+  setShowSettings: (show) => {
+    const current = get()
+    if (show) {
+      if (!current.showSettings) {
+        set({ showSettings: true, settingsSession: crypto.randomUUID() })
+      } else if (!current.settingsSession) {
+        set({ settingsSession: crypto.randomUUID() })
+      }
+      return
+    }
+    set({ showSettings: false, settingsSession: null })
+  },
   setShowHistory: (show) => set({ showHistory: show }),
   setError: (error) => set({ error }),
 
@@ -989,13 +1054,17 @@ function recordProjectChange(
   get: () => AppStore,
   before: ReturnType<typeof snapshotEditable>,
   label: string,
-  mergeKey?: string
+  mergeKey?: string,
+  settingsSession?: string
 ): void {
   const project = get().project
   if (!project) return
-  const after = snapshotEditable(project)
+  const after = snapshotEditable(project, get().settings)
   if (editableEquals(before, after)) return
-  const entry = makeHistoryEntry(label, before, after, mergeKey ? { mergeKey } : {})
+  const entry = makeHistoryEntry(label, before, after, {
+    ...(mergeKey ? { mergeKey } : {}),
+    ...(settingsSession ? { settingsSession } : {})
+  })
   set({ history: recordHistory(get().history, entry) })
 }
 
@@ -1025,7 +1094,7 @@ async function createFromMedia(
   })
   await get().refreshProjects()
   if (!get().status?.modelReady) {
-    set({ showSettings: true })
+    get().setShowSettings(true)
     get().notify('Скачайте модель CrisperWhisper, чтобы начать распознавание')
   }
 }

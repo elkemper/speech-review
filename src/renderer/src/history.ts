@@ -1,8 +1,21 @@
 import type {
   DefectBoundsOverride,
+  DefectRules,
+  DefectType,
   ManualMark,
-  Project
+  PlaybackSettings,
+  Project,
+  Settings,
+  SkipPadding
 } from '@shared/types'
+
+/** Only the playback fields that change skip intervals belong in history. */
+export interface HistoryPlaybackState {
+  skipBeforeSec: number
+  skipAfterSec: number
+  paddingByType?: Partial<Record<DefectType, SkipPadding>>
+  groupPadding?: SkipPadding
+}
 
 export interface EditableProjectState {
   marks: ManualMark[]
@@ -11,6 +24,8 @@ export interface EditableProjectState {
   dismissedMarks: ManualMark[]
   defectNotes: Record<string, string>
   defectOverrides: Record<string, DefectBoundsOverride>
+  rules: DefectRules
+  playback: HistoryPlaybackState
 }
 
 export interface HistoryEntry {
@@ -20,6 +35,8 @@ export interface HistoryEntry {
   before: EditableProjectState
   after: EditableProjectState
   mergeKey?: string
+  /** Set while the settings dialog is open, so undo cannot cross its opening. */
+  settingsSession?: string
 }
 
 export interface HistoryState {
@@ -34,7 +51,38 @@ export function createHistoryState(): HistoryState {
   return { entries: [], index: -1 }
 }
 
-export function snapshotEditable(project: Project): EditableProjectState {
+function cloneRules(rules: DefectRules): DefectRules {
+  return {
+    ...rules,
+    fillerWords: [...rules.fillerWords],
+    multiWordFillers: rules.multiWordFillers.map((phrase) => [...phrase]),
+    minDurationByType: { ...rules.minDurationByType },
+    enabledTypes: { ...rules.enabledTypes }
+  }
+}
+
+function clonePaddingMap(
+  paddingByType: Partial<Record<DefectType, SkipPadding>> | undefined
+): Partial<Record<DefectType, SkipPadding>> | undefined {
+  if (!paddingByType) return undefined
+  return Object.fromEntries(
+    Object.entries(paddingByType).map(([type, padding]) => [type, { ...padding }])
+  ) as Partial<Record<DefectType, SkipPadding>>
+}
+
+function clonePlayback(playback: PlaybackSettings): HistoryPlaybackState {
+  return {
+    skipBeforeSec: playback.skipBeforeSec,
+    skipAfterSec: playback.skipAfterSec,
+    paddingByType: clonePaddingMap(playback.paddingByType),
+    groupPadding: playback.groupPadding ? { ...playback.groupPadding } : undefined
+  }
+}
+
+export function snapshotEditable(
+  project: Project,
+  settings: Settings
+): EditableProjectState {
   return {
     marks: project.marks.map((mark) => ({
       ...mark,
@@ -52,7 +100,9 @@ export function snapshotEditable(project: Project): EditableProjectState {
         id,
         { ...bounds }
       ])
-    )
+    ),
+    rules: cloneRules(project.rules),
+    playback: clonePlayback(settings.playback)
   }
 }
 
@@ -72,7 +122,31 @@ export function applyEditable(project: Project, state: EditableProjectState): Pr
     defectNotes: { ...state.defectNotes },
     defectOverrides: Object.fromEntries(
       Object.entries(state.defectOverrides ?? {}).map(([id, bounds]) => [id, { ...bounds }])
-    )
+    ),
+    rules: cloneRules(state.rules)
+  }
+}
+
+/**
+ * Apply the history snapshot to the global settings without touching
+ * `skipEnabled`: the player owns that toggle and it is not a project setting.
+ */
+export function applySettingsSnapshot(
+  settings: Settings,
+  state: EditableProjectState
+): Settings {
+  return {
+    ...settings,
+    rules: cloneRules(state.rules),
+    playback: {
+      ...settings.playback,
+      skipBeforeSec: state.playback.skipBeforeSec,
+      skipAfterSec: state.playback.skipAfterSec,
+      paddingByType: clonePaddingMap(state.playback.paddingByType),
+      groupPadding: state.playback.groupPadding
+        ? { ...state.playback.groupPadding }
+        : undefined
+    }
   }
 }
 
@@ -84,7 +158,12 @@ export function makeHistoryEntry(
   label: string,
   before: EditableProjectState,
   after: EditableProjectState,
-  options: { mergeKey?: string; id?: string; at?: string } = {}
+  options: {
+    mergeKey?: string
+    id?: string
+    at?: string
+    settingsSession?: string
+  } = {}
 ): HistoryEntry {
   return {
     id:
@@ -94,7 +173,8 @@ export function makeHistoryEntry(
     at: options.at ?? new Date().toISOString(),
     before,
     after,
-    ...(options.mergeKey ? { mergeKey: options.mergeKey } : {})
+    ...(options.mergeKey ? { mergeKey: options.mergeKey } : {}),
+    ...(options.settingsSession ? { settingsSession: options.settingsSession } : {})
   }
 }
 
@@ -110,6 +190,7 @@ export function recordHistory(
     last &&
     entry.mergeKey &&
     last.mergeKey === entry.mergeKey &&
+    last.settingsSession === entry.settingsSession &&
     now - Date.parse(last.at) <= HISTORY_MERGE_WINDOW_MS
   ) {
     entries[entries.length - 1] = {
@@ -127,6 +208,14 @@ export function recordHistory(
 
 export function canUndo(state: HistoryState): boolean {
   return state.index >= 0
+}
+
+/** True for entries recorded while the current settings dialog is open. */
+export function isSettingsSessionEntry(
+  entry: HistoryEntry | undefined,
+  session: string | null
+): boolean {
+  return Boolean(entry && session && entry.settingsSession === session)
 }
 
 export function canRedo(state: HistoryState): boolean {

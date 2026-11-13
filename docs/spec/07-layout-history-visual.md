@@ -27,15 +27,19 @@ panel, and hide the defect panel completely.
 
 **Status:** Done · **Priority:** P0
 
-As a user, I want undo/redo with a log covering marks, confirmation state, notes and
-defect overrides.
+As a user, I want undo/redo with a log covering marks, confirmation state, notes,
+defect overrides and project settings.
 
 - `Cmd+Z` / `Ctrl+Z` undo; `Shift+Cmd+Z` / `Ctrl+Y` redo.
 - History dialog lists actions with timestamps and supports jumping.
 - Same `mergeKey` within 2 s coalesces.
-- Snapshot = marks + confirmed ids + dismissed ids + notes + overrides only.
-- Bookmarks, playback, selection, filters, transcript and settings excluded.
+- Snapshot = marks + confirmed ids + dismissed ids + notes + overrides + project
+  rules + skip padding.
+- Bookmarks, skip mode, playback, selection, filters, transcript, model/language,
+  export and UI-only settings excluded.
 - History resets when a project is opened/closed.
+- While the settings dialog is open, undo/redo only covers settings changes
+  recorded since it was opened; project edits are never rolled back from there.
 
 ### Story 33 — Professional desktop visual direction
 
@@ -55,6 +59,26 @@ As a user, I want the app to stay dark-only.
 - No light theme or switcher unless an explicit task asks for it.
 - New components must use the existing CSS variables and contrast.
 
+### Story 47 — Project settings in undo/redo
+
+**Status:** Done · **Priority:** P1
+
+As a user, I want changes to project rules and skip padding to be undone with
+the defect list and skip intervals they recalculated.
+
+- Snapshot includes `project.rules` and `playback.paddingByType`,
+  `playback.groupPadding`, `playback.skipBeforeSec`, `playback.skipAfterSec`.
+- `skipEnabled` is player state and stays out of history.
+- Changing a rule or padding records one history entry; slider dragging
+  coalesces through a per-field `mergeKey`.
+- Undo/redo restores the project rules, the global settings copy and the
+  editable review state in one update, then saves both files.
+- While the settings dialog is open, undo/redo only covers settings entries
+  recorded in that dialog session.
+- Without an open project, the project-dependent Defects tab is disabled and
+  the dialog falls back to General.
+- During active recognition, the whole settings form is disabled.
+
 ## Acceptance criteria
 
 ### Story 31
@@ -72,10 +96,13 @@ As a user, I want the app to stay dark-only.
 - [ ] Undo/redo works for marks, confirmation, deletion, notes, overrides.
 - [ ] The dialog lists actions and jumps correctly.
 - [ ] Merge key coalesces within 2 s.
-- [ ] Only editable project state is snapshotted.
-- [ ] Bookmarks/playback/selection/filters/settings are not snapshotted.
+- [ ] Only editable project state and project settings are snapshotted.
+- [ ] Bookmarks, skip mode, playback position, selection, filters, model,
+      language, export and UI-only settings are not snapshotted.
 - [ ] History resets on project change.
-- [ ] Tests cover index math and coalescing (`test/history.test.ts`).
+- [ ] While settings are open, undo cannot cross its opening.
+- [ ] Tests cover index math, coalescing and settings snapshots
+      (`test/history.test.ts`).
 
 ### Story 33
 
@@ -89,7 +116,21 @@ As a user, I want the app to stay dark-only.
 - [ ] New UI uses existing variables and keeps contrast.
 - [ ] Defect colors and waveform remain readable.
 
+### Story 47
+
+- [ ] Changing a rule adds one history entry and updates the defect list.
+- [ ] Changing a padding adds one history entry and updates skip intervals.
+- [ ] Undo/redo restores rules, paddings and review state together.
+- [ ] `skipEnabled` does not change on undo/redo.
+- [ ] `project.json` and `settings.json` are saved after undo/redo.
+- [ ] History dialog labels name the changed rule or padding.
+- [ ] With settings open, undo only covers changes made after opening it.
+- [ ] Without a project, the Defects tab is disabled and General is selected.
+- [ ] During recognition, the whole settings form is disabled.
+
 ## Verification
 
-- `test/history.test.ts` covers undo/redo and merge keys.
-- Panel resize and visual changes need a macOS run.
+- `test/history.test.ts` covers undo/redo, merge keys, rules and padding
+  snapshots; `test/settingsHistory.test.ts` covers labels and merge keys.
+- Panel resize, settings locking and visual changes need a macOS run.
+- Electron, real media and recognition are not verified in the Linux container.
