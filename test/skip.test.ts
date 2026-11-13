@@ -66,6 +66,12 @@ describe('skip intervals', () => {
     ).toEqual([{ start: 19.8, end: 21.3 }])
   })
 
+  it('skips a revealed candidate while it is selected', () => {
+    expect(
+      buildSkipIntervals([defect('a', 10, 11, { candidate: true })], settings, 60)
+    ).toEqual([{ start: 9.8, end: 11.3 }])
+  })
+
   it('clamps to the recording and ignores disabled mode', () => {
     expect(buildSkipIntervals([defect('a', 0.1, 1)], settings, 60)[0]).toEqual({
       start: 0,

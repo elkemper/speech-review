@@ -3,7 +3,7 @@ import { clamp, formatTimecode } from '@shared/format'
 import type { Defect } from '@shared/types'
 import { DEFECT_COLORS, defectByWordId } from '../defectsUi'
 import { seekTo } from '../player'
-import { nearestWord, rangeForSelection } from '../selection'
+import { rangeForSelection, wordsInRange } from '../selection'
 import { buildSkipIntervals } from '../skip'
 import { useApp } from '../store'
 import { buildWaveLut, computeWaveStats, waveAmp } from '../waveform'
@@ -38,11 +38,13 @@ export default function Timeline({
   const loop = useApp((state) => state.loop)
   const activeDefectId = useApp((state) => state.activeDefectId)
   const selection = useApp((state) => state.selection)
+  const timeSelection = useApp((state) => state.timeSelection)
   const playback = useApp((state) => state.settings.playback)
   const waveContrast = useApp((state) => state.settings.waveformContrast)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
   const setDefectBounds = useApp((state) => state.setDefectBounds)
-  const selectRange = useApp((state) => state.selectRange)
+  const selectTimeRange = useApp((state) => state.selectTimeRange)
+  const clearSelection = useApp((state) => state.clearSelection)
   const setFollow = useApp((state) => state.setFollow)
 
   const HEIGHT = Math.max(64, Math.round(height))
@@ -78,7 +80,17 @@ export default function Timeline({
     () => buildWaveLut(waveStats, waveContrast),
     [waveStats, waveContrast]
   )
-  const selectedRange = useMemo(() => rangeForSelection(words, selection), [words, selection])
+  const selectedRange = useMemo(() => {
+    if (timeSelection) {
+      return {
+        start: timeSelection.start,
+        end: timeSelection.end,
+        wordIds: wordsInRange(words, timeSelection.start, timeSelection.end),
+        text: ''
+      }
+    }
+    return rangeForSelection(words, selection)
+  }, [words, selection, timeSelection])
   const skipIntervals = useMemo(
     () =>
       buildSkipIntervals(visibleDefects, playback, project?.duration ?? 0),
@@ -86,7 +98,7 @@ export default function Timeline({
   )
 
   const draggingRef = useRef(false)
-  const selectingRef = useRef<{ anchorId: number } | null>(null)
+  const selectingRef = useRef<{ anchorTime: number } | null>(null)
   const boundaryRef = useRef<{ defectId: string; edge: DefectEdge } | null>(null)
 
   useEffect(() => {
@@ -479,23 +491,18 @@ export default function Timeline({
 
     const time = timeFromClientX(event.clientX)
 
-    if (event.shiftKey && words.length > 0) {
-      const focus = nearestWord(words, time)
-      const anchor = selection
-        ? words.find((word) => word.id === selection.anchorId) ?? focus
-        : focus
-      if (anchor && focus) {
-        event.preventDefault()
-        selectRange(anchor.id, focus.id)
-        selectingRef.current = { anchorId: anchor.id }
-        setActiveDefect(null)
-        setFollow(false)
-        event.currentTarget.setPointerCapture(event.pointerId)
-      }
+    if (event.shiftKey) {
+      event.preventDefault()
+      selectTimeRange(time, time)
+      selectingRef.current = { anchorTime: time }
+      setActiveDefect(null)
+      setFollow(false)
+      event.currentTarget.setPointerCapture(event.pointerId)
       return
     }
 
     const nearest = findDefectAt(event.clientX)
+    if (timeSelection) clearSelection()
     if (nearest) {
       setActiveDefect(nearest.id)
       seekTo(nearest.type === 'pause' ? nearest.start : Math.max(0, nearest.start + 0.01))
@@ -536,8 +543,7 @@ export default function Timeline({
     }
 
     if (selectingRef.current) {
-      const focus = nearestWord(words, timeFromClientX(event.clientX))
-      if (focus) selectRange(selectingRef.current.anchorId, focus.id)
+      selectTimeRange(selectingRef.current.anchorTime, timeFromClientX(event.clientX))
       return
     }
     if (draggingRef.current) {
@@ -563,7 +569,11 @@ export default function Timeline({
     setFollow(false)
   }
 
-  const selectedCount = selectedRange?.wordIds.length ?? 0
+  const selectedLabel = timeSelection
+    ? `${formatTimecode(timeSelection.start, true)}–${formatTimecode(timeSelection.end, true)}`
+    : selectedRange
+      ? `выделено ${selectedRange.wordIds.length} слов`
+      : `${formatTimecode(view.start)}–${formatTimecode(view.end)}`
 
   return (
     <div
@@ -578,7 +588,7 @@ export default function Timeline({
         setHover(null)
         if (!boundaryRef.current) setHandleHover(null)
       }}
-      title="Клик — перемотка, Shift+драг — выделение слов, Ctrl/⌘+колесо — зум, прокрутка — панорама. Границы выбранного дефекта можно двигать мышкой."
+      title="Клик — перемотка, Shift+драг — выделение области, Ctrl/⌘+колесо — зум, прокрутка — панорама. Границы выбранного дефекта можно двигать мышкой."
     >
       <canvas ref={canvasRef} />
       <div
@@ -594,11 +604,7 @@ export default function Timeline({
         <button onClick={() => setView(fitView(duration))} title="Вся запись">
           ⤢
         </button>
-        <span className="timeline-scale">
-          {selectedCount > 0
-            ? `выделено ${selectedCount} слов`
-            : `${formatTimecode(view.start)}–${formatTimecode(view.end)}`}
-        </span>
+        <span className="timeline-scale">{selectedLabel}</span>
       </div>
       {hover ? (
         <div className="timeline-hover" style={{ left: hover.x }}>

@@ -24,6 +24,7 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Selected words can be confirmed with `Shift+Enter` or deleted with `Shift+R` when they contain defects.
 - Bookmarks: `B` remembers a place, the list returns to it and can resume from the last one.
 - Thresholds are edited with a slider and a number field; every defect type has a minimum duration, and neighbouring defects can be grouped automatically.
+- A word whose short defect is below the threshold opens a temporary «кандидат» card when clicked. Resize, confirm, delete or add a note to keep it as a real defect.
 - Skip padding is configured per defect type and per group.
 - Loop over a fragment, speed 0.5–2×, hotkeys.
 - Skip mode: during playback, automatically cut every defect and manual mark except deleted ones, with configurable padding. Confirmation does not affect playback.
@@ -112,7 +113,7 @@ In skip mode the confirm/delete/mark hotkeys work only while playback is paused.
 
 Clicking the waveform seeks; clicking the triangle selects a defect. Clicking a word in the transcript seeks to its start.
 
-Word selection: a normal click selects one word, `Shift`+click extends the range, dragging selects several words. The `M` mark uses the exact selection boundaries. On the timeline, `Ctrl`/`Cmd`+wheel changes zoom, normal scrolling pans; the `+`, `−` and `⤢` buttons duplicate this with the mouse.
+Word selection in the transcript: a normal click selects one word, `Shift`+click extends the range, dragging selects several words. The `M` mark uses the exact selection boundaries. On the timeline, `Shift`+drag selects an exact time range and `M` creates a manual mark with those bounds. `Ctrl`/`Cmd`+wheel changes zoom, normal scrolling pans; the `+`, `−` and `⤢` buttons duplicate this with the mouse.
 
 Selecting a defect in the list or transcript shows two vertical boundaries on the timeline; they can be dragged with the mouse. Dragging a manual mark boundary onto a neighbouring mark merges them into a logical mark; the "split" button in the panel restores separate marks. The defect panel width is changed by dragging its left edge; it is hidden with the `⟩` button and restored with the "Defects" button in the header. Dragging the horizontal splitters changes the height of the video area and the timeline; the transcript takes the remaining space.
 

@@ -32,6 +32,16 @@ describe('defect card view', () => {
     }
   })
 
+  it('shows a revealed candidate as a full pending card with controls', () => {
+    expect(defectCardView(defect({ candidate: true }), true)).toMatchObject({
+      mode: 'pending',
+      compact: false,
+      fullBody: true,
+      showRail: true,
+      showUndo: false
+    })
+  })
+
   it('collapses a confirmed card in skip mode exactly like outside it', () => {
     const outside = defectCardView(defect({ confirmed: true }), false)
     const inside = defectCardView(defect({ confirmed: true }), true)

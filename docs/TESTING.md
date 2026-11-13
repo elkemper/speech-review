@@ -11,7 +11,7 @@ npm run typecheck     # checks main/preload/shared and renderer types separately
 npm run build         # checks that the production build succeeds
 ```
 
-Current state: **139 tests in 11 files**. A run takes less than a second in the Linux container.
+Current state: **150 tests in 12 files**. A run takes less than a second in the Linux container.
 
 ## 2. Configuration
 
@@ -36,16 +36,17 @@ Current state: **139 tests in 11 files**. A run takes less than a second in the 
 
 | File | Tests | What it checks |
 |---|---:|---|
+| `test/candidates.test.ts` | 6 | suppressed minimum-duration candidates, ID stability, promotion, disabled types, dismissed promotion |
 | `test/core.test.ts` | 19 | `words.json` parser, trailing comma, real fixture, `buildTranscript`, confidence, event classification, active word/segment, automatic defects, sentence-boundary pauses, manual marks, exact word boundaries, old marks without `wordIds`, overrides, logical marks |
-| `test/defectCardView.test.ts` | 6 | pending/confirmed/deleted card layout, collapsing in skip mode, automatic group marker, manual badges and split visibility |
+| `test/defectCardView.test.ts` | 7 | pending/confirmed/deleted card layout, candidate card, collapsing in skip mode, automatic group marker, manual badges and split visibility |
 | `test/engine.test.ts` | 8 | chunk planner (short recording, silence, max size, short first chunk, target), WAV reading, slicing, waveform |
 | `test/export.test.ts` | 4 | CSV field order, escaping, delimiter/header, all fields |
 | `test/format.test.ts` | 11 | number parsing (dot/comma/empty/partial), step snapping, float noise, display formatting, slider fill |
 | `test/grouping.test.ts` | 27 | per-type minimum duration, automatic grouping rules and limits, enabled types and id stability, grouping toggle and migration, per-type/group skip padding, settings normalization (padding, mini timeline, waveform contrast) |
 | `test/history.test.ts` | 5 | undo/redo by index, redo branch truncation, `mergeKey` coalescing, different keys, deleted-marks archive snapshot |
 | `test/marks.test.ts` | 9 | merge on add and move, split, logical mark ID, combined bounds/words/notes, confirmation reconciliation on merge/split, new marks |
-| `test/selection.test.ts` | 36 | selection range in both directions, exact mark boundaries, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, defect boundary dragging, bulk confirmation/deletion of a selection, mini timeline zoom/pan and colored word mapping |
-| `test/skip.test.ts` | 5 | padding and interval merging, all non-dismissed items, dismissed filtering, clamp/disabled, interval lookup |
+| `test/selection.test.ts` | 39 | selection range in both directions, exact mark boundaries, exact time range, defect overlap, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, defect boundary dragging, bulk confirmation/deletion of a selection, mini timeline zoom/pan and colored word mapping |
+| `test/skip.test.ts` | 6 | padding and interval merging, all non-dismissed items, dismissed and candidate filtering, clamp/disabled, interval lookup |
 | `test/waveform.test.ts` | 9 | waveform statistics (noise floor, loud reference, degenerate input), contrast lookup table (linear mode, gamma lift, gate, monotonicity), signed mapping |
 
 ## 4. Fixtures

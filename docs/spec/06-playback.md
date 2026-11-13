@@ -18,6 +18,8 @@ As a user, I want fast-forward to cut every defect and manual mark except
 deleted ones, and to treat a logical group as one item.
 
 - `buildSkipIntervals` uses every non-dismissed defect and manual mark.
+- A revealed minimum-duration candidate is a temporary defect, so it is cut
+  while it is active and stops being cut after switching away.
 - Confirmation does not affect playback.
 - Deleted automatic defects and manual marks are absent from the cut list.
 - Disabled mode yields no intervals.
@@ -89,6 +91,7 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 ### Story 25
 
 - [ ] Every non-dismissed defect and manual mark is skipped.
+- [ ] A revealed candidate is skipped only while it stays active.
 - [ ] Confirmation does not change the cut list.
 - [ ] Deleted items are not in the cut list.
 - [ ] Logical group is skipped/played as one.

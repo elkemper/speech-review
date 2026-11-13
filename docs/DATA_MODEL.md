@@ -209,13 +209,17 @@ interface Peaks {
 `Defect` is a computed representation and is not stored in `project.json`. It is assembled in the renderer:
 
 ```ts
-detectDefects(transcript, rules, marks, {
+detectDefectsWithCandidates(transcript, rules, marks, {
   dismissedIds: project.dismissedDefectIds,
-  dismissedMarks: project.dismissedMarks
+  dismissedMarks: project.dismissedMarks,
+  promotedIds // overrides + review ids + note keys, automatic IDs only
 })
-  → applyDefectOverrides(defects, project.defectOverrides)
+  → applyDefectOverrides(defectResult.defects, project.defectOverrides)
   → inject confirmed/dismissed/note from the project sets
+  → append the active minimum-duration candidate as `candidate: true`
 ```
+
+`detectDefects` remains a thin wrapper that returns only `defects`.
 
 Fields:
 
@@ -233,11 +237,14 @@ Fields:
 | `source` | `auto` or `manual` |
 | `confirmed` | confirmed as a real defect; does not affect skip |
 | `dismissed` | deleted as a false positive; excluded from skip and export |
+| `candidate` | computed only: a suppressed minimum-duration detection is revealed for preview; never persisted |
 | `note` | filled in by the renderer |
 
 Automatic IDs are **not stable**: `sequence` is the global insertion order. Changing rules or re-transcribing can shift the numbering. This is a known limitation; see `docs/BACKLOG.md`.
 
 `dismissedDefectIds` and `dismissedMarks` are applied inside `detectDefects`. Active automatic defects are grouped without dismissed members; deleted automatic and manual items are returned separately with `dismissed: true` so their thin cards can be restored and focused from the transcript. A deleted automatic group stores both the group ID and member IDs.
+
+A minimum-duration candidate is a rule match that did not pass the per-type filter. It keeps the same `auto-${type}-${sequence}` ID as it would have at a lower threshold. The renderer reveals one candidate at a time when `activeDefectId` matches it and computes `candidate: true`; the candidate is not persisted. Any explicit edit or review action (bounds override, confirmation, deletion, note) puts the ID into `promotedIds`, so the next detection pass returns it as a normal defect and it survives a switch or reload.
 
 `applyDefectOverrides`:
 
@@ -317,7 +324,7 @@ History is stored only in renderer memory and is reset when a project is opened 
 - A new entry after undo truncates the redo branch.
 - Entries with the same `mergeKey` within 2 seconds are coalesced (for example, note typing or boundary dragging).
 - `undo`/`redo`/`jumpHistory` apply a snapshot to the project and schedule a save.
-- History does not include: playhead position, speed, loop, selection, filters, bookmarks, transcript or settings.
+- History does not include: playhead position, speed, loop, selection (word or time range), filters, bookmarks, transcript or settings.
 
 ## 10. Writes and defect-state reset
 

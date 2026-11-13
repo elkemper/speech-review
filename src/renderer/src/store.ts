@@ -23,7 +23,13 @@ import type {
   Settings,
   TranscribeProgress
 } from '@shared/types'
-import { markRangeForSelection, type WordSelection } from './selection'
+import {
+  markRangeForSelection,
+  markRangeForTimeSelection,
+  timeSelectionFor,
+  type TimeSelection,
+  type WordSelection
+} from './selection'
 import {
   applyEditable,
   canRedo,
@@ -78,6 +84,8 @@ interface AppStore {
   activeDefectId: string | null
   selectedWordId: number | null
   selection: WordSelection | null
+  /** Exact time range from Shift+drag on the main timeline. */
+  timeSelection: TimeSelection | null
   follow: boolean
 
   jobId: string | null
@@ -127,6 +135,7 @@ interface AppStore {
   setActiveDefect: (id: string | null) => void
   selectWord: (id: number | null, extend?: boolean) => void
   selectRange: (anchorId: number, focusId: number) => void
+  selectTimeRange: (start: number, end: number) => void
   clearSelection: () => void
   setFollow: (follow: boolean) => void
   setFilter: (filter: DefectFilter) => void
@@ -185,6 +194,7 @@ export const useApp = create<AppStore>((set, get) => ({
   activeDefectId: null,
   selectedWordId: null,
   selection: null,
+  timeSelection: null,
   follow: true,
 
   jobId: null,
@@ -283,6 +293,7 @@ export const useApp = create<AppStore>((set, get) => ({
         activeDefectId: null,
         selectedWordId: null,
         selection: null,
+        timeSelection: null,
         filter: 'all',
         progress: null,
         jobId: null,
@@ -312,6 +323,7 @@ export const useApp = create<AppStore>((set, get) => ({
       activeDefectId: null,
       selectedWordId: null,
       selection: null,
+      timeSelection: null,
       jobId: null,
       progress: null,
       history: createHistoryState()
@@ -332,6 +344,7 @@ export const useApp = create<AppStore>((set, get) => ({
           activeDefectId: null,
           selectedWordId: null,
           selection: null,
+          timeSelection: null,
           jobId: null,
           progress: null,
           history: createHistoryState()
@@ -630,12 +643,12 @@ export const useApp = create<AppStore>((set, get) => ({
     if (!project) return
     const before = snapshotEditable(project)
     const words = project.transcript?.words ?? []
-    const range = markRangeForSelection(
-      words,
-      get().selection,
-      get().currentTime,
-      project.duration
-    )
+    const timeSelection = get().timeSelection
+    const timeRange = markRangeForTimeSelection(words, timeSelection, project.duration)
+    if (timeSelection && !timeRange) return
+    const range =
+      timeRange ??
+      markRangeForSelection(words, get().selection, get().currentTime, project.duration)
     const mark: ManualMark = {
       id: crypto.randomUUID(),
       type: 'manual',
@@ -660,7 +673,8 @@ export const useApp = create<AppStore>((set, get) => ({
       activeDefectId,
       filter: 'all',
       selection: null,
-      selectedWordId: null
+      selectedWordId: null,
+      timeSelection: null
     })
     recordProjectChange(set, get, before, 'Добавлена метка')
     get().scheduleSave()
@@ -909,19 +923,40 @@ export const useApp = create<AppStore>((set, get) => ({
   setActiveDefect: (id) => set({ activeDefectId: id }),
   selectWord: (id, extend = false) => {
     if (id === null) {
-      set({ selectedWordId: null, selection: null })
+      set({ selectedWordId: null, selection: null, timeSelection: null })
       return
     }
     const current = get().selection
     if (extend && current) {
-      set({ selectedWordId: id, selection: { anchorId: current.anchorId, focusId: id } })
+      set({
+        selectedWordId: id,
+        selection: { anchorId: current.anchorId, focusId: id },
+        timeSelection: null
+      })
     } else {
-      set({ selectedWordId: id, selection: { anchorId: id, focusId: id } })
+      set({
+        selectedWordId: id,
+        selection: { anchorId: id, focusId: id },
+        timeSelection: null
+      })
     }
   },
   selectRange: (anchorId, focusId) =>
-    set({ selectedWordId: focusId, selection: { anchorId, focusId } }),
-  clearSelection: () => set({ selectedWordId: null, selection: null }),
+    set({
+      selectedWordId: focusId,
+      selection: { anchorId, focusId },
+      timeSelection: null
+    }),
+  selectTimeRange: (start, end) => {
+    const duration = get().project?.duration ?? 0
+    set({
+      selectedWordId: null,
+      selection: null,
+      timeSelection: timeSelectionFor(start, end, duration)
+    })
+  },
+  clearSelection: () =>
+    set({ selectedWordId: null, selection: null, timeSelection: null }),
   setFollow: (follow) => set({ follow }),
   setFilter: (filter) => set({ filter }),
   setShowSettings: (show) => set({ showSettings: show }),

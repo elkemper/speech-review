@@ -71,6 +71,8 @@ export interface Defect {
   confirmed: boolean
   /** Deleted as a false positive. Excluded from skip mode and export. */
   dismissed: boolean
+  /** Computed only: a suppressed detection revealed for preview. Never persisted. */
+  candidate?: boolean
   note: string
 }
 

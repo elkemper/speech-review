@@ -4,7 +4,7 @@ import type { Defect, DefectType } from '@shared/types'
 import { DEFECT_COLORS, DEFECT_LABELS, TYPE_ORDER } from '../defectsUi'
 import { defectCardView } from '../defectCardView'
 import { playFrom, seekTo, toggleLoopForDefect } from '../player'
-import { defectIdsForSelection } from '../selection'
+import { defectIdsForSelection, defectIdsInRange } from '../selection'
 import { useApp, type DefectFilter } from '../store'
 import MiniTimeline from './MiniTimeline'
 
@@ -65,6 +65,7 @@ export default function DefectPanel({
   const activeDefectId = useApp((state) => state.activeDefectId)
   const loop = useApp((state) => state.loop)
   const selection = useApp((state) => state.selection)
+  const timeSelection = useApp((state) => state.timeSelection)
   const confirmMany = useApp((state) => state.confirmMany)
   const setFilter = useApp((state) => state.setFilter)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
@@ -85,19 +86,14 @@ export default function DefectPanel({
   const itemRefs = useRef(new Map<string, HTMLDivElement>())
 
   const ff = playback.skipEnabled
-  const queueDefects = defects.filter((defect) => !defect.dismissed)
+  const queueDefects = defects.filter((defect) => !defect.dismissed && !defect.candidate)
   const confirmedCount = queueDefects.filter((defect) => defect.confirmed).length
   const unconfirmedCount = queueDefects.length - confirmedCount
 
-  const selectedDefectIds = useMemo(
-    () =>
-      defectIdsForSelection(
-        defects,
-        project?.transcript?.words ?? [],
-        selection
-      ),
-    [defects, project?.transcript?.words, selection]
-  )
+  const selectedDefectIds = useMemo(() => {
+    if (timeSelection) return defectIdsInRange(defects, timeSelection)
+    return defectIdsForSelection(defects, project?.transcript?.words ?? [], selection)
+  }, [defects, project?.transcript?.words, selection, timeSelection])
 
   const counts = useMemo(() => {
     const map = new Map<DefectType, number>()
@@ -167,7 +163,7 @@ export default function DefectPanel({
     try {
       const path = await window.api.exportProject({
         project,
-        defects: defects.filter((defect) => !defect.dismissed),
+        defects: defects.filter((defect) => !defect.dismissed && !defect.candidate),
         marks: project.marks,
         format,
         exportSettings
@@ -331,6 +327,9 @@ export default function DefectPanel({
                     <span className="defect-duration">
                       {formatShortSeconds(defect.end - defect.start)}
                     </span>
+                    {defect.candidate ? (
+                      <span className="badge candidate">кандидат</span>
+                    ) : null}
                     {view.showManualBadge ? (
                       <span className="badge">ручная</span>
                     ) : null}

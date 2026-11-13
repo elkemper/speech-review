@@ -63,14 +63,18 @@ As a user, I want skip ranges and bookmarks visible on the timeline.
 - Bookmarks render as green flags + dashed lines.
 - Overlays update when padding or skip settings change.
 
-### Story 17 — Arbitrary selection and pause tokens
+### Story 17 — Arbitrary time selection
 
-**Status:** Backlog · **Priority:** P2
+**Status:** Done · **Priority:** P1
 
-As a user, I want to select an arbitrary time range on the waveform and have
-ad-hoc pause tokens generated when the edges do not match word boundaries.
+As a user, I want to select an exact time range on the waveform and create a
+manual mark from it without snapping to nearby words.
 
-Detail and acceptance criteria: [`04a-waveform-selection.md`](04a-waveform-selection.md).
+- `Shift`+drag on the main timeline sets an exact time range.
+- `M` / «＋ метка» creates a normal manual mark from that range.
+- Manual grouping and absorption of existing marks are unchanged.
+- The transcript keeps word-based selection.
+- Generated pause tokens remain deferred: [`04a-waveform-selection.md`](04a-waveform-selection.md).
 
 ## Acceptance criteria
 
@@ -109,8 +113,12 @@ Detail and acceptance criteria: [`04a-waveform-selection.md`](04a-waveform-selec
 
 ### Story 17
 
-- [ ] Parent story for `04a`; the detailed criteria live there.
-- [ ] Do not implement until the pause-token data model is approved.
+- [ ] `Shift`+drag selects an exact time range on the timeline.
+- [ ] `M` creates a manual mark with those exact bounds.
+- [ ] Manual grouping still absorbs touching/overlapping marks.
+- [ ] `Shift+Enter` / `Shift+R` use defects overlapping the range.
+- [ ] `Esc` clears the range; the transcript keeps word selection.
+- [ ] Pause tokens stay out of scope until separately approved.
 
 ## Verification
 

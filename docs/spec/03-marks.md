@@ -31,8 +31,9 @@ neighbouring word.
 
 As a user, I want to select several words and create one mark over all of them.
 
-- Click selects one word; `Shift`+click extends; dragging selects a range.
-- Selection works in the transcript and on the timeline.
+- Click selects one word; `Shift`+click extends; dragging in the transcript
+  selects a range.
+- The main timeline uses exact time selection (story 17), not word snapping.
 - `M` creates one mark with all selected ids.
 - The selection badge shows the count and offers confirm/delete actions.
 
@@ -57,8 +58,8 @@ mark.
 As a user, I want to confirm or delete every defect in a word selection in one
 action.
 
-- `Shift+Enter` confirms all defects touched by the selection (transcript or
-  timeline).
+- `Shift+Enter` confirms all defects touched by the word selection (transcript)
+  or by the exact timeline range.
 - `Shift+R` deletes all defects touched by the selection.
 - Toolbar and defect panel show both counts and explicit buttons.
 - A selection with no defects reports that.
@@ -125,6 +126,8 @@ actions, so I can decide the fate of a defect without treating the checkmark as
   confirm/delete/mark hotkeys are blocked; on pause they work again.
 - The panel's "только непроверенные" checkbox is removed. Settings has
   `showDismissed` for deleted cards only.
+- A revealed minimum-duration candidate uses the same pending card with a
+  «кандидат» badge. It is not exported or counted until promoted.
 
 ## Acceptance criteria
 
@@ -195,6 +198,7 @@ actions, so I can decide the fate of a defect without treating the checkmark as
 - [ ] No skip-mode hint annotation is shown.
 - [ ] Confirm/delete/mark hotkeys work in skip mode only while paused.
 - [ ] The panel no longer has "только непроверенные"; `showDismissed` remains in Settings.
+- [ ] A revealed candidate shows the «кандидат» badge and full pending controls.
 
 ## Verification
 

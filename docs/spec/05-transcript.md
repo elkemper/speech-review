@@ -29,6 +29,10 @@ As a user, I want clicking a marked word in the transcript to select and scroll
 to the matching item in the right defect list.
 
 - Clicking a word with a defect sets `activeDefectId` and seeks.
+- Clicking a plain word without a defect only seeks/selects it and clears the
+  active card.
+- A word covered only by a minimum-duration candidate reveals that candidate
+  (story 46) and switches the filter to «все».
 - The list scrolls the active item into view (`scrollIntoView`).
 - Selecting an item in the list selects/highlights the matching word(s) in the
   transcript.
@@ -115,6 +119,8 @@ analyzed.
 - [ ] Selecting a list item highlights the matching transcript word(s).
 - [ ] Hidden-by-filter items are revealed or the filter is adjusted.
 - [ ] A word covered only by a deleted card focuses its thin card.
+- [ ] A word covered only by a minimum-duration candidate focuses its card.
+- [ ] Clicking a plain word only seeks and clears the active card.
 - [ ] Logical/automatic groups sync correctly.
 - [ ] Pause defects sync with their chip.
 

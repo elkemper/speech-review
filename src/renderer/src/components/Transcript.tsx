@@ -3,7 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatTimecode } from '@shared/format'
 import { endsSentence, findActiveWord, findSegmentIndexForWord } from '@shared/transcript'
 import type { Defect, Segment } from '@shared/types'
-import { DEFECT_COLORS, DEFECT_LABELS, SEVERITY_LABELS } from '../defectsUi'
+import { DEFECT_COLORS, DEFECT_LABELS, SEVERITY_LABELS, defectByWordId } from '../defectsUi'
 import { seekTo } from '../player'
 import { rangeForSelection, defectIdsForSelection } from '../selection'
 import { buildSkipIntervals } from '../skip'
@@ -15,7 +15,13 @@ type Row =
   | { kind: 'segment'; segment: Segment }
   | { kind: 'gap'; id: string; start: number; end: number }
 
-export default function Transcript({ defects }: { defects: Defect[] }) {
+export default function Transcript({
+  defects,
+  candidates = []
+}: {
+  defects: Defect[]
+  candidates?: Defect[]
+}) {
   const project = useApp((state) => state.project)
   const currentTime = useApp((state) => state.currentTime)
   const follow = useApp((state) => state.follow)
@@ -74,6 +80,8 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
     }
     return map
   }, [defects])
+
+  const candidateByWordId = useMemo(() => defectByWordId(candidates), [candidates])
 
   const pauseAfter = useMemo(() => {
     const map = new Map<number, Defect>()
@@ -257,6 +265,14 @@ export default function Transcript({ defects }: { defects: Defect[] }) {
               // A deleted card can be under a type filter other than its own.
               if (primary.dismissed) setFilter('all')
               setActiveDefect(primary.id)
+            } else {
+              const candidate = candidateByWordId.get(word.id)
+              if (candidate) {
+                setFilter('all')
+                setActiveDefect(candidate.id)
+              } else {
+                setActiveDefect(null)
+              }
             }
           }}
         >

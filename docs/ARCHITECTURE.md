@@ -75,7 +75,7 @@ MVP limitations:
 | `src/renderer/src/history.ts` | editable-state snapshots, undo/redo, action log |
 | `src/renderer/src/player.ts` | `<video>` control, seek, loop, skip bypass |
 | `src/renderer/src/skip.ts` | skip intervals and interval lookup by time |
-| `src/renderer/src/selection.ts` | word selection, manual-mark range, nearest word |
+| `src/renderer/src/selection.ts` | word selection, exact time range, manual-mark range, nearest word |
 | `src/renderer/src/timelineView.ts` | zoom, pan, LOD, ticks, defect boundaries |
 | `src/renderer/src/defectsUi.ts` | labels, colors, type ordering, word→defect mapping for underlays |
 | `src/renderer/src/hooks/useHotkeys.ts` | hotkeys, bulk confirmation/deletion and bookmark shortcut |
@@ -145,7 +145,7 @@ Cancellation: `cancel(jobId)` or `cancelProject(projectId)` calls `AbortControll
 
 ## 7. Defects and manual marks
 
-`detectDefects(transcript, rules, marks)` is a pure function. It returns automatic and manual defects sorted by time, type and severity. Automatic defects are filtered by `minDurationByType` and optionally merged by `groupAutoDefects` before manual marks are appended.
+`detectDefectsWithCandidates(transcript, rules, marks, options)` is a pure function. It returns `{ defects, candidates }` sorted by time, type and severity; `detectDefects` is a wrapper returning only defects. Automatic defects are filtered by `minDurationByType`, optionally merged by `groupAutoDefects`, and manual marks are appended. A match below a minimum is kept as a `DefectCandidate` with the same ID, and `options.promotedIds` turns it back into a real defect.
 
 Automatic rules (`DEFAULT_RULES`):
 
@@ -160,7 +160,7 @@ Automatic rules (`DEFAULT_RULES`):
 | `vocal_sound` | events `[LAUGHTER]`, `[COUGH]`, etc. |
 | `unclear` | confidence below the threshold; effectively disabled while the engine writes `0` |
 
-Every automatic defect is also filtered by `rules.minDurationByType[type]`. A pause measures the silence, a repetition the shorter of the repeated words.
+Every automatic defect is also filtered by `rules.minDurationByType[type]`. A pause measures the silence, a repetition the shorter of the repeated words. A suppressed match becomes a candidate; the renderer reveals one candidate at a time when its ID becomes active.
 
 Automatic defect ID: `auto-${type}-${sequence}`, where `sequence` is the global insertion order. IDs are not stable when rules change or the recording is re-transcribed.
 
@@ -184,7 +184,7 @@ Manual marks:
 - `reconcileConfirmedIds(before, after, confirmedIds)` recomputes manual IDs after add, merge, split or move. A logical mark stays confirmed only if all its parts were confirmed before the change.
 - Notes are stored in `Project.defectNotes` by defect ID; for manual marks they are duplicated in `ManualMark.note`.
 - History (`src/renderer/src/history.ts`) stores snapshots of editable state only: `marks`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `defectOverrides`. Rapid changes with the same `mergeKey` within 2 seconds are coalesced. History lives in memory and is reset when a project is opened or closed.
-- `buildSkipIntervals` takes all defects, excludes `dismissed`, adds before/after padding, clamps to the duration and merges overlapping intervals. Padding comes from `playback.paddingByType[defect.type]`; a logical group (manual or automatic) uses `playback.groupPadding` instead. There is no skip scope: automatic defects and manual marks are cut together. Padding settings are editable regardless of `skipEnabled`.
+- `buildSkipIntervals` takes all defects, excludes `dismissed`, adds before/after padding, clamps to the duration and merges overlapping intervals. A revealed candidate is in `defects` only while active, so it is cut only for that preview. Padding comes from `playback.paddingByType[defect.type]`; a logical group (manual or automatic) uses `playback.groupPadding` instead. There is no skip scope: automatic defects and manual marks are cut together. Padding settings are editable regardless of `skipEnabled`.
 - `player.ts` jumps over an interval once so it does not fight the seek. The "listen" button temporarily disables skipping for the selected defect.
 
 ## 9. UI
@@ -206,8 +206,9 @@ Canvas waveform with zoom and pan:
 - `follow` keeps the playhead visible until the user starts panning;
 - bookmarks are drawn as green flags and dashed lines;
 - LOD: waveform and defect markers first, then word marks, boundaries and labels;
-- click seeks; `Shift`+click/drag selects words; clicking a marker selects a defect;
-- `Shift+Enter` confirms and `Shift+R` deletes every defect touched by the current selection;
+- click seeks; `Shift`+click/drag selects an exact time range; clicking a marker selects a defect;
+- the range is not snapped to words; `M` creates a manual mark with exact `start`/`end`;
+- `Shift+Enter` confirms and `Shift+R` deletes every defect touched by the word selection or exact time range;
 - the active defect has two draggable boundaries. An automatic defect is saved in `defectOverrides`; a manual mark updates its `start`/`end` and `wordIds`;
 - skip intervals are highlighted in yellow.
 
@@ -226,6 +227,7 @@ Canvas waveform with zoom and pan:
 - A selected range with defects shows confirm and delete actions.
 - A pending card has a left rail with delete and confirm buttons. A confirmed card collapses to a compact row with a right-side undo button. A deleted card is a thin row with a restore button when `showDismissed` is on. Further actions: note, "listen", loop, delete and "split" for manual marks.
 - `defectCardView` derives the card layout. Skip mode does not expand compact cards: confirming or deleting in skip mode collapses the card exactly like outside it. The automatic group marker stays visible, while a compact card never exposes its hidden text.
+- A revealed minimum-duration candidate is a normal pending card with a «кандидат» badge. It is excluded from progress counters and export until promoted.
 - The active item shows a mini timeline under its text: waveform context, the defect span, draggable boundaries and the shared playhead.
 - Jump to the next unconfirmed defect.
 - CSV/JSON export.

@@ -6,6 +6,20 @@ export interface WordSelection {
   focusId: number
 }
 
+export interface TimeSelection {
+  start: number
+  end: number
+}
+
+/** Exact timeline range; direction is normalized and endpoints are clamped. */
+export function timeSelectionFor(anchor: number, focus: number, duration: number): TimeSelection {
+  const limit = Math.max(0, duration)
+  return {
+    start: clamp(Math.min(anchor, focus), 0, limit),
+    end: clamp(Math.max(anchor, focus), 0, limit)
+  }
+}
+
 export interface SelectionRange {
   start: number
   end: number
@@ -87,6 +101,19 @@ export function markRangeForSelection(
   return { start, end, wordIds: wordsInRange(words, start, end) }
 }
 
+/** Exact timeline selection: edges stay where the user dragged them. */
+export function markRangeForTimeSelection(
+  words: Word[],
+  selection: TimeSelection | null,
+  duration: number
+): MarkRange | null {
+  if (!selection) return null
+  const start = clamp(selection.start, 0, duration)
+  const end = clamp(Math.max(start + 0.05, selection.end), 0, duration)
+  if (end <= start + 1e-6) return null
+  return { start, end, wordIds: wordsInRange(words, start, end) }
+}
+
 /** Nearest word by distance to its [start, end] interval, used for snapping. */
 export function nearestWord(words: Word[], time: number): Word | null {
   let best: Word | null = null
@@ -119,6 +146,23 @@ export function defectIdsForSelection(
     .filter(
       (defect) =>
         !defect.dismissed && defect.wordIds.some((wordId) => selected.has(wordId))
+    )
+    .map((defect) => defect.id)
+}
+
+/** Defects touched by an exact time range on the timeline. */
+export function defectIdsInRange(
+  defects: Defect[],
+  range: TimeSelection | null
+): string[] {
+  if (!range || range.end <= range.start) return []
+  const epsilon = 1e-6
+  return defects
+    .filter(
+      (defect) =>
+        !defect.dismissed &&
+        defect.end > range.start + epsilon &&
+        defect.start < range.end - epsilon
     )
     .map((defect) => defect.id)
 }

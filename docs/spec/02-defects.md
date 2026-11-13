@@ -4,7 +4,7 @@
 [03 — Marks and review](03-marks.md)
 
 **Files:** `src/shared/defects.ts`, `src/shared/types.ts`, tests in
-`test/core.test.ts`, `test/grouping.test.ts`.
+`test/core.test.ts`, `test/grouping.test.ts`, `test/candidates.test.ts`.
 
 ## Stories
 
@@ -85,6 +85,29 @@ values I already set.
 - The UI is a checkbox per type and a checkbox plus gap slider for grouping
   (story 43).
 
+### Story 46 — Minimum-duration candidates
+
+**Status:** Done · **Priority:** P1
+
+As a user, I want a suppressed short defect to be inspectable when I click its
+word, without changing the minimum-duration rule globally.
+
+- `detectDefectsWithCandidates` returns `{ defects, candidates }`; the existing
+  `detectDefects` remains a wrapper.
+- A below-threshold match keeps its normal automatic id and order. Lowering the
+  threshold later produces the same id.
+- A candidate is revealable only for `min-duration`; a disabled type stays off.
+- While `activeDefectId` matches a candidate, the renderer adds a computed
+  `candidate: true` defect to the list. It has the normal pending controls,
+  mini-timeline, timeline markers and skip intervals.
+- Candidate cards show the «кандидат» badge and are excluded from export and
+  confirmation progress while they stay candidates.
+- Promotion is implicit through existing editable state: bounds override,
+  confirmation, deletion or a note makes the id `promoted` and it survives
+  switching and reload.
+- If the user only clicked and then moved to another word/defect, the candidate
+  disappears and is not skipped.
+
 ## Acceptance criteria
 
 ### Story 4
@@ -101,7 +124,8 @@ values I already set.
 - [ ] Every type has a clamped value in `minDurationByType`.
 - [ ] Pause uses the silence length, repetition the shorter word, others the
       defect span.
-- [ ] A defect below the value is not reported.
+- [ ] A defect below the value is not reported as a defect, but remains a
+      hidden candidate (story 46).
 - [ ] Old projects without the field load with zeros.
 - [ ] `normalizeRules` fills and clamps the field.
 
@@ -134,9 +158,20 @@ values I already set.
 - [ ] Old rules with a positive gap migrate to enabled.
 - [ ] Regression tests cover on/off, id stability and migration.
 
+### Story 46
+
+- [ ] A below-threshold match is returned as a candidate, not a defect.
+- [ ] The candidate id equals the id it would get at a lower threshold.
+- [ ] Other automatic ids do not shift around a candidate.
+- [ ] Promoting the id includes it as a defect; disabled types stay off.
+- [ ] Candidates are excluded from export and confirmation progress.
+- [ ] Revealed candidates are skipped, and disappear after switching away.
+- [ ] Bounds, confirm, delete or note keep the promoted defect.
+
 ## Verification
 
 - `test/core.test.ts` — fixture, rule counts, sentence pause.
 - `test/grouping.test.ts` — minimum duration, grouping, enabled types,
   normalization.
+- `test/candidates.test.ts` — suppressed candidates, id stability, promotion.
 - Real recognition still needs a macOS run.

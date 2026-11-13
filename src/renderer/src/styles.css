@@ -247,6 +247,13 @@ input[type="checkbox"] {
   text-transform: none;
 }
 
+.badge.candidate {
+  color: #fde68a;
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.1);
+  text-transform: none;
+}
+
 .dot {
   display: inline-block;
   width: 7px;

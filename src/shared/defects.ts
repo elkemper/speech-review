@@ -142,6 +142,19 @@ function severityRank(value: Severity): number {
   return value === 'high' ? 0 : value === 'medium' ? 1 : 2
 }
 
+export function compareDefects(a: Defect, b: Defect): number {
+  if (a.start !== b.start) return a.start - b.start
+  const typeDelta = DEFECT_TYPE_ORDER.indexOf(a.type) - DEFECT_TYPE_ORDER.indexOf(b.type)
+  if (typeDelta !== 0) return typeDelta
+  const severityDelta = severityRank(a.severity) - severityRank(b.severity)
+  if (severityDelta !== 0) return severityDelta
+  return a.id.localeCompare(b.id)
+}
+
+export function sortDefects(defects: Defect[]): Defect[] {
+  return [...defects].sort(compareDefects)
+}
+
 function isElongated(text: string, minRepeats: number): boolean {
   const threshold = Math.max(2, Math.floor(minRepeats) - 1)
   const re = new RegExp(`(\\p{L})\\1{${threshold},}`, 'u')
@@ -248,6 +261,23 @@ export interface DetectDefectsOptions {
   dismissedIds?: Iterable<string>
   /** Manual marks deleted by the user, kept so their cards can be restored. */
   dismissedMarks?: ManualMark[]
+  /**
+   * Automatic IDs that must survive the minimum-duration filter. The renderer
+   * fills this from overrides, review state and notes, so an explicitly edited
+   * candidate stays a real defect.
+   */
+  promotedIds?: Iterable<string>
+}
+
+/** A rule match suppressed by a type toggle or the minimum-duration rule. */
+export interface DefectCandidate extends Defect {
+  reason: 'type-disabled' | 'min-duration'
+  measuredSec: number
+}
+
+export interface DetectDefectsResult {
+  defects: Defect[]
+  candidates: DefectCandidate[]
 }
 
 /** Manual defects built from marks, shared by active and dismissed lists. */
@@ -293,10 +323,22 @@ export function detectDefects(
   marks: ManualMark[] = [],
   options: DetectDefectsOptions = {}
 ): Defect[] {
+  return detectDefectsWithCandidates(transcript, rules, marks, options).defects
+}
+
+export function detectDefectsWithCandidates(
+  transcript: Transcript,
+  rules: DefectRules = DEFAULT_RULES,
+  marks: ManualMark[] = [],
+  options: DetectDefectsOptions = {}
+): DetectDefectsResult {
   const words = transcript.words
   const auto: Defect[] = []
+  const candidates: DefectCandidate[] = []
   const claimed = new Set<number>()
   const dismissed = new Set(options.dismissedIds ?? [])
+  const promoted = new Set([...dismissed, ...(options.promotedIds ?? [])])
+  const promotedCandidates = new Set<string>()
   let sequence = 0
 
   const add = (
@@ -311,10 +353,7 @@ export function detectDefects(
     // The sequence advances even for disabled types so that turning one type
     // off does not renumber every later automatic defect.
     const id = `auto-${type}-${sequence++}`
-    if (rules.enabledTypes?.[type] === false) return
-    const min = rules.minDurationByType?.[type] ?? 0
-    if (measuredSec + 1e-9 < min) return
-    auto.push({
+    const defect: Defect = {
       id,
       type,
       start,
@@ -326,7 +365,20 @@ export function detectDefects(
       confirmed: false,
       dismissed: false,
       note: ''
-    })
+    }
+    if (rules.enabledTypes?.[type] === false) {
+      candidates.push({ ...defect, reason: 'type-disabled', measuredSec })
+      return
+    }
+    const min = rules.minDurationByType?.[type] ?? 0
+    if (measuredSec + 1e-9 < min) {
+      if (!promoted.has(id)) {
+        candidates.push({ ...defect, reason: 'min-duration', measuredSec })
+        return
+      }
+      promotedCandidates.add(id)
+    }
+    auto.push(defect)
   }
 
   if (rules.detectLexicalFillers) {
@@ -448,26 +500,43 @@ export function detectDefects(
   const dismissedAuto = auto
     .filter((defect) => dismissed.has(defect.id))
     .map((defect) => ({ ...defect, dismissed: true }))
-  const groupedActive = groupAutoDefects(activeAuto, groupGap, words)
-  const groupedDismissed = groupAutoDefects(dismissedAuto, groupGap, words).map(
-    (defect) => ({ ...defect, dismissed: true })
+  // A candidate promoted from below the threshold stays a standalone card, so
+  // its id does not abruptly turn into an automatic-group id while selected.
+  const groupedActive = groupAutoDefects(
+    activeAuto.filter((defect) => !promotedCandidates.has(defect.id)),
+    groupGap,
+    words
   )
-  return [...groupedActive, ...groupedDismissed, ...activeManual, ...dismissedManual]
-    .filter((defect) => {
-      const key =
-        defect.source === 'manual'
-          ? defect.id
-          : `${defect.type}|${defect.start.toFixed(2)}|${defect.end.toFixed(2)}|${defect.wordIds.join(',')}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-    .sort((a, b) => {
-      if (a.start !== b.start) return a.start - b.start
-      const typeDelta = DEFECT_TYPE_ORDER.indexOf(a.type) - DEFECT_TYPE_ORDER.indexOf(b.type)
-      if (typeDelta !== 0) return typeDelta
-      return severityRank(a.severity) - severityRank(b.severity)
-    })
+  const groupedDismissed = groupAutoDefects(
+    dismissedAuto.filter((defect) => !promotedCandidates.has(defect.id)),
+    groupGap,
+    words
+  ).map((defect) => ({ ...defect, dismissed: true }))
+  const promotedAuto = activeAuto.filter((defect) => promotedCandidates.has(defect.id))
+  const promotedDismissed = dismissedAuto.filter((defect) =>
+    promotedCandidates.has(defect.id)
+  )
+  const defects = sortDefects([
+    ...groupedActive,
+    ...promotedAuto,
+    ...groupedDismissed,
+    ...promotedDismissed,
+    ...activeManual,
+    ...dismissedManual
+  ]).filter((defect) => {
+    const key =
+      defect.source === 'manual'
+        ? defect.id
+        : `${defect.type}|${defect.start.toFixed(2)}|${defect.end.toFixed(2)}|${defect.wordIds.join(',')}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  return {
+    defects,
+    candidates: candidates.sort(compareDefects)
+  }
 }
 
 export function applyDefectOverrides(

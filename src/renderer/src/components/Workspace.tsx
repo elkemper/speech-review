@@ -5,7 +5,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent
 } from 'react'
-import { applyDefectOverrides, detectDefects } from '@shared/defects'
+import { applyDefectOverrides, detectDefectsWithCandidates, sortDefects } from '@shared/defects'
 import { formatDuration, formatTimecode } from '@shared/format'
 import { MODEL_SPECS } from '@shared/models'
 import type { Defect, TranscribeProgress } from '@shared/types'
@@ -56,6 +56,7 @@ const TIMELINE_MIN = 80
 
 export default function Workspace() {
   const project = useApp((state) => state.project)
+  const activeDefectId = useApp((state) => state.activeDefectId)
   const status = useApp((state) => state.status)
   const progress = useApp((state) => state.progress)
   const jobId = useApp((state) => state.jobId)
@@ -163,15 +164,31 @@ export default function Workspace() {
     }
   }
 
-  const baseDefects = useMemo<Defect[]>(() => {
-    if (!project?.transcript) return []
-    return detectDefects(
+  const promotedIds = useMemo<string[]>(() => {
+    if (!project) return []
+    return [
+      ...Object.keys(project.defectOverrides ?? {}),
+      ...project.confirmedDefectIds,
+      ...project.dismissedDefectIds,
+      ...Object.keys(project.defectNotes ?? {})
+    ].filter((id) => id.startsWith('auto-'))
+  }, [
+    project?.defectOverrides,
+    project?.confirmedDefectIds,
+    project?.dismissedDefectIds,
+    project?.defectNotes
+  ])
+
+  const detection = useMemo(() => {
+    if (!project?.transcript) return { defects: [] as Defect[], candidates: [] }
+    return detectDefectsWithCandidates(
       project.transcript,
       project.rules,
       project.marks,
       {
         dismissedIds: project.dismissedDefectIds,
-        dismissedMarks: project.dismissedMarks
+        dismissedMarks: project.dismissedMarks,
+        promotedIds
       }
     )
   }, [
@@ -179,32 +196,58 @@ export default function Workspace() {
     project?.rules,
     project?.marks,
     project?.dismissedDefectIds,
-    project?.dismissedMarks
+    project?.dismissedMarks,
+    promotedIds
   ])
+
+  // Disabled types stay off; only the minimum-duration candidates are revealed.
+  const candidates = useMemo(
+    () => detection.candidates.filter((candidate) => candidate.reason === 'min-duration'),
+    [detection.candidates]
+  )
+
+  const revealedCandidate = useMemo(
+    () => candidates.find((candidate) => candidate.id === activeDefectId) ?? null,
+    [candidates, activeDefectId]
+  )
 
   const defects = useMemo<Defect[]>(() => {
     if (!project) return []
     const confirmedIds = new Set(project.confirmedDefectIds)
     const dismissedIds = new Set(project.dismissedDefectIds)
-    return applyDefectOverrides(baseDefects, project.defectOverrides).map((defect) => {
-      const groupDismissed =
-        defect.groupIds && defect.groupIds.length > 0
-          ? defect.groupIds.every((id) => dismissedIds.has(id))
-          : false
-      const dismissed = defect.dismissed || dismissedIds.has(defect.id) || groupDismissed
-      const groupConfirmed =
-        defect.groupIds && defect.groupIds.length > 0
-          ? defect.groupIds.every((id) => confirmedIds.has(id))
-          : false
-      return {
-        ...defect,
-        dismissed,
-        confirmed: !dismissed && (confirmedIds.has(defect.id) || groupConfirmed),
-        note: project.defectNotes[defect.id] ?? defect.note
+    const base = applyDefectOverrides(detection.defects, project.defectOverrides).map(
+      (defect) => {
+        const groupDismissed =
+          defect.groupIds && defect.groupIds.length > 0
+            ? defect.groupIds.every((id) => dismissedIds.has(id))
+            : false
+        const dismissed = defect.dismissed || dismissedIds.has(defect.id) || groupDismissed
+        const groupConfirmed =
+          defect.groupIds && defect.groupIds.length > 0
+            ? defect.groupIds.every((id) => confirmedIds.has(id))
+            : false
+        return {
+          ...defect,
+          dismissed,
+          confirmed: !dismissed && (confirmedIds.has(defect.id) || groupConfirmed),
+          note: project.defectNotes[defect.id] ?? defect.note
+        }
       }
-    })
+    )
+    if (!revealedCandidate) return base
+
+    const { reason: _reason, measuredSec: _measuredSec, ...candidate } = revealedCandidate
+    return sortDefects([
+      ...base,
+      {
+        ...candidate,
+        candidate: true,
+        note: project.defectNotes[candidate.id] ?? candidate.note
+      }
+    ])
   }, [
-    baseDefects,
+    detection.defects,
+    revealedCandidate,
     project?.defectOverrides,
     project?.confirmedDefectIds,
     project?.dismissedDefectIds,
@@ -219,7 +262,7 @@ export default function Workspace() {
   const modelReady = status?.modelReady && status.modelId === settings.modelId
   const words = project.transcript?.words.length ?? 0
   const unconfirmed = defects.filter(
-    (defect) => !defect.dismissed && !defect.confirmed
+    (defect) => !defect.dismissed && !defect.confirmed && !defect.candidate
   ).length
 
   const onTranscribe = (): void => {
@@ -362,7 +405,7 @@ export default function Workspace() {
           ) : null}
 
           {project.transcript ? (
-            <Transcript defects={defects} />
+            <Transcript defects={defects} candidates={candidates} />
           ) : progress ? (
             <ProgressCard progress={progress} onCancel={() => void cancelTranscription()} />
           ) : (

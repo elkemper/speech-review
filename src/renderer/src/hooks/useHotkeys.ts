@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { Defect } from '@shared/types'
 import { nudge, playPause, seekTo, setPlaybackRate, toggleLoopForDefect } from '../player'
-import { defectIdsForSelection } from '../selection'
+import { defectIdsForSelection, defectIdsInRange } from '../selection'
 import { useApp } from '../store'
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
@@ -224,6 +224,15 @@ export function useHotkeys(defects: Defect[]): void {
       }
 
       const active = defects.find((defect) => defect.id === state.activeDefectId) ?? null
+      const hasSelection = Boolean(state.timeSelection || state.selection)
+      const selectedIds = (): string[] =>
+        state.timeSelection
+          ? defectIdsInRange(defects, state.timeSelection)
+          : defectIdsForSelection(
+              defects,
+              state.project?.transcript?.words ?? [],
+              state.selection
+            )
 
       switch (action) {
         case 'play':
@@ -256,12 +265,8 @@ export function useHotkeys(defects: Defect[]): void {
           break
         case 'confirm':
           event.preventDefault()
-          if (event.shiftKey && state.selection) {
-            const ids = defectIdsForSelection(
-              defects,
-              state.project.transcript?.words ?? [],
-              state.selection
-            )
+          if (event.shiftKey && hasSelection) {
+            const ids = selectedIds()
             if (ids.length > 0) {
               state.confirmMany(ids, `Подтверждено выделение: ${ids.length}`)
             } else {
@@ -275,12 +280,8 @@ export function useHotkeys(defects: Defect[]): void {
           break
         case 'delete':
           event.preventDefault()
-          if (event.shiftKey && state.selection) {
-            const ids = defectIdsForSelection(
-              defects,
-              state.project.transcript?.words ?? [],
-              state.selection
-            )
+          if (event.shiftKey && hasSelection) {
+            const ids = selectedIds()
             if (ids.length > 0) {
               state.removeDefects(
                 ids.map((id) => ({
@@ -316,7 +317,7 @@ export function useHotkeys(defects: Defect[]): void {
         case 'escape':
           if (state.loop) state.setLoop(null)
           else if (state.activeDefectId) state.setActiveDefect(null)
-          else if (state.selection) state.clearSelection()
+          else if (state.selection || state.timeSelection) state.clearSelection()
           break
         default: {
           const index = Number(action.slice(4)) - 1

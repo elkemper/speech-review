@@ -37,10 +37,10 @@ only the area it is working on.
 | File | Stories | Area |
 |---|---|---|
 | [`01-settings.md`](spec/01-settings.md) | 1–3, 43 | Tabs, sliders, rows, show-dismissed |
-| [`02-defects.md`](spec/02-defects.md) | 4–7, 44 | Detection, minimum duration, auto-grouping, toggles, sentence pauses |
+| [`02-defects.md`](spec/02-defects.md) | 4–7, 44, 46 | Detection, minimum duration, candidates, auto-grouping, toggles, sentence pauses |
 | [`03-marks.md`](spec/03-marks.md) | 8–13, 45 | Manual marks, selection, logical marks, boundaries, confirmation state |
 | [`04-timeline.md`](spec/04-timeline.md) | 14–17 | Zoom/pan, LOD, overlays, timeline selection |
-| [`04a-waveform-selection.md`](spec/04a-waveform-selection.md) | 17 detail | Arbitrary waveform selection + pause tokens |
+| [`04a-waveform-selection.md`](spec/04a-waveform-selection.md) | 17 detail | Exact time selection + manual marks; pause tokens deferred |
 | [`04b-word-underlays.md`](spec/04b-word-underlays.md) | 41 | Colored word underlays in both timelines |
 | [`04c-waveform-contrast.md`](spec/04c-waveform-contrast.md) | 42 | Readable waveform across a wide dynamic range |
 | [`05-transcript.md`](spec/05-transcript.md) | 18–24 | Seeking, sync, follow, pause rows, skipping style, partials |
@@ -97,8 +97,9 @@ Applies to every story.
   not weaken invariant 6.
 - **Partial recognition** is chunk-by-chunk. No intra-chunk streaming yet
   (story 37).
-- **Arbitrary waveform selection + pause tokens** is a separate feature file
-  (`04a`) because it needs new persisted tokens.
+- **Arbitrary time selection** is implemented in `04a`: `Shift`+drag selects
+  exact bounds and `M` creates a normal manual mark. Generated pause tokens
+  remain deferred because `ManualMark` already stores exact start/end.
 - **Visual refresh** is a separate track (`07a`); it does not change behaviour.
 
 ## Triage
@@ -130,14 +131,14 @@ Applies to every story.
 
 | Story | Item |
 |---|---|
-| 17 / `04a` | Arbitrary waveform selection + ad-hoc pause tokens |
+| 17 / `04a` follow-up | Generated pause tokens for non-word-aligned edges |
 | 29 / `06a` | Clean playback without marked places (needs approval) |
 | 33 / `07a` | Visual refresh toward Photoshop/Audacity 3 |
 | 37 / `08a` | Streaming ASR |
 
 ### Done — do not regress
 
-Stories 1–7, 10–13, 16, 20–21, 25–26, 30–32, 34, 38–45.
+Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–46.
 Verification only (implemented, needs a pass): 9, 24.
 
 ## Related documents

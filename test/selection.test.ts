@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   defectIdsForSelection,
+  defectIdsInRange,
   markRangeForSelection,
+  markRangeForTimeSelection,
   nearestWord,
-  rangeForSelection
+  rangeForSelection,
+  timeSelectionFor
 } from '../src/renderer/src/selection'
 import {
   canDrawWordLabel,
@@ -428,5 +431,56 @@ describe('stable word label rows', () => {
     expect(labelHasRoom(1, 1.02, 400)).toBe(true)
     expect(labelHasRoom(1, 1.02, 0)).toBe(false)
     expect(LABEL_MIN_GAP_PX).toBe(4)
+  })
+})
+
+describe('time selection on the timeline', () => {
+  it('normalizes and clamps the dragged range', () => {
+    expect(timeSelectionFor(5, 2, 60)).toEqual({ start: 2, end: 5 })
+    expect(timeSelectionFor(-4, 7, 60)).toEqual({ start: 0, end: 7 })
+    expect(timeSelectionFor(55, 99, 60)).toEqual({ start: 55, end: 60 })
+  })
+
+  it('keeps the exact area edges and only collects overlapping words', () => {
+    expect(markRangeForTimeSelection(words, { start: 1.2, end: 2.2 }, 60)).toEqual({
+      start: 1.2,
+      end: 2.2,
+      wordIds: [0, 1]
+    })
+    expect(markRangeForTimeSelection(words, { start: 1, end: 1 }, 60)).toEqual({
+      start: 1,
+      end: 1.05,
+      wordIds: [0]
+    })
+  })
+
+  it('finds defects touched by the exact time range', () => {
+    const defect = (id: string, start: number, end: number, extra: Partial<Defect> = {}): Defect => ({
+      id,
+      type: 'filler',
+      start,
+      end,
+      wordIds: [],
+      text: id,
+      severity: 'medium',
+      source: 'auto',
+      confirmed: false,
+      dismissed: false,
+      note: '',
+      ...extra
+    })
+
+    const list = [
+      defect('left', 1, 2),
+      defect('middle', 3, 4),
+      defect('dismissed', 3.2, 3.8, { dismissed: true }),
+      defect('candidate', 4.2, 4.6, { candidate: true })
+    ]
+
+    expect(defectIdsInRange(list, { start: 2, end: 4.2 })).toEqual(['middle'])
+    expect(defectIdsInRange(list, { start: 2, end: 3 })).toEqual([])
+    expect(defectIdsInRange(list, { start: 4, end: 4.5 })).toEqual(['candidate'])
+    expect(defectIdsInRange(list, null)).toEqual([])
+    expect(defectIdsInRange(list, { start: 4, end: 4 })).toEqual([])
   })
 })
