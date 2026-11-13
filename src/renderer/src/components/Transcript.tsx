@@ -2,8 +2,15 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatTimecode } from '@shared/format'
 import { endsSentence, findActiveWord, findSegmentIndexForWord } from '@shared/transcript'
+import type { DefectCandidate } from '@shared/defects'
 import type { Defect, Segment } from '@shared/types'
-import { DEFECT_COLORS, DEFECT_LABELS, SEVERITY_LABELS, defectByWordId } from '../defectsUi'
+import {
+  DEFECT_COLORS,
+  DEFECT_LABELS,
+  SEVERITY_LABELS,
+  candidateHint,
+  defectByWordId
+} from '../defectsUi'
 import { seekTo } from '../player'
 import { rangeForSelection, defectIdsForSelection } from '../selection'
 import { buildSkipIntervals } from '../skip'
@@ -20,7 +27,7 @@ export default function Transcript({
   candidates = []
 }: {
   defects: Defect[]
-  candidates?: Defect[]
+  candidates?: DefectCandidate[]
 }) {
   const project = useApp((state) => state.project)
   const currentTime = useApp((state) => state.currentTime)
@@ -176,10 +183,16 @@ export default function Transcript({
       activeList.length > 0 && activeList.every((defect) => defect.confirmed)
     const primary = activeList[0] ?? list[0]
     const skipped = isSkippedRange(word.start, word.end)
+    const wordCandidate = candidateByWordId.get(word.id)
+    // A word covered only by a hidden candidate is not a defect: it stays
+    // visible but must not look like a marked filler and must explain itself.
+    const candidateOnly = wordCandidate !== undefined && activeList.length === 0
 
     const classes = ['word']
-    if (word.kind === 'filler') classes.push('kind-filler')
-    else if (word.kind === 'event' || word.kind === 'vocal_sound') classes.push('kind-event')
+    if (word.kind === 'filler') {
+      classes.push('kind-filler')
+      if (candidateOnly) classes.push('below-threshold')
+    } else if (word.kind === 'event' || word.kind === 'vocal_sound') classes.push('kind-event')
     if (list.length > 0) {
       classes.push('has-defect')
       if (list.some((defect) => defect.severity === 'high')) classes.push('high')
@@ -190,23 +203,28 @@ export default function Transcript({
     if (isFocus && selection && selection.anchorId !== selection.focusId) classes.push('focus')
     if (skipped) classes.push('skipped')
 
-    const title =
+    const titleLines: string[] =
       list.length > 0
-        ? list
-            .map(
-              (defect) =>
-                `${DEFECT_LABELS[defect.type]} · ${SEVERITY_LABELS[defect.severity]}${
-                  defect.dismissed
-                    ? ' · удалён'
-                    : defect.confirmed
-                      ? ' · подтверждено'
-                      : ''
-                }`
-            )
-            .join('\n') + (skipped ? '\nпропускается в режиме быстрого просмотра' : '')
-        : skipped
-          ? 'пропускается в режиме быстрого просмотра'
-          : undefined
+        ? list.map(
+            (defect) =>
+              `${DEFECT_LABELS[defect.type]} · ${SEVERITY_LABELS[defect.severity]}${
+                defect.dismissed
+                  ? ' · удалён'
+                  : defect.confirmed
+                    ? ' · подтверждено'
+                    : ''
+              }`
+          )
+        : candidateOnly
+          ? [
+              candidateHint(
+                wordCandidate,
+                project?.rules.minDurationByType[wordCandidate.type] ?? 0
+              )
+            ]
+          : []
+    if (skipped && !candidateOnly) titleLines.push('пропускается в режиме быстрого просмотра')
+    const title = titleLines.length > 0 ? titleLines.join('\n') : undefined
 
     return (
       <Fragment key={word.id}>
@@ -266,10 +284,9 @@ export default function Transcript({
               if (primary.dismissed) setFilter('all')
               setActiveDefect(primary.id)
             } else {
-              const candidate = candidateByWordId.get(word.id)
-              if (candidate) {
+              if (wordCandidate) {
                 setFilter('all')
-                setActiveDefect(candidate.id)
+                setActiveDefect(wordCandidate.id)
               } else {
                 setActiveDefect(null)
               }

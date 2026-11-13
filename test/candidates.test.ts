@@ -5,6 +5,7 @@ import {
   detectDefectsWithCandidates,
   normalizeRules
 } from '../src/shared/defects'
+import { candidateHint } from '../src/renderer/src/defectsUi'
 import type { DefectRules, Transcript, Word } from '../src/shared/types'
 
 function word(
@@ -137,5 +138,35 @@ describe('automatic defect candidates', () => {
     const promoted = detectDefectsWithCandidates(close, rules, [], { promotedIds })
     expect(promoted.defects.map((item) => item.id).sort()).toEqual([...promotedIds].sort())
     expect(promoted.defects.every((item) => !item.groupIds)).toBe(true)
+  })
+})
+
+describe('below-threshold candidate hint', () => {
+  const words = [
+    word(0, 1, 1.3, 'ну', 'filler'),
+    word(1, 4, 4.5, 'да')
+  ]
+  const transcript = transcriptOf(words)
+
+  it('explains that a below-threshold filler is not skipped', () => {
+    const result = detectDefectsWithCandidates(transcript, rulesWithFillerMin(0.5))
+    const candidate = result.candidates.find((item) => item.id === 'auto-filler-0')
+    expect(candidate).toBeDefined()
+
+    expect(candidateHint(candidate!, 0.5)).toBe(
+      'филлер · ниже порога 0.30 c < 0.50 c · не пропускается'
+    )
+  })
+
+  it('does not claim a threshold for a disabled type', () => {
+    const rules = normalizeRules({
+      ...rulesWithFillerMin(0.5),
+      enabledTypes: { ...DEFAULT_RULES.enabledTypes, filler: false }
+    })
+    const result = detectDefectsWithCandidates(transcript, rules)
+    const candidate = result.candidates.find((item) => item.id === 'auto-filler-0')
+    expect(candidate).toBeDefined()
+
+    expect(candidateHint(candidate!, 0.5)).toBe('филлер · тип выключен · не пропускается')
   })
 })

@@ -1042,6 +1042,12 @@ body[data-platform^="darwin"] .titlebar {
   font-weight: 650;
 }
 
+/* Only a hidden below-threshold candidate: keep the hint, drop the emphasis. */
+.word.kind-filler.below-threshold {
+  font-weight: 300;
+  font-size: 15px;
+}
+
 .word.kind-event {
   color: #34d399;
   font-style: italic;

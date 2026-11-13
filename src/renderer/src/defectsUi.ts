@@ -1,4 +1,5 @@
 import type { Defect, DefectType, Severity } from '@shared/types'
+import type { DefectCandidate } from '@shared/defects'
 
 export const DEFECT_LABELS: Record<DefectType, string> = {
   filler: 'филлер',
@@ -40,12 +41,26 @@ export const TYPE_ORDER: DefectType[] = [
 ]
 
 /**
+ * Tooltip for a word that only carries a hidden candidate. Such a word keeps
+ * its kind styling hint but is not a defect and is not cut by skip mode.
+ */
+export function candidateHint(candidate: DefectCandidate, minSec: number): string {
+  if (candidate.reason === 'type-disabled') {
+    return `${DEFECT_LABELS[candidate.type]} · тип выключен · не пропускается`
+  }
+  const measured = Math.max(0, candidate.measuredSec).toFixed(2)
+  return `${DEFECT_LABELS[candidate.type]} · ниже порога ${measured} c < ${minSec.toFixed(
+    2
+  )} c · не пропускается`
+}
+
+/**
  * The defect/mark that owns each word, used for colored underlays on the
  * timelines. Pauses are excluded because they describe a gap, not words.
  * A manual mark wins over an automatic defect when both cover a word.
  */
-export function defectByWordId(defects: Defect[]): Map<number, Defect> {
-  const map = new Map<number, Defect>()
+export function defectByWordId<T extends Defect>(defects: T[]): Map<number, T> {
+  const map = new Map<number, T>()
   for (const defect of defects) {
     if (defect.type === 'pause') continue
     for (const wordId of defect.wordIds) {

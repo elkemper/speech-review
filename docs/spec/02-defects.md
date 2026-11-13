@@ -111,6 +111,9 @@ word, without changing the minimum-duration rule globally.
   switching and reload.
 - If the user only clicked and then moved to another word/defect, the candidate
   disappears and is not skipped.
+- A word covered only by a hidden candidate is not styled as a detected defect:
+  a below-threshold filler keeps its filler colour but not the bold weight, and
+  its tooltip says it is below the threshold and is not skipped.
 
 ## Acceptance criteria
 
@@ -170,6 +173,8 @@ word, without changing the minimum-duration rule globally.
 - [ ] Promoting the id includes it as a defect; disabled types stay off.
 - [ ] Candidates are excluded from export and confirmation progress.
 - [ ] Revealed candidates are skipped, and disappear after switching away.
+- [ ] A below-threshold filler is not bold and its tooltip explains that it is
+      below the threshold and is not skipped.
 - [ ] Bounds, confirm, delete or note keep the promoted defect.
 
 ## Verification
