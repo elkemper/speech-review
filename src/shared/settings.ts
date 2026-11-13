@@ -59,10 +59,20 @@ export const DEFAULT_SKIP_PADDING_BY_TYPE: Record<DefectType, SkipPadding> = {
 
 export const DEFAULT_GROUP_PADDING: SkipPadding = { before: 0.15, after: 0.35 }
 
+/**
+ * A pause is shortened rather than removed: this much silence is kept and
+ * split evenly between the word before and the word after the cut. 0 restores
+ * the old behaviour of removing the whole silence.
+ */
+export const DEFAULT_PAUSE_KEEP_SEC = 0.4
+export const MIN_PAUSE_KEEP_SEC = 0
+export const MAX_PAUSE_KEEP_SEC = 3
+
 export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
   skipEnabled: false,
   skipBeforeSec: 0.15,
   skipAfterSec: 0.35,
+  pauseKeepSec: DEFAULT_PAUSE_KEEP_SEC,
   paddingByType: Object.fromEntries(
     Object.entries(DEFAULT_SKIP_PADDING_BY_TYPE).map(([type, padding]) => [
       type,
@@ -153,6 +163,12 @@ export function normalizePlaybackSettings(value: unknown): PlaybackSettings {
     skipEnabled: raw.skipEnabled === true,
     skipBeforeSec: clampNumber(raw.skipBeforeSec, 0, 5, DEFAULT_PLAYBACK_SETTINGS.skipBeforeSec),
     skipAfterSec: clampNumber(raw.skipAfterSec, 0, 5, DEFAULT_PLAYBACK_SETTINGS.skipAfterSec),
+    pauseKeepSec: clampNumber(
+      raw.pauseKeepSec,
+      MIN_PAUSE_KEEP_SEC,
+      MAX_PAUSE_KEEP_SEC,
+      DEFAULT_PAUSE_KEEP_SEC
+    ),
     paddingByType,
     groupPadding: normalizeSkipPadding(raw.groupPadding, DEFAULT_GROUP_PADDING)
   }

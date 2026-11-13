@@ -139,7 +139,7 @@ transcript + rules + marks
 - `src/shared/defects.ts` owns detection, grouping and overrides. `src/shared/marks.ts` owns logical marks and confirmation reconciliation. Both are pure and tested without Electron.
 - `Project` is the source of truth for editable state: marks, overrides, confirmed IDs, dismissed IDs/marks, notes, rules and skip padding.
 - History (`history.ts`) snapshots only that editable state; `skipEnabled` is player state. See `docs/SPEC.md` (story 32/47) and `DATA_MODEL.md` §9.
-- `skip.ts` derives intervals from every non-dismissed defect, applies per-type or group padding, clamps them to the duration and merges overlaps. It does not mutate project state.
+- `skip.ts` derives intervals from every non-dismissed defect, applies per-type or group padding plus the pause room tone, clamps them to the duration and merges overlaps. It does not mutate project state.
 - A revealed minimum-duration candidate is computed from the active ID and disappears when selection changes; only an explicit edit promotes it into project state.
 
 The rules themselves — thresholds, enable flags, grouping conditions, candidate promotion and confirmation semantics — are specified in `docs/spec/02-defects.md` and `docs/spec/03-marks.md` and stored as described in `DATA_MODEL.md` §6–8. Do not restate them here.

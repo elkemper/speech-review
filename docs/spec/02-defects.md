@@ -29,9 +29,13 @@ As a user, I want each automatic type to have a minimum duration, so short
 fillers, coughs and repetitions do not flood the list.
 
 - Field: `rules.minDurationByType: Record<DefectType, number>`.
-- `0` means no limit.
+- `0` means no limit, except for `pause`: `0`/missing normalizes to 1.2 s and
+  the value is clamped to 0.3–10 s.
 - Pause measures the silence; repetition measures the shorter repeated word;
   other types measure the defect span.
+- For `pause` the value is a hard detection threshold: shorter gaps are not
+  defects and do not become hidden candidates. Other types keep the candidate
+  behaviour (story 46).
 - UI: the per-type row in Defects, next to the type name (story 43).
 
 ### Story 6 — Automatic grouping of neighbours
@@ -124,10 +128,10 @@ word, without changing the minimum-duration rule globally.
 - [ ] Every type has a clamped value in `minDurationByType`.
 - [ ] Pause uses the silence length, repetition the shorter word, others the
       defect span.
-- [ ] A defect below the value is not reported as a defect, but remains a
-      hidden candidate (story 46).
-- [ ] Old projects without the field load with zeros.
-- [ ] `normalizeRules` fills and clamps the field.
+- [ ] A defect below the value is not reported as a defect; non-pause types
+      keep it as a hidden candidate (story 46), pauses do not.
+- [ ] Old projects without the field load with defaults (pause 1.2 s).
+- [ ] `normalizeRules` fills, clamps and drops obsolete pause fields.
 
 ### Story 6
 

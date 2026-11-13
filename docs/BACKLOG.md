@@ -37,7 +37,7 @@ If the app crashes, an unfinished job starts over. Completed chunks could be sav
 
 ## 4. Stable defect IDs when rules change
 
-Automatic defect IDs are based on order (`auto-filler-3`). Changing the pause threshold or filler list shifts the numbering, and old confirmation/dismissal flags and notes may end up on different defects.
+Automatic defect IDs are based on order (`auto-filler-3`). Changing the pause minimum duration or filler list shifts the numbering, and old confirmation/dismissal flags and notes may end up on different defects.
 
 Options:
 
@@ -103,7 +103,7 @@ Rules are currently shared for the project. Useful additions:
 - profiles "lecturer", "interview", "fast pace";
 - separate filler lists for Russian/English;
 - exceptions for words the model constantly marks as fillers;
-- a pause threshold that depends on speech rate.
+- a pause minimum duration that depends on speech rate.
 
 ## 13. Improve chunking
 

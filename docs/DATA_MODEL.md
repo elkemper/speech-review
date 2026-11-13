@@ -56,14 +56,12 @@ Speech Review/
   fillerWords: ['э', 'ээ', 'эээ', 'эм', 'мм', 'м', 'ну', 'вот',
                 'типа', 'короче', 'значит', 'собственно', 'ага', 'угу'],
   multiWordFillers: [['как', 'бы'], ['в', 'общем'], ['это', 'самое'], ['так', 'сказать']],
-  pauseThresholdSec: 1.2,
-  pauseHighSec: 2.0,
   excludePauseAfterSentenceEnd: true,
   repetitionWindowSec: 2.0,
   elongationMinRepeats: 3,
   detectLexicalFillers: true,
   lowConfidenceThreshold: 0.45,
-  minDurationByType: { filler: 0, pause: 0, repetition: 0, elongation: 0,
+  minDurationByType: { filler: 0, pause: 1.2, repetition: 0, elongation: 0,
                        false_start: 0, vocal_sound: 0, unclear: 0, manual: 0 },
   enabledTypes: { filler: true, pause: true, repetition: true, elongation: true,
                   false_start: true, vocal_sound: true, unclear: false, manual: true },
@@ -72,7 +70,7 @@ Speech Review/
 }
 ```
 
-`minDurationByType` sets the shortest reported defect for each type. For `pause` it is the silence length, for `repetition` the shorter of the two repeated words; `0` means no limit. `enabledTypes` turns a whole automatic type off for the project; missing entries mean on, and `manual` is never filtered. `autoGroupEnabled` is the grouping switch; `autoGroupGapSec` is the largest gap at which neighbouring automatic defects become one group. The gap value is kept while grouping is off, and `0` also disables grouping at the data level.
+`minDurationByType` sets the shortest reported defect for each type. For `pause` it is the silence length and the only pause threshold: shorter gaps are not defects and do not become candidates. For `repetition` it is the shorter of the two repeated words; `0` means no limit, except for `pause`, where `0`/missing normalizes to 1.2 s and the range is 0.3–10 s. `enabledTypes` turns a whole automatic type off for the project; missing entries mean on, and `manual` is never filtered. `autoGroupEnabled` is the grouping switch; `autoGroupGapSec` is the largest gap at which neighbouring automatic defects become one group. The gap value is kept while grouping is off, and `0` also disables grouping at the data level.
 
 `export`:
 
@@ -84,8 +82,13 @@ Speech Review/
 
 - `skipEnabled` — `false` by default;
 - `skipBeforeSec` / `skipAfterSec` — global fallback, 0–5 s, defaults 0.15 / 0.35;
+- `pauseKeepSec` — room tone kept inside a standalone pause, 0–3 s, default 0.4; split evenly between both edges, `0` removes the whole silence;
 - `paddingByType` — `Record<DefectType, { before, after }>`; defaults give a pause `0/0` and a filler `0.1/0.2`;
 - `groupPadding` — `{ before, after }` for a logical group, default 0.15 / 0.35.
+
+For a pause the keep is applied as negative padding, so the cut shrinks by
+`pauseKeepSec`; the pause type padding still adds on top. A cut shorter than
+0.2 s is skipped instead of performed.
 
 Padding is resolved when skip intervals are built and does not depend on `skipEnabled`: the controls stay editable even when skip mode is off.
 
@@ -95,10 +98,10 @@ Padding is resolved when skip intervals are built and does not depend on `skipEn
 - `rules` is merged with missing `DEFAULT_RULES` fields;
 - `chunkTargetSec` is rounded and clamped to 120–900;
 - `export.fields` is filtered to known fields; an empty list is replaced with the full list; the legacy `reviewed` field is migrated to `confirmed`;
-- `playback` is normalized by `normalizePlaybackSettings`: every per-type padding entry is filled from the defaults and values are clamped to 0–5 s;
+- `playback` is normalized by `normalizePlaybackSettings`: every per-type padding entry is filled from the defaults, padding values are clamped to 0–5 s and `pauseKeepSec` is clamped to 0–3 s;
 - `miniTimelinePadSec` is clamped to 0–15 s (`normalizeMiniTimelinePad`);
 - `waveformContrast` is rounded and clamped to 0–100 (`normalizeWaveformContrast`);
-- `rules` is normalized by `normalizeRules`: missing `minDurationByType` entries and `autoGroupGapSec` are added, values are clamped, missing `enabledTypes` entries default to on, and old rules with a positive gap migrate to `autoGroupEnabled: true`.
+- `rules` is normalized by `normalizeRules`: missing `minDurationByType` entries and `autoGroupGapSec` are added, values are clamped (pause 0.3–10 s, with 0/missing becoming 1.2 s), missing `enabledTypes` entries default to on, obsolete `pauseThresholdSec`/`pauseHighSec` keys are dropped, and old rules with a positive gap migrate to `autoGroupEnabled: true`.
 
 `saveSettings` writes `settings.json.tmp`, then renames it to `settings.json`. Format — JSON with 2-space indentation.
 
@@ -320,6 +323,7 @@ History is stored only in renderer memory and is reset when a project is opened 
   playback: {
     skipBeforeSec: number
     skipAfterSec: number
+    pauseKeepSec: number
     paddingByType?: Partial<Record<DefectType, SkipPadding>>
     groupPadding?: SkipPadding
   }

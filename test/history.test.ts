@@ -30,6 +30,7 @@ function state(value: string): EditableProjectState {
     playback: {
       skipBeforeSec: 0.15,
       skipAfterSec: 0.35,
+      pauseKeepSec: 0.4,
       paddingByType: { filler: { before: 0.1, after: 0.2 } },
       groupPadding: { before: 0.15, after: 0.35 }
     }
@@ -145,20 +146,25 @@ describe('action history', () => {
       dismissedMarks: [],
       defectNotes: {},
       defectOverrides: {},
-      rules: { ...DEFAULT_RULES, pauseThresholdSec: 1.8 }
+      rules: {
+        ...DEFAULT_RULES,
+        minDurationByType: { ...DEFAULT_RULES.minDurationByType, pause: 1.8 }
+      }
     } as unknown as Project
     const settings = {
       ...DEFAULT_SETTINGS,
       playback: {
         ...DEFAULT_SETTINGS.playback,
         skipEnabled: true,
+        pauseKeepSec: 0.6,
         paddingByType: { pause: { before: 0.2, after: 0.4 } },
         groupPadding: { before: 0.3, after: 0.6 }
       }
     }
 
     const snapshot = snapshotEditable(project, settings)
-    expect(snapshot.rules.pauseThresholdSec).toBe(1.8)
+    expect(snapshot.rules.minDurationByType.pause).toBe(1.8)
+    expect(snapshot.playback.pauseKeepSec).toBe(0.6)
     expect(snapshot.playback.paddingByType?.pause).toEqual({ before: 0.2, after: 0.4 })
     expect(snapshot.playback.groupPadding).toEqual({ before: 0.3, after: 0.6 })
     expect(snapshot.rules).not.toBe(project.rules)
@@ -167,9 +173,12 @@ describe('action history', () => {
 
     const restored = applyEditable(project, {
       ...snapshot,
-      rules: { ...snapshot.rules, pauseThresholdSec: 1.2 }
+      rules: {
+        ...snapshot.rules,
+        minDurationByType: { ...snapshot.rules.minDurationByType, pause: 1.2 }
+      }
     })
-    expect(restored.rules.pauseThresholdSec).toBe(1.2)
+    expect(restored.rules.minDurationByType.pause).toBe(1.2)
     expect(restored.rules).not.toBe(snapshot.rules)
   })
 
@@ -181,6 +190,7 @@ describe('action history', () => {
     const applied = applySettingsSnapshot(settings, state('x'))
 
     expect(applied.playback.skipEnabled).toBe(true)
+    expect(applied.playback.pauseKeepSec).toBe(0.4)
     expect(applied.playback.paddingByType).toEqual({ filler: { before: 0.1, after: 0.2 } })
     expect(applied.playback.groupPadding).toEqual({ before: 0.15, after: 0.35 })
     expect(applied.rules).toEqual(DEFAULT_RULES)
@@ -192,7 +202,10 @@ describe('action history', () => {
     expect(
       editableEquals(state('x'), {
         ...state('x'),
-        rules: { ...DEFAULT_RULES, pauseThresholdSec: 2 }
+        rules: {
+          ...DEFAULT_RULES,
+          minDurationByType: { ...DEFAULT_RULES.minDurationByType, pause: 2 }
+        }
       })
     ).toBe(false)
   })
@@ -204,7 +217,7 @@ describe('action history', () => {
       makeHistoryEntry('one', state('base'), state('a'), {
         id: 'one',
         at: '2026-01-01T00:00:00.000Z',
-        mergeKey: 'rules:pause-threshold',
+        mergeKey: 'rules:min:pause',
         settingsSession: 'session-1'
       }),
       Date.parse('2026-01-01T00:00:00.000Z')
@@ -214,7 +227,7 @@ describe('action history', () => {
       makeHistoryEntry('two', state('a'), state('b'), {
         id: 'two',
         at: '2026-01-01T00:00:01.000Z',
-        mergeKey: 'rules:pause-threshold',
+        mergeKey: 'rules:min:pause',
         settingsSession: 'session-2'
       }),
       Date.parse('2026-01-01T00:00:01.000Z')

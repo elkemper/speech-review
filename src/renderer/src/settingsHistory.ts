@@ -33,14 +33,6 @@ export const RULES_HISTORY = {
     label: 'Повторы буквы',
     mergeKey: 'rules:elongation-repeats'
   },
-  pauseThreshold: {
-    label: 'Порог паузы',
-    mergeKey: 'rules:pause-threshold'
-  },
-  pauseHigh: {
-    label: 'Критичная пауза',
-    mergeKey: 'rules:pause-high'
-  },
   sentenceEndPause: {
     label: 'Пауза после точки',
     mergeKey: 'rules:sentence-end-pause'
@@ -61,6 +53,7 @@ export const PADDING_HISTORY = {
     label: `Отступы: ${DEFECT_LABELS[type]}`,
     mergeKey: `padding:${type}`
   }),
+  pauseKeep: { label: 'Тишина в паузах', mergeKey: 'padding:pause-keep' },
   group: { label: 'Отступы группы', mergeKey: 'padding:group' }
 } satisfies Record<string, SettingsHistoryMeta | ((type: DefectType) => SettingsHistoryMeta)>
 
@@ -68,6 +61,7 @@ function playbackTouchesPadding(patch: Partial<PlaybackSettings>): boolean {
   return (
     patch.skipBeforeSec !== undefined ||
     patch.skipAfterSec !== undefined ||
+    patch.pauseKeepSec !== undefined ||
     patch.paddingByType !== undefined ||
     patch.groupPadding !== undefined
   )

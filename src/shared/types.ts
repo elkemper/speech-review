@@ -97,8 +97,6 @@ export interface DefectBoundsOverride {
 export interface DefectRules {
   fillerWords: string[]
   multiWordFillers: string[][]
-  pauseThresholdSec: number
-  pauseHighSec: number
   excludePauseAfterSentenceEnd: boolean
   repetitionWindowSec: number
   elongationMinRepeats: number
@@ -222,6 +220,11 @@ export interface PlaybackSettings {
   /** Global fallback padding used when a type has no explicit entry. */
   skipBeforeSec: number
   skipAfterSec: number
+  /**
+   * Room tone kept inside a pause defect, split evenly between its two edges.
+   * A pause is shortened, not glued: the cut never removes this much silence.
+   */
+  pauseKeepSec: number
   /** Per-type padding. A missing entry falls back to the global values. */
   paddingByType?: Partial<Record<DefectType, SkipPadding>>
   /** Padding for a logical group (manual marks or automatically grouped defects). */

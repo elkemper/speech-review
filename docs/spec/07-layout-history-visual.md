@@ -67,7 +67,8 @@ As a user, I want changes to project rules and skip padding to be undone with
 the defect list and skip intervals they recalculated.
 
 - Snapshot includes `project.rules` and `playback.paddingByType`,
-  `playback.groupPadding`, `playback.skipBeforeSec`, `playback.skipAfterSec`.
+  `playback.groupPadding`, `playback.pauseKeepSec`, `playback.skipBeforeSec`,
+  `playback.skipAfterSec`.
 - `skipEnabled` is player state and stays out of history.
 - Changing a rule or padding records one history entry; slider dragging
   coalesces through a per-field `mergeKey`.

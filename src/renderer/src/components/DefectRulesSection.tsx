@@ -1,6 +1,16 @@
 import { Fragment } from 'react'
-import { DEFAULT_GROUP_PADDING, DEFAULT_SKIP_PADDING_BY_TYPE } from '@shared/settings'
-import { DEFAULT_RULES } from '@shared/defects'
+import {
+  DEFAULT_GROUP_PADDING,
+  DEFAULT_PAUSE_KEEP_SEC,
+  DEFAULT_SKIP_PADDING_BY_TYPE,
+  MAX_PAUSE_KEEP_SEC,
+  MIN_PAUSE_KEEP_SEC
+} from '@shared/settings'
+import {
+  DEFAULT_RULES,
+  MAX_PAUSE_MIN_DURATION,
+  MIN_PAUSE_MIN_DURATION
+} from '@shared/defects'
 import type { DefectRules, DefectType, PlaybackSettings, SkipPadding } from '@shared/types'
 import { DEFECT_LABELS } from '../defectsUi'
 import {
@@ -23,7 +33,7 @@ const ROW_ORDER: DefectType[] = [
 
 const MAX_MIN_DURATION: Record<DefectType, number> = {
   filler: 3,
-  pause: 10,
+  pause: MAX_PAUSE_MIN_DURATION,
   repetition: 3,
   elongation: 3,
   false_start: 3,
@@ -32,8 +42,6 @@ const MAX_MIN_DURATION: Record<DefectType, number> = {
   manual: 3
 }
 
-const MAX_PAUSE_THRESHOLD = 5
-const MAX_PAUSE_HIGH = 10
 const MAX_REPETITION_WINDOW = 10
 const MAX_ELONGATION_REPEATS = 10
 const MAX_AUTO_GROUP_GAP = 5
@@ -140,7 +148,7 @@ export default function DefectRulesSection({
                 ) : (
                   <RangeField
                     value={rules.minDurationByType?.[type] ?? 0}
-                    min={0}
+                    min={type === 'pause' ? MIN_PAUSE_MIN_DURATION : 0}
                     max={MAX_MIN_DURATION[type]}
                     step={0.05}
                     suffix="с"
@@ -225,7 +233,7 @@ export default function DefectRulesSection({
                   ) : null}
 
                   {type === 'pause' ? (
-                    <span className="muted small">порог и конец предложения — ниже</span>
+                    <span className="muted small">тишина и конец предложения — ниже</span>
                   ) : null}
                 </div>
               </div>
@@ -233,29 +241,19 @@ export default function DefectRulesSection({
               {type === 'pause' ? (
                 <div className="defect-row-extra">
                   <RangeField
-                    label="порог паузы"
-                    value={rules.pauseThresholdSec}
-                    min={0.3}
-                    max={MAX_PAUSE_THRESHOLD}
-                    step={0.1}
+                    label="оставить тишины"
+                    value={playback.pauseKeepSec ?? DEFAULT_PAUSE_KEEP_SEC}
+                    min={MIN_PAUSE_KEEP_SEC}
+                    max={MAX_PAUSE_KEEP_SEC}
+                    step={0.05}
                     suffix="с"
                     disabled={!enabled}
                     compact
                     onChange={(value) =>
-                      setRules({ pauseThresholdSec: value }, RULES_HISTORY.pauseThreshold)
-                    }
-                  />
-                  <RangeField
-                    label="критичная пауза"
-                    value={rules.pauseHighSec}
-                    min={0.5}
-                    max={MAX_PAUSE_HIGH}
-                    step={0.1}
-                    suffix="с"
-                    disabled={!enabled}
-                    compact
-                    onChange={(value) =>
-                      setRules({ pauseHighSec: value }, RULES_HISTORY.pauseHigh)
+                      updateSettings(
+                        { playback: { pauseKeepSec: value } },
+                        PADDING_HISTORY.pauseKeep
+                      )
                     }
                   />
                   <label className={`check ${enabled ? '' : 'disabled'}`}>
@@ -270,7 +268,7 @@ export default function DefectRulesSection({
                         )
                       }
                     />
-                    не считать после . ? ! …
+                    не считать дефектом паузу в конце предложения
                   </label>
                 </div>
               ) : null}
@@ -281,8 +279,9 @@ export default function DefectRulesSection({
 
       <div className="hint">
         Дефект короче минимальной длительности не попадает в список. Для повтора
-        учитывается длительность повторяемого слова, для паузы — длина тишины.
-        0 — без ограничения. Снятый тип не детектируется, но его настройки
+        учитывается длительность повторяемого слова. Для паузы это порог тишины:
+        более короткие разрывы не считаются дефектом. 0 — без ограничения (кроме
+        паузы: минимум 0.3 с). Снятый тип не детектируется, но его настройки
         сохраняются.
       </div>
 
@@ -343,6 +342,7 @@ export default function DefectRulesSection({
                       { ...padding }
                     ])
                   ),
+                  pauseKeepSec: DEFAULT_PAUSE_KEEP_SEC,
                   groupPadding: { ...DEFAULT_GROUP_PADDING }
                 }
               },
@@ -370,9 +370,12 @@ export default function DefectRulesSection({
       </div>
       <div className="hint">
         Отступы оставляют базовую паузу по краям, чтобы вырезанное место не
-        склеивалось вплотную. Для объединённой группы применяются отступы
-        группы, а не каждого элемента внутри. В режиме пропуска вырезаются все
-        дефекты и метки, кроме удалённых.
+        склеивалось вплотную. Для паузы отдельно задаётся, сколько тишины
+        оставить: она делится поровну между краями, а отступы паузы могут
+        дополнительно расширить вырезанное место. Слишком короткий рез не
+        выполняется. Для объединённой группы применяются отступы группы, а не
+        каждого элемента внутри. В режиме пропуска вырезаются все дефекты и
+        метки, кроме удалённых.
       </div>
     </section>
   )

@@ -25,7 +25,7 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Bookmarks: `B` remembers a place, the list returns to it and can resume from the last one.
 - Thresholds are edited with a slider and a number field; every defect type has a minimum duration, and neighbouring defects can be grouped automatically.
 - A word whose short defect is below the threshold opens a temporary «кандидат» card when clicked. Resize, confirm, delete or add a note to keep it as a real defect.
-- Skip padding is configured per defect type and per group.
+- Skip padding is configured per defect type and per group; a pause keeps a configurable amount of room tone instead of being cut to zero.
 - Loop over a fragment, speed 0.5–2×, hotkeys.
 - Skip mode: during playback, automatically cut every defect and manual mark except deleted ones, with configurable padding. Confirmation does not affect playback.
 - Deleted defects stay as thin cards with an undo button when "Show deleted defects" is enabled. Confirmed cards collapse to a compact row with an undo button. Pending cards have delete/confirm buttons on the left.
@@ -118,7 +118,7 @@ Word selection in the transcript: a normal click selects one word, `Shift`+click
 
 Selecting a defect in the list or transcript shows two vertical boundaries on the timeline; they can be dragged with the mouse. Dragging a manual mark boundary onto a neighbouring mark merges them into a logical mark; the "split" button in the panel restores separate marks. The defect panel width is changed by dragging its left edge; it is hidden with the `⟩` button and restored with the "Defects" button in the header. Dragging the horizontal splitters changes the height of the video area and the timeline; the transcript takes the remaining space.
 
-On the **Defects** settings tab, each defect type is one row: an enable checkbox, minimum duration, before/after skip padding and the controls that belong to that type (pause is the last row and holds the pause threshold, critical pause and sentence-end rule). "Auto-group" has its own checkbox and maximum gap; turning it off keeps the gap for next time. Skip mode and what it skips are controlled in the player (the ⏭ button), not in Settings.
+On the **Defects** settings tab, each defect type is one row: an enable checkbox, minimum duration, before/after skip padding and the controls that belong to that type (pause is the last row; its minimum duration is the silence threshold, and the row also holds the kept room tone and sentence-end rule). "Auto-group" has its own checkbox and maximum gap; turning it off keeps the gap for next time. Skip mode and what it skips are controlled in the player (the ⏭ button), not in Settings.
 
 ## Default defect rules
 
@@ -126,7 +126,7 @@ On the **Defects** settings tab, each defect type is one row: an enable checkbox
 |---|---|---|
 | `filler` | `[UH]`, `[UM]`, `[ER]`, `[HM]` from CrisperWhisper | high |
 | `filler` | words "э", "эм", "ну", "вот", "типа", "короче", "как бы", etc. | low |
-| `pause` | gap between words ≥ 1.2 s | medium, ≥ 2.0 s — high |
+| `pause` | gap between words ≥ 1.2 s (minimum duration) | medium |
 | `repetition` | the same word within 2 s | medium |
 | `elongation` | 3+ identical letters in a row | medium |
 | `false_start` | word longer than 2 characters ends with `-` | medium |
@@ -155,7 +155,7 @@ Electron main
 - `words.json` from audio.cpp contains `start_sample`/`end_sample` at 16 kHz. The parser tolerates trailing commas.
 - Defects are computed in the renderer from the transcript and rules. Confirmed and dismissed IDs, deleted manual marks and notes are stored in `project.json`.
 - The partial transcript is written with `transcriptComplete: false`; on the first partial result, old confirmation and dismissal state is reset because defect IDs may have changed. Manual marks are preserved.
-- Skip mode does not re-encode video: during playback the position jumps over intervals built from all defects and marks except deleted ones. "Before/after" padding is configured per defect type and per group.
+- Skip mode does not re-encode video: during playback the position jumps over intervals built from all defects and marks except deleted ones. "Before/after" padding is configured per defect type and per group, and pauses keep a configurable amount of silence so cuts do not sound clipped.
 
 ## Where data lives
 

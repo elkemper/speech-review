@@ -23,7 +23,9 @@ export const AUTO_DEFECT_TYPES: DefectType[] = [
 
 export const DEFAULT_MIN_DURATION_BY_TYPE: Record<DefectType, number> = {
   filler: 0,
-  pause: 0,
+  // A pause has no separate threshold: this is the shortest silence that
+  // becomes a pause defect at all.
+  pause: 1.2,
   repetition: 0,
   elongation: 0,
   false_start: 0,
@@ -31,6 +33,9 @@ export const DEFAULT_MIN_DURATION_BY_TYPE: Record<DefectType, number> = {
   unclear: 0,
   manual: 0
 }
+
+export const MIN_PAUSE_MIN_DURATION = 0.3
+export const MAX_PAUSE_MIN_DURATION = 10
 
 /** Every type is detected by default; `unclear` stays off until confidence is real. */
 export const DEFAULT_ENABLED_TYPES: Record<DefectType, boolean> = {
@@ -67,8 +72,6 @@ export const DEFAULT_RULES: DefectRules = {
     ['это', 'самое'],
     ['так', 'сказать']
   ],
-  pauseThresholdSec: 1.2,
-  pauseHighSec: 2.0,
   excludePauseAfterSentenceEnd: true,
   repetitionWindowSec: 2.0,
   elongationMinRepeats: 3,
@@ -91,11 +94,29 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
  * instead of a shallow spread that would drop defaults.
  */
 export function normalizeRules(value: unknown): DefectRules {
-  const raw = (value ?? {}) as Partial<DefectRules>
+  // Obsolete keys from the old pause-threshold model are dropped, not migrated:
+  // there are no released users yet. The pause minimum is the only threshold.
+  const source = { ...((value ?? {}) as Record<string, unknown>) }
+  delete source.pauseThresholdSec
+  delete source.pauseHighSec
+  const raw = source as Partial<DefectRules>
   const minDuration: Record<DefectType, number> = { ...DEFAULT_MIN_DURATION_BY_TYPE }
   const rawMin = (raw.minDurationByType ?? {}) as Partial<Record<DefectType, number>>
   for (const type of DEFECT_TYPE_ORDER) {
-    minDuration[type] = clampNumber(rawMin[type], 0, 10, DEFAULT_MIN_DURATION_BY_TYPE[type])
+    if (type === 'pause') {
+      const rawPause = rawMin.pause
+      minDuration.pause =
+        typeof rawPause === 'number' && Number.isFinite(rawPause) && rawPause > 0
+          ? clampNumber(
+              rawPause,
+              MIN_PAUSE_MIN_DURATION,
+              MAX_PAUSE_MIN_DURATION,
+              DEFAULT_MIN_DURATION_BY_TYPE.pause
+            )
+          : DEFAULT_MIN_DURATION_BY_TYPE.pause
+    } else {
+      minDuration[type] = clampNumber(rawMin[type], 0, 10, DEFAULT_MIN_DURATION_BY_TYPE[type])
+    }
   }
   const enabledTypes: Record<DefectType, boolean> = { ...DEFAULT_ENABLED_TYPES }
   const rawEnabled = (raw.enabledTypes ?? {}) as Partial<Record<DefectType, boolean>>
@@ -433,11 +454,18 @@ export function detectDefectsWithCandidates(
     }
   }
 
+  const rawPauseMin = rules.minDurationByType?.pause
+  const pauseMin =
+    typeof rawPauseMin === 'number' && Number.isFinite(rawPauseMin) && rawPauseMin > 0
+      ? rawPauseMin
+      : DEFAULT_MIN_DURATION_BY_TYPE.pause
   for (let i = 0; i < words.length - 1; i++) {
     const previous = words[i]
     const next = words[i + 1]
     const gap = next.start - previous.end
-    if (gap < rules.pauseThresholdSec) continue
+    // The pause minimum is a hard detection threshold: shorter gaps are not
+    // defects and do not become hidden candidates.
+    if (gap < pauseMin) continue
     if (rules.excludePauseAfterSentenceEnd && endsSentence(previous.text)) continue
     add(
       'pause',
@@ -445,7 +473,7 @@ export function detectDefectsWithCandidates(
       next.start,
       [previous.id, next.id],
       `${previous.text} … ${next.text}`,
-      gap >= rules.pauseHighSec ? 'high' : 'medium'
+      'medium'
     )
   }
 

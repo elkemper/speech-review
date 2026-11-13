@@ -37,7 +37,7 @@ can download/delete models and configure the recognizer in one place.
 As a user, I want every threshold to have a slider **and** a numeric field, so I
 can adjust it quickly or precisely.
 
-- Applies to pause threshold, critical pause, repetition window, elongation
+- Applies to the pause minimum duration, repetition window and elongation
   repeats.
 - Also used by minimum duration (story 5) and padding (story 26).
 - Values persist in `settings.json` and the project `rules`.
@@ -70,8 +70,9 @@ configure one type without scanning several sections.
 - Every row has a checkbox that enables/disables detection for that type
   (story 44), a minimum-duration field and a before/after padding pair.
 - Type-specific controls live in the same row: filler → lexical-filler toggle;
-  repetition → repetition window; elongation → letter repeats; pause → pause
-  threshold, critical pause and sentence-end exclusion in a sub-row.
+  repetition → repetition window; elongation → letter repeats; pause → kept
+  room tone and sentence-end exclusion in a sub-row. For pause the row's
+  minimum duration is the silence threshold.
 - Manual-mark and group padding stay as a compact pair under the table.
 - Automatic grouping has its own checkbox and gap slider (story 44).
 - Timeline contrast and mini-timeline padding follow in their own sections.
@@ -125,8 +126,9 @@ configure one type without scanning several sections.
 
 ### Story 43
 
-- [ ] Pause is the last row and carries threshold, critical pause and
-      sentence-end exclusion.
+- [ ] Pause is the last row; its minimum duration (0.3–10 s) is the silence
+      threshold, and the sub-row carries kept room tone and sentence-end
+      exclusion.
 - [ ] Each type row shows its checkbox, minimum duration, before/after padding
       and type-specific controls.
 - [ ] Manual and group padding remain editable.

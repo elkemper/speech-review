@@ -3,12 +3,16 @@ import {
   DEFAULT_RULES,
   detectDefects,
   groupAutoDefects,
+  MAX_PAUSE_MIN_DURATION,
+  MIN_PAUSE_MIN_DURATION,
   normalizeRules
 } from '../src/shared/defects'
 import { buildSkipIntervals } from '../src/renderer/src/skip'
 import {
   DEFAULT_MINI_TIMELINE_PAD_SEC,
+  DEFAULT_PAUSE_KEEP_SEC,
   DEFAULT_WAVEFORM_CONTRAST,
+  MAX_PAUSE_KEEP_SEC,
   normalizeMiniTimelinePad,
   normalizePlaybackSettings,
   normalizeSkipPadding,
@@ -51,7 +55,8 @@ function transcriptOf(words: Word[], duration = 60): Transcript {
 const basePlayback: PlaybackSettings = {
   skipEnabled: true,
   skipBeforeSec: 0.15,
-  skipAfterSec: 0.35
+  skipAfterSec: 0.35,
+  pauseKeepSec: 0
 }
 
 function defect(id: string, start: number, end: number, extra: Partial<Defect> = {}): Defect {
@@ -283,7 +288,7 @@ describe('enabled defect types', () => {
   })
 
   it('recognises old rules without enabledTypes with every usable type on', () => {
-    const rules = normalizeRules({ pauseThresholdSec: 0.9 })
+    const rules = normalizeRules({ repetitionWindowSec: 1.5 })
     for (const type of [
       'filler',
       'pause',
@@ -351,12 +356,39 @@ describe('settings normalization', () => {
     })
   })
 
+  it('defaults and clamps the pause room tone', () => {
+    expect(normalizePlaybackSettings({}).pauseKeepSec).toBe(DEFAULT_PAUSE_KEEP_SEC)
+    expect(normalizePlaybackSettings({ pauseKeepSec: -1 }).pauseKeepSec).toBe(0)
+    expect(normalizePlaybackSettings({ pauseKeepSec: 99 }).pauseKeepSec).toBe(
+      MAX_PAUSE_KEEP_SEC
+    )
+    expect(normalizePlaybackSettings({ pauseKeepSec: 0.6 }).pauseKeepSec).toBe(0.6)
+  })
+
   it('adds new rule fields to old rule objects', () => {
-    const rules = normalizeRules({ pauseThresholdSec: 0.9 })
-    expect(rules.pauseThresholdSec).toBe(0.9)
+    const rules = normalizeRules({ repetitionWindowSec: 1.5 })
+    expect(rules.minDurationByType.pause).toBe(1.2)
     expect(rules.autoGroupGapSec).toBe(DEFAULT_RULES.autoGroupGapSec)
     expect(rules.minDurationByType.filler).toBe(0)
     expect(rules.fillerWords).toEqual(DEFAULT_RULES.fillerWords)
+  })
+
+  it('keeps the pause minimum as the only pause threshold', () => {
+    expect(normalizeRules({}).minDurationByType.pause).toBe(1.2)
+    expect(normalizeRules({ minDurationByType: { pause: 0 } }).minDurationByType.pause).toBe(
+      1.2
+    )
+    expect(
+      normalizeRules({ minDurationByType: { pause: MIN_PAUSE_MIN_DURATION / 2 } })
+        .minDurationByType.pause
+    ).toBe(MIN_PAUSE_MIN_DURATION)
+    expect(normalizeRules({ minDurationByType: { pause: 4 } }).minDurationByType.pause).toBe(4)
+    expect(
+      normalizeRules({ minDurationByType: { pause: MAX_PAUSE_MIN_DURATION + 1 } })
+        .minDurationByType.pause
+    ).toBe(MAX_PAUSE_MIN_DURATION)
+    expect('pauseThresholdSec' in normalizeRules({ pauseThresholdSec: 1.5 })).toBe(false)
+    expect('pauseHighSec' in normalizeRules({ pauseHighSec: 2.5 })).toBe(false)
   })
 
   it('clamps the mini timeline padding', () => {

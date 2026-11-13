@@ -5,7 +5,8 @@ import type { Defect, PlaybackSettings } from '../src/shared/types'
 const settings: PlaybackSettings = {
   skipEnabled: true,
   skipBeforeSec: 0.2,
-  skipAfterSec: 0.3
+  skipAfterSec: 0.3,
+  pauseKeepSec: 0
 }
 
 function defect(
@@ -90,5 +91,78 @@ describe('skip intervals', () => {
     const intervals = buildSkipIntervals([defect('a', 10, 11)], settings, 60)
     expect(intervalAt(intervals, 10.5)?.end).toBe(11.3)
     expect(intervalAt(intervals, 11.4)).toBeNull()
+  })
+})
+
+describe('pause room tone', () => {
+  const keep = (pauseKeepSec: number, extra: Partial<PlaybackSettings> = {}): PlaybackSettings => ({
+    ...settings,
+    pauseKeepSec,
+    paddingByType: { pause: { before: 0, after: 0 } },
+    ...extra
+  })
+
+  it('keeps silence on both edges instead of cutting the whole pause', () => {
+    expect(
+      buildSkipIntervals([defect('p', 10, 12, { type: 'pause' })], keep(0.4), 60)
+    ).toEqual([{ start: 10.2, end: 11.8 }])
+  })
+
+  it('cuts the whole pause when the keep is zero', () => {
+    expect(
+      buildSkipIntervals([defect('p', 10, 12, { type: 'pause' })], keep(0), 60)
+    ).toEqual([{ start: 10, end: 12 }])
+  })
+
+  it('does not cut a pause shorter than the kept silence', () => {
+    expect(
+      buildSkipIntervals([defect('p', 10, 10.3, { type: 'pause' })], keep(0.4), 60)
+    ).toEqual([])
+  })
+
+  it('does not make a jump shorter than the minimum cut', () => {
+    expect(
+      buildSkipIntervals([defect('p', 10, 10.4, { type: 'pause' })], keep(0.3), 60)
+    ).toEqual([])
+  })
+
+  it('leaves other defect types untouched', () => {
+    expect(buildSkipIntervals([defect('a', 10, 11)], keep(0.4), 60)).toEqual([
+      { start: 9.8, end: 11.3 }
+    ])
+  })
+
+  it('falls back to the default keep when legacy settings omit it', () => {
+    const legacy = { ...keep(0.4), pauseKeepSec: undefined } as unknown as PlaybackSettings
+    expect(buildSkipIntervals([defect('p', 10, 12, { type: 'pause' })], legacy, 60)).toEqual([
+      { start: 10.2, end: 11.8 }
+    ])
+  })
+
+  it('adds the pause padding on top of the kept silence', () => {
+    const padding = { pause: { before: 0.1, after: 0.1 } }
+    expect(
+      buildSkipIntervals(
+        [defect('p', 10, 12, { type: 'pause' })],
+        keep(0.4, { paddingByType: padding }),
+        60
+      )
+    ).toEqual([{ start: 10.1, end: 11.9 }])
+  })
+
+  it('uses group padding for a grouped pause', () => {
+    expect(
+      buildSkipIntervals(
+        [
+          defect('g', 10, 12, {
+            type: 'pause',
+            groupIds: ['a', 'b'],
+            groupTypes: ['filler', 'pause']
+          })
+        ],
+        keep(0.4, { groupPadding: { before: 0.5, after: 0.5 } }),
+        60
+      )
+    ).toEqual([{ start: 9.5, end: 12.5 }])
   })
 })

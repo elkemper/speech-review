@@ -92,7 +92,7 @@ test/                     Vitest suites and fixtures
 | Command | What it does | Works in this Linux container? |
 |---|---|---|
 | `npm run typecheck` | `tsc --noEmit` for node and web configs | Yes |
-| `npm test` | Vitest run (160 tests / 13 files) | Yes |
+| `npm test` | Vitest run (170 tests / 13 files) | Yes |
 | `npm run test:watch` | Vitest watch mode | Yes |
 | `npm run build` | electron-vite production build into `out/` | Yes |
 | `npm run dev` | electron-vite dev + Electron | **No** (needs macOS + macOS Electron) |
@@ -138,10 +138,10 @@ If you changed UI behavior or runtime code, also state clearly that Electron, `a
 - **Boundary edits:** automatic defects use `Project.defectOverrides[defectId]`; manual marks update `mark.start`/`mark.end` and recompute `wordIds` with strict overlap.
 - **Manual grouping is explicit.** `mergeMarkNeighbours` runs only when a mark is added or a boundary moves. Do not regroup all marks on every render; that would undo an intentional split.
 - **First partial transcript resets defect lifecycle state** (`confirmedDefectIds`, `dismissedDefectIds`, notes, overrides) because automatic IDs may change. Later partials preserve the user's local edits to the already visible prefix. `marks` and `dismissedMarks` survive.
-- **Skip intervals** use every defect except `dismissed`, clamp to duration, and merge overlapping padded ranges. Padding is resolved per defect type, and a logical group (manual or automatic) uses `playback.groupPadding` instead of per-member padding. There is no skip scope: automatic defects and manual marks are cut together.
+- **Skip intervals** use every defect except `dismissed`, clamp to duration, and merge overlapping padded ranges. Padding is resolved per defect type, and a logical group (manual or automatic) uses `playback.groupPadding` instead of per-member padding. A standalone pause keeps `playback.pauseKeepSec` of room tone split across both edges (0 removes the whole silence); a cut shorter than 0.2 s is not performed. There is no skip scope: automatic defects and manual marks are cut together.
 - **Automatic grouping** is opt-in through `rules.autoGroupEnabled` plus `rules.autoGroupGapSec` (and a gap of 0 disables it at the data level). Neighbouring automatic defects merge only when the gap is within the limit and no real spoken word sits inside the gap. The result carries `groupIds` / `groupTypes` and the id `auto-group-${firstId}`.
 - **Defect types can be switched off** with `rules.enabledTypes`. A disabled type produces no defects, but the detection sequence still advances, so the ids of the other types stay stable. `manual` is never filtered.
-- **Minimum duration** is a per-type rule (`rules.minDurationByType`). For pauses it measures the silence, for repetitions the shorter repeated word. A match below the limit is returned as a hidden `DefectCandidate` with the same automatic ID; it is not a defect until `promotedIds` contains it.
+- **Minimum duration** is a per-type rule (`rules.minDurationByType`). For pauses it measures the silence and is the only pause threshold: the default is 1.2 s, it is clamped to 0.3–10 s, and a shorter gap is neither a defect nor a candidate. For repetitions it measures the shorter repeated word. For other types a match below the limit is returned as a hidden `DefectCandidate` with the same automatic ID; it is not a defect until `promotedIds` contains it.
 - **A revealed candidate is transient.** The renderer adds it to `defects` only while `activeDefectId` matches, so it gets the normal controls, timeline markers and skip intervals. Bounds, confirmation, deletion or a note promote it through existing project state; switching away drops it.
 - **Timeline Shift+drag selects exact time.** The transcript keeps word-based selection; `M` / «＋ метка» turns a time range into a normal `ManualMark` with exact `start`/`end`, then `mergeMarkNeighbours` and `reconcileConfirmedIds` run as before.
 - **Bookmarks** (`Project.bookmarks`) are navigation markers, not defects. They persist with the project but stay out of undo/redo, skip intervals and exports.

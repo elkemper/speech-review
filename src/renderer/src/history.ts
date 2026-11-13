@@ -13,6 +13,7 @@ import type {
 export interface HistoryPlaybackState {
   skipBeforeSec: number
   skipAfterSec: number
+  pauseKeepSec: number
   paddingByType?: Partial<Record<DefectType, SkipPadding>>
   groupPadding?: SkipPadding
 }
@@ -74,6 +75,7 @@ function clonePlayback(playback: PlaybackSettings): HistoryPlaybackState {
   return {
     skipBeforeSec: playback.skipBeforeSec,
     skipAfterSec: playback.skipAfterSec,
+    pauseKeepSec: playback.pauseKeepSec,
     paddingByType: clonePaddingMap(playback.paddingByType),
     groupPadding: playback.groupPadding ? { ...playback.groupPadding } : undefined
   }
@@ -142,6 +144,7 @@ export function applySettingsSnapshot(
       ...settings.playback,
       skipBeforeSec: state.playback.skipBeforeSec,
       skipAfterSec: state.playback.skipAfterSec,
+      pauseKeepSec: state.playback.pauseKeepSec,
       paddingByType: clonePaddingMap(state.playback.paddingByType),
       groupPadding: state.playback.groupPadding
         ? { ...state.playback.groupPadding }

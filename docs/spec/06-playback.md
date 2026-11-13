@@ -26,17 +26,26 @@ deleted ones, and to treat a logical group as one item.
 - Logical manual/automatic groups are already one defect and one interval.
 - `K` toggles the mode from the workspace.
 
-### Story 26 — Per-type and group padding
+### Story 26 — Per-type and group padding, pause room tone
 
 **Status:** Done · **Priority:** P1
 
 As a user, I want padding per type and per group, independent of whether
-fast-forward is on.
+fast-forward is on, and a pause that is shortened without gluing words
+together.
 
 - `playback.paddingByType[type]`, `playback.groupPadding`.
 - Global `skipBeforeSec`/`skipAfterSec` are fallback.
+- `playback.pauseKeepSec` keeps room tone inside a standalone pause: 0.4 s by
+  default, split evenly between both edges. `0` removes the whole silence.
+- The pause type padding applies on top of the keep and can widen the cut into
+  the kept silence.
+- A pause cut shorter than 0.2 s is not performed, and a pause shorter than the
+  kept silence is left untouched.
+- A grouped pause uses `groupPadding`, not the keep.
 - Defaults: pause `0/0`, filler `0.1/0.2`, group `0.15/0.35`.
-- Padding is clamped to 0–5 s and to the recording.
+- Padding is clamped to 0–5 s and to the recording; the keep is clamped to
+  0–3 s.
 - Settings remain editable when `skipEnabled` is false.
 - Padding changes are undoable together with the skip intervals they produce
   (story 47).
@@ -104,6 +113,10 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 ### Story 26
 
 - [ ] Per-type padding is used; group padding for groups; global fallback.
+- [ ] A standalone pause keeps `pauseKeepSec` of silence split across both
+      edges; `0` removes the whole silence.
+- [ ] A pause shorter than the keep or a cut shorter than 0.2 s is not cut.
+- [ ] A grouped pause uses group padding and is not affected by the keep.
 - [ ] Padding is clamped to duration.
 - [ ] Overlapping ranges merge.
 - [ ] Changing padding while paused affects the next skip.
@@ -146,6 +159,7 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 
 ## Verification
 
-- `test/skip.test.ts` covers padding, dismissed filtering, merging, lookup.
+- `test/skip.test.ts` covers padding, pause room tone, dismissed filtering,
+  merging, lookup.
 - Add a pure "next target" helper test for story 28.
 - Real playback and listen need a macOS run.

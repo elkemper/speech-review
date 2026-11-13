@@ -15,12 +15,13 @@ describe('settings history metadata', () => {
 
   it('labels padding changes', () => {
     expect(PADDING_HISTORY.type('repetition').label).toBe('Отступы: повтор')
+    expect(PADDING_HISTORY.pauseKeep.label).toBe('Тишина в паузах')
     expect(PADDING_HISTORY.group.label).toBe('Отступы группы')
     expect(PADDING_HISTORY.reset.mergeKey).toBe('padding:reset')
   })
 
   it('falls back to a generic entry for rules', () => {
-    expect(settingsHistoryMetaForPatch({ rules: { pauseThresholdSec: 1.4 } })).toEqual({
+    expect(settingsHistoryMetaForPatch({ rules: { repetitionWindowSec: 1.4 } })).toEqual({
       label: 'Правила дефектов',
       mergeKey: 'rules'
     })
@@ -35,6 +36,9 @@ describe('settings history metadata', () => {
       settingsHistoryMetaForPatch({
         playback: { paddingByType: { pause: { before: 0, after: 0 } } }
       })
+    ).toEqual({ label: 'Отступы пропуска', mergeKey: 'padding' })
+    expect(
+      settingsHistoryMetaForPatch({ playback: { pauseKeepSec: 0.6 } })
     ).toEqual({ label: 'Отступы пропуска', mergeKey: 'padding' })
   })
 })
