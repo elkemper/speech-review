@@ -38,7 +38,7 @@ only the area it is working on.
 |---|---|---|
 | [`01-settings.md`](spec/01-settings.md) | 1–3, 43 | Tabs, sliders, rows, show-dismissed |
 | [`02-defects.md`](spec/02-defects.md) | 4–7, 44, 46 | Detection, minimum duration, candidates, auto-grouping, toggles, sentence pauses |
-| [`03-marks.md`](spec/03-marks.md) | 8–13, 45 | Manual marks, selection, logical marks, boundaries, confirmation state |
+| [`03-marks.md`](spec/03-marks.md) | 8–13, 45 | Manual marks, selection, logical marks, cut handles, confirmation state |
 | [`04-timeline.md`](spec/04-timeline.md) | 14–17 | Zoom/pan, LOD, overlays, timeline selection |
 | [`04a-waveform-selection.md`](spec/04a-waveform-selection.md) | 17 detail | Exact time selection + manual marks; pause tokens deferred |
 | [`04b-word-underlays.md`](spec/04b-word-underlays.md) | 41 | Colored word underlays in both timelines |
@@ -51,7 +51,7 @@ only the area it is working on.
 | [`08-processing-progress.md`](spec/08-processing-progress.md) | 35–37 | Progress semantics, chunk length, streaming |
 | [`08a-streaming-asr.md`](spec/08a-streaming-asr.md) | 37 detail | Streaming recognition |
 | [`09-export.md`](spec/09-export.md) | 38–39 | CSV and JSON |
-| [`10-mini-timeline.md`](spec/10-mini-timeline.md) | 40 | Selected defect snippet with editable boundaries |
+| [`10-mini-timeline.md`](spec/10-mini-timeline.md) | 40 | Selected defect snippet with editable cut handles |
 
 ## Product invariants
 
@@ -66,17 +66,18 @@ Applies to every story.
 5. **`unclear` / word confidence stays disabled** while the engine writes
    `confidence: 0`.
 6. **Skip mode cuts every defect and manual mark except dismissed ones.**
+   The final range is `Project.cutOverrides[id]` or the derived padded range.
    Confirmation is a review marker only. A different playback mode is allowed
    only as a separate, explicitly named mode (story 29 / `06a`).
 7. **The exact selected words define a manual mark.** Logical grouping may
    expand a *group's* span, but each underlying mark keeps its exact `wordIds`.
 8. **History is editable project state only:** marks, confirmed/dismissed ids, dismissed marks, notes,
-   defect overrides, project defect rules and skip padding. Not skip mode,
+   cut overrides, project defect rules and skip padding. Not skip mode,
    playback position, speed, loop, selection, filters, bookmarks, transcript,
    model/language/export or UI-only settings. While the settings dialog is open,
    undo is limited to settings changes made since it was opened.
-9. **Manual grouping is explicit.** Group on add or boundary move; do not
-   regroup every render.
+9. **Manual grouping is explicit.** Group on add, or when a cut handle captures
+   a neighbour; do not regroup every render.
 10. **ID rules stay stable.** Automatic `auto-${type}-${sequence}`; manual
     UUIDs; logical manual `manual-group-${groupId}`; automatic group
     `auto-group-${firstDefectId}`.

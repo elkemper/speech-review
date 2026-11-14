@@ -73,6 +73,10 @@ CSV/JSON already exist. Useful for editing:
 - EDL/FCPXML with a cut list;
 - `file:///...#t=12.34` links for jumping from a table.
 
+### Video export from the cut list
+
+`buildCutList` in `src/shared/cuts.ts` already returns the final merged cuts, and `complementRanges` returns the ranges that stay. A future "export cut video" command can feed those ranges to ffmpeg (`select`/`aselect` + concat) without touching the original. The CSV base columns and the JSON `cuts` array are already the editor-facing form; the original defect bounds are optional columns. Do not introduce a second cut model: playback, the timeline hatching and video export must all use the same `buildCutList`.
+
 ## 9. Transcript search
 
 There is no word search field. Needed:

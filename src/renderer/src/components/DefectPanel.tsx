@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { formatShortSeconds, formatTimecode } from '@shared/format'
-import type { Defect, DefectType } from '@shared/types'
+import type { Defect, DefectType, ExportDefect } from '@shared/types'
 import { DEFECT_COLORS, DEFECT_LABELS, TYPE_ORDER } from '../defectsUi'
 import { defectCardView } from '../defectCardView'
 import { playFrom, seekTo, toggleLoopForDefect } from '../player'
 import { defectIdsForSelection, defectIdsInRange } from '../selection'
+import { buildCutList, cutRangeFor } from '../skip'
 import { useApp, type DefectFilter } from '../store'
 import MiniTimeline from './MiniTimeline'
 
@@ -105,6 +106,22 @@ export default function DefectPanel({
     return map
   }, [queueDefects])
 
+  const cutDurations = useMemo(() => {
+    const map = new Map<string, { start: number; end: number } | null>()
+    for (const defect of defects) {
+      map.set(
+        defect.id,
+        cutRangeFor(
+          defect,
+          playback,
+          project?.duration ?? 0,
+          project?.cutOverrides?.[defect.id]
+        )
+      )
+    }
+    return map
+  }, [defects, playback, project?.duration, project?.cutOverrides])
+
   const filtered = useMemo(
     () =>
       defects.filter(
@@ -161,10 +178,28 @@ export default function DefectPanel({
   const exportAs = async (format: 'csv' | 'json'): Promise<void> => {
     if (!project) return
     try {
+      const exportable = defects.filter(
+        (defect) => !defect.dismissed && !defect.candidate
+      )
+      const exportDefects: ExportDefect[] = exportable.map((defect) => {
+        const cut = cutDurations.get(defect.id) ?? null
+        return {
+          ...defect,
+          cutStart: cut ? cut.start : null,
+          cutEnd: cut ? cut.end : null
+        }
+      })
+      const cuts = buildCutList(
+        exportable,
+        playback,
+        project.duration,
+        project.cutOverrides
+      )
       const path = await window.api.exportProject({
         project,
-        defects: defects.filter((defect) => !defect.dismissed && !defect.candidate),
+        defects: exportDefects,
         marks: project.marks,
+        cuts,
         format,
         exportSettings
       })
@@ -266,9 +301,14 @@ export default function DefectPanel({
             const view = defectCardView(defect, ff)
             const dismissed = view.mode === 'dismissed'
             const confirmed = view.mode === 'confirmed'
+            const cut = cutDurations.get(defect.id) ?? null
+            const cutDuration = cut ? cut.end - cut.start : null
+            const cutStart = cut ? cut.start : defect.start
             const { compact, fullBody, showRail, showUndo } = view
             const isLooping =
-              active && loop !== null && Math.abs(loop.start - Math.max(0, defect.start - 0.25)) < 0.05
+              active &&
+              loop !== null &&
+              Math.abs(loop.start - Math.max(0, cutStart - 0.25)) < 0.05
             return (
               <div
                 key={defect.id}
@@ -324,8 +364,24 @@ export default function DefectPanel({
                       {DEFECT_LABELS[defect.type]}
                     </span>
                     <span className="defect-sep">—</span>
-                    <span className="defect-duration">
-                      {formatShortSeconds(defect.end - defect.start)}
+                    <span
+                      className="defect-duration"
+                      title={
+                        cut
+                          ? `вырез ${formatTimecode(cut.start, true)}–${formatTimecode(
+                              cut.end,
+                              true
+                            )} · дефект ${formatTimecode(
+                              defect.start,
+                              true
+                            )}–${formatTimecode(defect.end, true)}`
+                          : `не вырезается · дефект ${formatTimecode(
+                              defect.start,
+                              true
+                            )}–${formatTimecode(defect.end, true)}`
+                      }
+                    >
+                      {cutDuration !== null ? formatShortSeconds(cutDuration) : '—'}
                     </span>
                     {defect.candidate ? (
                       <span className="badge candidate">кандидат</span>
@@ -405,8 +461,11 @@ export default function DefectPanel({
                               setActiveDefect(defect.id)
                               setFollow(true)
                               playFrom(
-                                Math.max(0, defect.start - (defect.type === 'pause' ? 0.15 : 0.3)),
-                                defect.end + 0.35
+                                Math.max(
+                                  0,
+                                  cutStart - (defect.type === 'pause' ? 0.15 : 0.3)
+                                ),
+                                (cut ? cut.end : defect.end) + 0.35
                               )
                             }}
                           >
@@ -416,7 +475,9 @@ export default function DefectPanel({
                             className="link-btn"
                             onClick={(event) => {
                               event.stopPropagation()
-                              toggleLoopForDefect(defect)
+                              toggleLoopForDefect(
+                                cut ? { ...defect, start: cut.start, end: cut.end } : defect
+                              )
                             }}
                           >
                             {isLooping ? 'выключить цикл' : 'цикл'}

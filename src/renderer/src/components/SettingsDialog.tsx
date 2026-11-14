@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { formatBytes } from '@shared/format'
 import { MODEL_ORDER, MODEL_SPECS } from '@shared/models'
 import {
+  DEFAULT_EXPORT_FIELDS,
   EXPORT_FIELDS,
   EXPORT_FIELD_LABELS,
   MAX_CHUNK_TARGET_SEC,
@@ -499,7 +500,7 @@ export default function SettingsDialog() {
                         onClick={() =>
                           updateSettings({
                             export: {
-                              fields: ['start_tc', 'end_tc', 'type', 'severity', 'text', 'note']
+                              fields: [...DEFAULT_EXPORT_FIELDS]
                             }
                           })
                         }

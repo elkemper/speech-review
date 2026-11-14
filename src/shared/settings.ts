@@ -8,7 +8,7 @@ import type {
   SkipPadding
 } from './types'
 
-export const EXPORT_FIELDS: ExportField[] = [
+export const DEFAULT_EXPORT_FIELDS: ExportField[] = [
   'start_tc',
   'end_tc',
   'start_sec',
@@ -22,22 +22,38 @@ export const EXPORT_FIELDS: ExportField[] = [
   'note'
 ]
 
+export const EXPORT_FIELDS: ExportField[] = [
+  ...DEFAULT_EXPORT_FIELDS,
+  'cut',
+  'defect_start_tc',
+  'defect_end_tc',
+  'defect_start_sec',
+  'defect_end_sec',
+  'defect_duration_sec'
+]
+
 export const EXPORT_FIELD_LABELS: Record<ExportField, string> = {
-  start_tc: 'Начало (таймкод)',
-  end_tc: 'Конец (таймкод)',
-  start_sec: 'Начало (секунды)',
-  end_sec: 'Конец (секунды)',
-  duration_sec: 'Длительность',
+  start_tc: 'Начало выреза (таймкод)',
+  end_tc: 'Конец выреза (таймкод)',
+  start_sec: 'Начало выреза (секунды)',
+  end_sec: 'Конец выреза (секунды)',
+  duration_sec: 'Длительность выреза',
   type: 'Тип',
   severity: 'Важность',
   source: 'Источник',
   confirmed: 'Подтверждено',
   text: 'Текст',
-  note: 'Заметка'
+  note: 'Заметка',
+  cut: 'Режется',
+  defect_start_tc: 'Начало дефекта (таймкод)',
+  defect_end_tc: 'Конец дефекта (таймкод)',
+  defect_start_sec: 'Начало дефекта (секунды)',
+  defect_end_sec: 'Конец дефекта (секунды)',
+  defect_duration_sec: 'Длительность дефекта'
 }
 
 export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
-  fields: [...EXPORT_FIELDS],
+  fields: [...DEFAULT_EXPORT_FIELDS],
   delimiter: ';',
   includeHeader: true
 }

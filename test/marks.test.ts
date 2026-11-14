@@ -4,6 +4,7 @@ import {
   manualDefectIdForMark,
   markIdsForDefectId,
   mergeMarkNeighbours,
+  mergeMarksAtSpan,
   reconcileConfirmedIds,
   confirmIdForMark
 } from '../src/shared/marks'
@@ -137,5 +138,88 @@ describe('confirmed state when marks merge and split', () => {
     const after = [mark('a', 1, 1.5), mark('b', 3, 3.5)]
     expect(reconcileConfirmedIds(before, after, ['manual-a'])).toEqual(['manual-a'])
     expect(confirmIdForMark(after[1])).toBe('manual-b')
+  })
+})
+
+describe('capturing neighbours with a cut handle', () => {
+  it('groups a neighbour when the cut span reaches it and keeps original bounds', () => {
+    const marks = [mark('a', 1, 1.5), mark('b', 2, 2.5)]
+    const result = mergeMarksAtSpan(marks, 'a', { start: 1, end: 1.9 }, {
+      createGroupId: () => 'g'
+    })
+    expect(result.activeDefectId).toBe('manual-group-g')
+    expect(result.affectedMarkIds.sort()).toEqual(['a', 'b'])
+    expect(result.affectedGroupIds).toEqual([])
+    expect(result.marks.find((item) => item.id === 'a')).toMatchObject({
+      start: 1,
+      end: 1.5,
+      groupId: 'g'
+    })
+    expect(result.marks.find((item) => item.id === 'b')).toMatchObject({
+      start: 2,
+      end: 2.5,
+      groupId: 'g'
+    })
+  })
+
+  it('does not group when the cut span stays short', () => {
+    const marks = [mark('a', 1, 1.5), mark('b', 2, 2.5)]
+    const result = mergeMarksAtSpan(marks, 'a', { start: 1, end: 1.7 })
+    expect(result.activeDefectId).toBe('manual-a')
+    expect(result.affectedMarkIds).toEqual(['a'])
+    expect(result.affectedGroupIds).toEqual([])
+    expect(result.marks.find((item) => item.id === 'a')?.groupId).toBeUndefined()
+  })
+
+  it('captures a whole existing group and reports its old id', () => {
+    const marks = [
+      mark('a', 1, 1.5),
+      mark('b', 2, 2.5, { groupId: 'old' }),
+      mark('c', 2.6, 3, { groupId: 'old' })
+    ]
+    const result = mergeMarksAtSpan(marks, 'a', { start: 1, end: 2.1 })
+    expect(result.activeDefectId).toBe('manual-group-old')
+    expect(result.affectedMarkIds.sort()).toEqual(['a', 'b', 'c'])
+    expect(result.affectedGroupIds).toEqual(['old'])
+  })
+})
+
+describe('edge-specific cut capture', () => {
+  it('captures only on the dragged edge', () => {
+    const marks = [mark('a', 1, 1.5), mark('b', 2, 2.5)]
+    const byEnd = mergeMarksAtSpan(
+      marks,
+      'a',
+      { start: 0.85, end: 1.9 },
+      { edge: 'end', createGroupId: () => 'g' }
+    )
+    expect(byEnd.activeDefectId).toBe('manual-group-g')
+
+    const byStart = mergeMarksAtSpan(
+      marks,
+      'a',
+      { start: 1, end: 1.9 },
+      { edge: 'start', createGroupId: () => 'g' }
+    )
+    expect(byStart.activeDefectId).toBe('manual-a')
+  })
+
+  it('captures a left neighbour from the start edge', () => {
+    const marks = [mark('a', 2, 2.5), mark('b', 1, 1.5)]
+    const byStart = mergeMarksAtSpan(
+      marks,
+      'a',
+      { start: 1.6, end: 2.5 },
+      { edge: 'start', createGroupId: () => 'g' }
+    )
+    expect(byStart.activeDefectId).toBe('manual-group-g')
+
+    const byEnd = mergeMarksAtSpan(
+      marks,
+      'a',
+      { start: 1.6, end: 2.5 },
+      { edge: 'end', createGroupId: () => 'g' }
+    )
+    expect(byEnd.activeDefectId).toBe('manual-a')
   })
 })

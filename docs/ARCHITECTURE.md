@@ -131,16 +131,16 @@ The defect list is computed, never stored. The renderer applies one ordered pipe
 transcript + rules + marks
   → detectDefectsWithCandidates   (automatic rules, minimum-duration candidates,
                                    auto grouping, manual defects, dismissed members)
-  → applyDefectOverrides          (edited automatic boundaries)
+  → cutRangeFor(defect, playback, duration, project.cutOverrides[id])
   → confirmed / dismissed / notes injected from Project
   → Defect[] shown by the UI and used by skip intervals
 ```
 
-- `src/shared/defects.ts` owns detection, grouping and overrides. `src/shared/marks.ts` owns logical marks and confirmation reconciliation. Both are pure and tested without Electron.
-- `Project` is the source of truth for editable state: marks, overrides, confirmed IDs, dismissed IDs/marks, notes, rules and skip padding.
+- `src/shared/defects.ts` owns detection and grouping. `src/shared/marks.ts` owns logical marks and confirmation reconciliation. `src/shared/cuts.ts` owns the final cut range, the cut list and the complement used by a future video export. All three are pure and tested without Electron.
+- `Project` is the source of truth for editable state: marks, cut overrides, confirmed IDs, dismissed IDs/marks, notes, rules and skip padding.
 - History (`history.ts`) snapshots only that editable state; `skipEnabled` is player state. See `docs/SPEC.md` (story 32/47) and `DATA_MODEL.md` §9.
-- `skip.ts` derives intervals from every non-dismissed defect, applies per-type or group padding plus the pause room tone, clamps them to the duration and merges overlaps. It does not mutate project state.
-- A revealed minimum-duration candidate is computed from the active ID and disappears when selection changes; only an explicit edit promotes it into project state.
+- `src/renderer/src/skip.ts` re-exports `shared/cuts.ts`. `buildCutList` derives every non-dismissed cut, applies per-type or group padding plus the pause room tone, clamps to the duration and merges overlaps; it does not depend on skip mode. `buildSkipIntervals` is the same list only while skip mode is on.
+- A revealed minimum-duration candidate is computed from the active ID and disappears when selection changes; only an explicit cut edit, confirmation, deletion or note promotes it into project state.
 
 The rules themselves — thresholds, enable flags, grouping conditions, candidate promotion and confirmation semantics — are specified in `docs/spec/02-defects.md` and `docs/spec/03-marks.md` and stored as described in `DATA_MODEL.md` §6–8. Do not restate them here.
 
@@ -150,7 +150,7 @@ The rules themselves — thresholds, enable flags, grouping conditions, candidat
 - `Player` wraps `<video src="app-media://…">` with custom controls. A `requestAnimationFrame` loop syncs `currentTime`, loop and skip. A codec error is shown to the user but does not block transcription, because ffmpeg reads the file independently.
 - `Timeline` draws a canvas waveform. `timelineView.ts` owns zoom/pan, ticks and level-of-detail thresholds; `waveform.ts` owns the display-only contrast lookup table. The timeline reads defects, selection and skip intervals from the store rather than deriving its own.
 - `Transcript` uses `@tanstack/react-virtual` for the segment list. Word selection and exact time selection stay separate: the transcript is word-based, the timeline is exact-time based.
-- `DefectPanel` renders computed `Defect` objects; `defectCardView.ts` derives card layout from the defect and skip state. The mini timeline reuses the shared playhead and the same `setDefectBounds` action as the main timeline.
+- `DefectPanel` renders computed `Defect` objects; `defectCardView.ts` derives card layout from the defect and skip state. The mini timeline reuses the shared playhead and the same `setCutBounds` action as the main timeline.
 - `SettingsDialog` owns the tabbed settings UI. While a recognition job runs, the tabs and body sit inside an `inert` flex container; the scroll body keeps its constrained layout.
 - `useHotkeys` matches `event.code` first, so hotkeys keep working on the Russian keyboard layout. They are disabled in text fields.
 

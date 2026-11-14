@@ -20,6 +20,8 @@ the word under the playhead, not the previous one.
 - `findActiveWord(words, time)` returns the word containing the time.
 - Selecting a mark highlights its first word, not the preceding word.
 - A pause is represented by its chip, not by highlighting a spoken word.
+- The pause chip shows the final cut duration (or `—` when the pause is not cut);
+  its tooltip includes the original pause and the cut duration.
 
 ### Story 19 — Selection sync with the defect list
 
@@ -96,7 +98,7 @@ analyzed.
 
 - After each chunk, transcript + peaks update.
 - User can seek, click, mark and review during the job.
-- Later partials keep marks, bookmarks, notes, overrides, confirmed/dismissed ids.
+- Later partials keep marks, bookmarks, notes, cut overrides, confirmed/dismissed ids.
 - First partial resets automatic confirmation state (invariant 11).
 - "partial" badge stays until the final transcript.
 
@@ -109,6 +111,7 @@ analyzed.
 - [ ] Selecting a mark highlights its first word.
 - [ ] No previous-word highlight for a filler/mark selection.
 - [ ] Pause chips are used for pauses.
+- [ ] The pause chip shows the cut duration, or `—` when it is not cut.
 - [ ] Regression: `findActiveWord(words, defect.start + ε)` returns the first
       defect word.
 

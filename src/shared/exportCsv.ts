@@ -1,4 +1,4 @@
-import type { Defect, ExportField, ExportSettings } from './types'
+import type { ExportDefect, ExportField, ExportSettings } from './types'
 
 /** CSV consumers expect a fixed-width timecode, including leading zero hours. */
 export function exportTimecode(seconds: number): string {
@@ -35,17 +35,50 @@ export function csvCell(value: string | number | boolean): string {
   return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
-export function exportValue(defect: Defect, field: ExportField): string | number | boolean {
+function cutBounds(defect: ExportDefect): { start: number; end: number } | null {
+  if (defect.cutStart === null || defect.cutEnd === null) return null
+  if (!Number.isFinite(defect.cutStart) || !Number.isFinite(defect.cutEnd)) return null
+  if (defect.cutEnd <= defect.cutStart) return null
+  return { start: defect.cutStart, end: defect.cutEnd }
+}
+
+function cutValue(defect: ExportDefect, format: (seconds: number) => string): string {
+  const cut = cutBounds(defect)
+  return cut ? format(cut.start) : ''
+}
+
+function cutDuration(defect: ExportDefect): string {
+  const cut = cutBounds(defect)
+  return cut ? (cut.end - cut.start).toFixed(3) : ''
+}
+
+export function exportValue(defect: ExportDefect, field: ExportField): string | number | boolean {
   switch (field) {
     case 'start_tc':
-      return exportTimecode(defect.start)
-    case 'end_tc':
-      return exportTimecode(defect.end)
+      return cutValue(defect, exportTimecode)
+    case 'end_tc': {
+      const cut = cutBounds(defect)
+      return cut ? exportTimecode(cut.end) : ''
+    }
     case 'start_sec':
-      return defect.start.toFixed(3)
-    case 'end_sec':
-      return defect.end.toFixed(3)
+      return cutValue(defect, (value) => value.toFixed(3))
+    case 'end_sec': {
+      const cut = cutBounds(defect)
+      return cut ? cut.end.toFixed(3) : ''
+    }
     case 'duration_sec':
+      return cutDuration(defect)
+    case 'cut':
+      return cutBounds(defect) ? 'да' : 'нет'
+    case 'defect_start_tc':
+      return exportTimecode(defect.start)
+    case 'defect_end_tc':
+      return exportTimecode(defect.end)
+    case 'defect_start_sec':
+      return defect.start.toFixed(3)
+    case 'defect_end_sec':
+      return defect.end.toFixed(3)
+    case 'defect_duration_sec':
       return (defect.end - defect.start).toFixed(3)
     case 'type':
       return TYPE_LABEL[defect.type] ?? defect.type
@@ -64,7 +97,7 @@ export function exportValue(defect: Defect, field: ExportField): string | number
   }
 }
 
-export function buildCsv(defects: Defect[], settings: ExportSettings): string {
+export function buildCsv(defects: ExportDefect[], settings: ExportSettings): string {
   const fields = settings.fields.length > 0 ? settings.fields : (['start_tc'] as ExportField[])
   const delimiter = settings.delimiter === ',' ? ',' : ';'
   const lines: string[] = []

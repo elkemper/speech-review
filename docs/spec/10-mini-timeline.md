@@ -9,25 +9,30 @@
 
 ## Story
 
-### Story 40 — In-panel snippet with editable boundaries
+### Story 40 — In-panel snippet with editable cut handles
 
 **Status:** Done · **Priority:** P1
 
 As a user, I want the selected defect/mark in the right panel to show a small
-piece of the timeline under its text, so I can adjust its boundaries without
-hunting for it on the main timeline.
+piece of the timeline under its text, so I can adjust its cut without hunting
+for it on the main timeline.
 
 - The snippet appears only for the active defect/mark.
-- The visible window contains the defect with generous context (at least 4 s
-  when the recording allows it; more for long defects).
-- It shows the waveform, word ticks/labels where they fit, the defect span,
-  both boundary handles and the playhead.
-- Dragging a handle calls the same `setDefectBounds` action as the main
-  timeline: automatic defects go to `defectOverrides`, manual marks update
-  `start`/`end` and `wordIds`.
+- The visible window contains the original defect **and** its final cut with
+  generous context (at least 4 s when the recording allows it; more for long
+  defects).
+- It shows the waveform, word ticks/labels where they fit, the original defect
+  fill, the final cut handles and the playhead.
+- Dragging a handle calls the same `setCutBounds` action as the main timeline.
+  Every defect stores the final cut in `cutOverrides`; the original
+  `Defect.start/end` / `ManualMark.start/end` stay unchanged.
+- A manual mark's cut handle can capture a neighbour: the marks join a logical
+  group, the handle becomes the group cut, and nested overrides are dropped.
+- Double-clicking a handle deletes the cut override and restores the derived
+  cut; double-clicking elsewhere resets the snippet zoom.
 - Clicking/dragging inside the snippet seeks, so the playhead moves in the
   snippet, the main timeline and the player.
-- Selection and boundary changes made on the main timeline are reflected in the
+- Selection and cut changes made on the main timeline are reflected in the
   snippet.
 - The snippet has a fixed base window: **±3 s around the defect by default**,
   configurable in Defects (`miniTimelinePadSec`).
@@ -39,7 +44,7 @@ hunting for it on the main timeline.
 - `Ctrl`/`Cmd`+wheel or trackpad pinch zooms around the pointer; a double-click
   on the snippet resets zoom to 100%.
 - Other defects/marks inside the window are drawn faintly for context. Their
-  boundaries are lighter than the active ones but still faint. They are never
+  cut ranges are lighter than the active ones but still faint. They are never
   interactive and cannot be dragged from this snippet.
 - Marked words get a colored underlay using their defect/mark type
   ([story 41](04b-word-underlays.md)).
@@ -55,12 +60,16 @@ hunting for it on the main timeline.
 - [ ] The waveform is drawn from `peaks`; if peaks are missing, the snippet
       still renders the grid, defect span, words and playhead.
 - [ ] Word ticks appear at the bottom; labels appear only when they fit.
-- [ ] Both boundaries are visible and draggable.
+- [ ] Both cut handles are visible and draggable.
 - [ ] Dragging uses the same clamp/min-length rules as the main timeline.
-- [ ] Manual mark edits update `wordIds`; automatic defects use overrides.
+- [ ] Every cut edit goes to `cutOverrides`; the original defect/mark bounds do
+      not move.
+- [ ] A cut handle reaching a neighbour groups the marks and drops nested
+      overrides.
+- [ ] Double-clicking a handle resets the cut; elsewhere it resets the zoom.
 - [ ] Clicking the snippet seeks; the playhead is shared with the main
       timeline and player.
-- [ ] External boundary edits (main timeline, undo) reframe the snippet.
+- [ ] External cut edits (main timeline, undo) reframe the snippet.
 - [ ] The snippet does not hijack the list item click/selection.
 - [ ] Interaction works with a narrow panel (≥ 280 px).
 - [ ] Default context is ±3 s on both sides, configurable in Defects.
@@ -71,7 +80,7 @@ hunting for it on the main timeline.
       scrollbar, its thumb, `Shift`+wheel or two-finger horizontal scroll.
 - [ ] Panning is clamped to the original base window (content up to four times
       as large at 4×, not an infinite timeline).
-- [ ] Neighbouring defect boundaries are lighter than the active handles but
+- [ ] Neighbouring defect cut ranges are lighter than the active handles but
       still faint and non-interactive.
 - [ ] Marked words have a colored underlay; active words are stronger, other
       marked words are faint, confirmed words are dimmer.

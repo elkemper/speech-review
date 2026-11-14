@@ -16,20 +16,20 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Click a word or a marker to seek the video to that point.
 - Defect queue: filters, confirmation/deletion, notes, manual marks.
 - Adjacent manual marks merge into one logical mark: it can be confirmed once, split back or deleted as a whole.
-- Boundaries of the selected defect or mark can be dragged directly on the timeline; touching neighbouring marks merge.
+- The selected defect or mark shows its original span as a fill and its final cut as draggable handles; dragging a cut handle onto a neighbouring mark merges them.
 - Undo/redo (`⌘Z` / `⇧⌘Z`) with an action history dialog; defect-rule and skip-padding changes roll back together with the recalculated defect list and intervals.
 - The defect panel can be resized by dragging its edge and hidden completely; the video and timeline heights are adjustable the same way.
-- The selected defect shows a mini waveform in the right panel with ±3 s context (configurable), draggable boundaries, 1–4× zoom with horizontal panning, faint neighbouring marks, colored word underlays and the same playhead as the main timeline.
+- The selected defect shows a mini waveform in the right panel with ±3 s context (configurable), draggable cut handles, 1–4× zoom with horizontal panning, faint neighbouring marks, colored word underlays and the same playhead as the main timeline.
 - Word selection with click, `Shift`+click or drag; a mark uses the exact selection boundaries.
 - Selected words can be confirmed with `Shift+Enter` or deleted with `Shift+R` when they contain defects.
 - Bookmarks: `B` remembers a place, the list returns to it and can resume from the last one.
 - Thresholds are edited with a slider and a number field; every defect type has a minimum duration, and neighbouring defects can be grouped automatically.
 - A word whose short defect is below the threshold opens a temporary «кандидат» card when clicked. Resize, confirm, delete or add a note to keep it as a real defect.
-- Skip padding is configured per defect type and per group; a pause keeps a configurable amount of room tone instead of being cut to zero.
+- Skip padding is configured per defect type and per group; a pause keeps a configurable amount of room tone instead of being cut to zero. The handles on the timeline set the final cut; the fill stays the original defect. Double-click a handle to return to the derived cut.
 - Loop over a fragment, speed 0.5–2×, hotkeys.
 - Skip mode: during playback, automatically cut every defect and manual mark except deleted ones, with configurable padding. Confirmation does not affect playback.
 - Deleted defects stay as thin cards with an undo button when "Show deleted defects" is enabled. Confirmed cards collapse to a compact row with an undo button. Pending cards have delete/confirm buttons on the left.
-- Export defects to CSV (Excel) and JSON; CSV fields and delimiter are configurable.
+- Export defects to CSV (Excel) and JSON; CSV fields and delimiter are configurable. The base CSV columns are the final cut bounds; the original defect bounds are optional extra columns. JSON also contains the merged `cuts` list for a video editor.
 - Photoshop-like dark theme, automatic project save after every action.
 
 ## Requirements
@@ -112,11 +112,11 @@ In skip mode the confirm/delete/mark hotkeys work only while playback is paused.
 | `Shift+Cmd+Z` / `Ctrl+Y` | redo |
 | `Esc` | clear loop / selection |
 
-Clicking the waveform seeks; clicking the triangle selects a defect. Clicking a word in the transcript seeks to its start.
+Clicking the waveform seeks; clicking a defect marker or its cut region selects the defect. Clicking a word in the transcript seeks to its start.
 
 Word selection in the transcript: a normal click selects one word, `Shift`+click extends the range, dragging selects several words. The `M` mark uses the exact selection boundaries. On the timeline, `Shift`+drag selects an exact time range and `M` creates a manual mark with those bounds. `Ctrl`/`Cmd`+wheel changes zoom, normal scrolling pans; the `+`, `−` and `⤢` buttons duplicate this with the mouse.
 
-Selecting a defect in the list or transcript shows two vertical boundaries on the timeline; they can be dragged with the mouse. Dragging a manual mark boundary onto a neighbouring mark merges them into a logical mark; the "split" button in the panel restores separate marks. The defect panel width is changed by dragging its left edge; it is hidden with the `⟩` button and restored with the "Defects" button in the header. Dragging the horizontal splitters changes the height of the video area and the timeline; the transcript takes the remaining space.
+Selecting a defect in the list or transcript shows two vertical cut handles on the timeline; they can be dragged with the mouse. The fill behind them is the original detected/marked span: padding appears as a hatch in the defect type color outside it, kept room tone as a neutral, slightly lighter background hatch inside it. Dragging a manual mark's cut handle onto a neighbouring mark merges them into a logical mark; the "split" button in the panel restores separate marks. Double-click a handle to drop the manual cut and return to the derived padding. The defect panel width is changed by dragging its left edge; it is hidden with the `⟩` button and restored with the "Defects" button in the header. Dragging the horizontal splitters changes the height of the video area and the timeline; the transcript takes the remaining space.
 
 On the **Defects** settings tab, each defect type is one row: an enable checkbox, minimum duration, before/after skip padding and the controls that belong to that type (pause is the last row; its minimum duration is the silence threshold, and the row also holds the kept room tone and sentence-end rule). "Auto-group" has its own checkbox and maximum gap; turning it off keeps the gap for next time. Skip mode and what it skips are controlled in the player (the ⏭ button), not in Settings.
 
@@ -155,7 +155,7 @@ Electron main
 - `words.json` from audio.cpp contains `start_sample`/`end_sample` at 16 kHz. The parser tolerates trailing commas.
 - Defects are computed in the renderer from the transcript and rules. Confirmed and dismissed IDs, deleted manual marks and notes are stored in `project.json`.
 - The partial transcript is written with `transcriptComplete: false`; on the first partial result, old confirmation and dismissal state is reset because defect IDs may have changed. Manual marks are preserved.
-- Skip mode does not re-encode video: during playback the position jumps over intervals built from all defects and marks except deleted ones. "Before/after" padding is configured per defect type and per group, and pauses keep a configurable amount of silence so cuts do not sound clipped.
+- Skip mode does not re-encode video: during playback the position jumps over the final cut ranges built from all defects and marks except deleted ones. "Before/after" padding is configured per defect type and per group, and pauses keep a configurable amount of silence so cuts do not sound clipped. Dragging a handle stores an explicit cut that wins over padding; double-clicking it restores the derived cut.
 
 ## Where data lives
 

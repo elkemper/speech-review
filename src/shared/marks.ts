@@ -172,3 +172,84 @@ export function mergeMarkNeighbours(
 
   return list
 }
+
+export interface MarkSpanMerge {
+  marks: ManualMark[]
+  /** Marks whose own override must be dropped. */
+  affectedMarkIds: string[]
+  /** Logical groups whose override must be dropped. */
+  affectedGroupIds: string[]
+  activeDefectId: string
+}
+
+/**
+ * Merge a single manual mark using its *cut* span instead of its original
+ * bounds. The cut handle can reach a neighbour while the mark itself stays put;
+ * the neighbour is captured into a logical group, the handle becomes the group
+ * boundary and every nested override is dropped.
+ *
+ * The marks keep their original `start`/`end`: the cut is a separate layer.
+ */
+export function mergeMarksAtSpan(
+  marks: ManualMark[],
+  markId: string,
+  span: { start: number; end: number },
+  options: { gapSec?: number; createGroupId?: () => string; edge?: 'start' | 'end' } = {}
+): MarkSpanMerge {
+  const mark = marks.find((item) => item.id === markId)
+  if (!mark) {
+    return { marks, affectedMarkIds: [], affectedGroupIds: [], activeDefectId: '' }
+  }
+
+  const start = Math.min(span.start, span.end)
+  const end = Math.max(span.start, span.end)
+  // Only the dragged edge may capture a neighbour. The other side keeps the
+  // mark's original bound, so padding that already overlaps a neighbour does
+  // not group the marks until the user actually drags that handle.
+  const virtualStart = options.edge === 'end' ? mark.start : start
+  const virtualEnd = options.edge === 'start' ? mark.end : end
+  const virtual = marks.map((item) =>
+    item.id === markId
+      ? {
+          ...item,
+          start: Math.min(virtualStart, virtualEnd),
+          end: Math.max(virtualStart, virtualEnd)
+        }
+      : item
+  )
+  const merged = mergeMarkNeighbours(virtual, [markId], options)
+  const groupById = new Map(merged.map((item) => [item.id, item.groupId]))
+  const next = marks.map((item) => {
+    const groupId = groupById.get(item.id)
+    return groupId === item.groupId ? item : { ...item, groupId }
+  })
+  const nextMark = next.find((item) => item.id === markId) ?? mark
+  const activeDefectId = nextMark.groupId
+    ? `manual-group-${nextMark.groupId}`
+    : `manual-${nextMark.id}`
+
+  const affectedMarkIds = new Set<string>([markId])
+  const affectedGroupIds = new Set<string>()
+  if (mark.groupId) affectedGroupIds.add(mark.groupId)
+
+  if (nextMark.groupId) {
+    for (const item of next) {
+      if (item.groupId !== nextMark.groupId) continue
+      affectedMarkIds.add(item.id)
+      const previous = marks.find((candidate) => candidate.id === item.id)
+      if (previous?.groupId) affectedGroupIds.add(previous.groupId)
+    }
+  }
+  if (mark.groupId) {
+    for (const item of marks) {
+      if (item.groupId === mark.groupId) affectedMarkIds.add(item.id)
+    }
+  }
+
+  return {
+    marks: next,
+    affectedMarkIds: [...affectedMarkIds],
+    affectedGroupIds: [...affectedGroupIds],
+    activeDefectId
+  }
+}

@@ -25,7 +25,7 @@ function state(value: string): EditableProjectState {
     dismissedDefectIds: [],
     dismissedMarks: [],
     defectNotes: {},
-    defectOverrides: {},
+    cutOverrides: {},
     rules: DEFAULT_RULES,
     playback: {
       skipBeforeSec: 0.15,
@@ -125,7 +125,7 @@ describe('action history', () => {
       dismissedDefectIds: ['auto-pause-0'],
       dismissedMarks: [mark],
       defectNotes: {},
-      defectOverrides: {},
+      cutOverrides: {},
       rules: DEFAULT_RULES
     } as unknown as Project
 
@@ -145,7 +145,7 @@ describe('action history', () => {
       dismissedDefectIds: [],
       dismissedMarks: [],
       defectNotes: {},
-      defectOverrides: {},
+      cutOverrides: {},
       rules: {
         ...DEFAULT_RULES,
         minDurationByType: { ...DEFAULT_RULES.minDurationByType, pause: 1.8 }

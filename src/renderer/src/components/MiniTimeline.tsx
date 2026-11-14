@@ -6,6 +6,8 @@ import { seekTo } from '../player'
 import { useApp } from '../store'
 import { clampDefectEdge, chooseTickStep, type DefectEdge } from '../timelineView'
 import { buildWaveLut, computeWaveStats, waveAmp } from '../waveform'
+import { cutRangeFor, cutView, subtractRanges, type CutRange } from '../skip'
+import { hatchPattern, TRACK_BG, TRACK_BG_LIGHT } from '../hatch'
 import {
   MINI_ZOOM_MAX,
   MINI_ZOOM_MIN,
@@ -22,20 +24,26 @@ import {
 
 const HEIGHT = 76
 
-function baseWindow(defect: Defect, duration: number, padSec: number): MiniWindow {
-  return miniWindowForDefect(defect.start, defect.end, duration, padSec)
+function baseWindow(
+  start: number,
+  end: number,
+  duration: number,
+  padSec: number
+): MiniWindow {
+  return miniWindowForDefect(start, end, duration, padSec)
 }
 
 function framedWindow(
-  defect: Defect,
+  start: number,
+  end: number,
   duration: number,
   zoom: number,
   padSec: number,
   anchorTime?: number
 ): MiniWindow {
-  const base = baseWindow(defect, duration, padSec)
+  const base = baseWindow(start, end, duration, padSec)
   if (zoom <= 1) return base
-  const center = anchorTime ?? (defect.start + defect.end) / 2
+  const center = anchorTime ?? (start + end) / 2
   return zoomMiniWindow(base, zoom, center, base)
 }
 
@@ -62,18 +70,30 @@ export default function MiniTimeline({
   const project = useApp((state) => state.project)
   const padSec = useApp((state) => state.settings.miniTimelinePadSec)
   const waveContrast = useApp((state) => state.settings.waveformContrast)
-  const setDefectBounds = useApp((state) => state.setDefectBounds)
+  const playback = useApp((state) => state.settings.playback)
+  const setCutBounds = useApp((state) => state.setCutBounds)
+  const resetCutBounds = useApp((state) => state.resetCutBounds)
+
+  const cut = useMemo(
+    () => cutRangeFor(defect, playback, duration, project?.cutOverrides?.[defect.id]),
+    [defect, playback, duration, project?.cutOverrides]
+  )
+  const spanStart = cut ? Math.min(defect.start, cut.start) : defect.start
+  const spanEnd = cut ? Math.max(defect.end, cut.end) : defect.end
+  const span = useMemo(() => ({ start: spanStart, end: spanEnd }), [spanStart, spanEnd])
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const defectRef = useRef(defect)
-  defectRef.current = defect
-  const baseRef = useRef<MiniWindow>(baseWindow(defect, duration, padSec))
-  baseRef.current = baseWindow(defect, duration, padSec)
+  const spanRef = useRef(span)
+  spanRef.current = span
+  const baseRef = useRef<MiniWindow>(baseWindow(span.start, span.end, duration, padSec))
+  baseRef.current = baseWindow(span.start, span.end, duration, padSec)
 
   const [width, setWidth] = useState(0)
   const [zoom, setZoom] = useState(1)
-  const [view, setView] = useState<MiniWindow>(() => baseWindow(defect, duration, padSec))
+  const [view, setView] = useState<MiniWindow>(() =>
+    baseWindow(span.start, span.end, duration, padSec)
+  )
   const [hoverEdge, setHoverEdge] = useState<DefectEdge | null>(null)
   const dragRef = useRef<DefectEdge | null>(null)
   const scrubRef = useRef(false)
@@ -127,10 +147,10 @@ export default function MiniTimeline({
       selectedIdRef.current = defect.id
       zoomRef.current = 1
       setZoom(1)
-      setView(baseWindow(defect, duration, padSec))
+      setView(baseWindow(span.start, span.end, duration, padSec))
       return
     }
-    const nextBase = baseWindow(defect, duration, padSec)
+    const nextBase = baseWindow(span.start, span.end, duration, padSec)
     const currentZoom = zoomRef.current
     if (currentZoom <= 1) {
       setView(nextBase)
@@ -139,7 +159,7 @@ export default function MiniTimeline({
     const current = viewRef.current
     const anchor = (current.start + current.end) / 2
     setView(zoomMiniWindow(nextBase, currentZoom, anchor, nextBase))
-  }, [defect.id, defect.start, defect.end, duration, padSec])
+  }, [defect.id, span.start, span.end, duration, padSec])
 
   useEffect(() => {
     const wrap = wrapRef.current
@@ -178,7 +198,7 @@ export default function MiniTimeline({
   const resetZoom = (): void => {
     zoomRef.current = 1
     setZoom(1)
-    setView(baseWindow(defectRef.current, duration, padSec))
+    setView(baseWindow(spanRef.current.start, spanRef.current.end, duration, padSec))
   }
 
   // Ctrl/Cmd+wheel (or pinch) zooms; horizontal/shift+wheel pans while the
@@ -225,7 +245,7 @@ export default function MiniTimeline({
     const span = Math.max(1e-6, view.end - view.start)
     const toX = (time: number): number => miniXForTime(time, view, width)
 
-    ctx.fillStyle = '#141414'
+    ctx.fillStyle = TRACK_BG
     ctx.fillRect(0, 0, width, HEIGHT)
 
     // Grid
@@ -303,6 +323,49 @@ export default function MiniTimeline({
       ctx.stroke()
     }
 
+
+    // Original defect fill. The kept room tone is left unfilled so the
+    // waveform stays visible under its neutral hatch.
+    const color = DEFECT_COLORS[defect.type]
+    const layers = cutView(defect, cut)
+    ctx.save()
+    ctx.globalAlpha = 0.2
+    ctx.fillStyle = color
+    for (const range of subtractRanges(layers.defect, layers.inner)) {
+      const x1 = clamp(toX(range.start), 0, width)
+      const x2 = clamp(toX(range.end), 0, width)
+      if (x2 - x1 < 1) continue
+      ctx.fillRect(x1, 4, x2 - x1, HEIGHT - 8)
+    }
+    ctx.restore()
+
+    // Hatching: outer is padding added by the cut (defect color over the empty
+    // track), inner is kept room tone (a neutral, slightly lighter shade of the
+    // background, with no opaque base, because that part still plays).
+    if (layers.cut) {
+      const outerPattern = hatchPattern(ctx, color, 0.62)
+      const innerPattern = hatchPattern(ctx, TRACK_BG_LIGHT, 0.9)
+      const drawHatch = (
+        ranges: CutRange[],
+        pattern: CanvasPattern | null,
+        alpha: number
+      ): void => {
+        if (!pattern) return
+        ctx.save()
+        ctx.globalAlpha = alpha
+        ctx.fillStyle = pattern
+        for (const range of ranges) {
+          const x1 = clamp(toX(range.start), 0, width)
+          const x2 = clamp(toX(range.end), 0, width)
+          if (x2 - x1 < 1) continue
+          ctx.fillRect(x1, 4, x2 - x1, HEIGHT - 8)
+        }
+        ctx.restore()
+      }
+      drawHatch(layers.outer, outerPattern, 1)
+      drawHatch(layers.inner, innerPattern, 1)
+    }
+
     // Word ticks and labels where they fit.
     if (words.length > 0) {
       const barTop = HEIGHT - 18
@@ -332,33 +395,26 @@ export default function MiniTimeline({
       }
     }
 
-    // Active defect span
-    const color = DEFECT_COLORS[defect.type]
-    const x1 = clamp(toX(defect.start), 0, width)
-    const x2 = clamp(toX(defect.end), 0, width)
-    ctx.save()
-    ctx.globalAlpha = 0.2
-    ctx.fillStyle = color
-    ctx.fillRect(x1, 4, Math.max(1, x2 - x1), HEIGHT - 8)
-    ctx.restore()
-
-    // Boundary handles
+    // Cut handles.
     const activeEdge = hoverEdge ?? dragRef.current
-    for (const edge of ['start', 'end'] as DefectEdge[]) {
-      const x = toX(edge === 'start' ? defect.start : defect.end)
-      if (x < -2 || x > width + 2) continue
-      const active = activeEdge === edge
-      ctx.strokeStyle = color
-      ctx.globalAlpha = active ? 1 : 0.8
-      ctx.lineWidth = active ? 2 : 1.5
-      ctx.beginPath()
-      ctx.moveTo(x, 3)
-      ctx.lineTo(x, HEIGHT - 3)
-      ctx.stroke()
-      ctx.fillStyle = color
-      ctx.fillRect(x - 3.5, 2, 7, 5)
-      ctx.fillRect(x - 3.5, HEIGHT - 7, 7, 5)
-      ctx.globalAlpha = 1
+    if (layers.cut) {
+      for (const edge of ['start', 'end'] as DefectEdge[]) {
+        const time = edge === 'start' ? layers.cut.start : layers.cut.end
+        const x = toX(time)
+        if (x < -2 || x > width + 2) continue
+        const active = activeEdge === edge
+        ctx.strokeStyle = color
+        ctx.globalAlpha = active ? 1 : 0.8
+        ctx.lineWidth = active ? 2 : 1.5
+        ctx.beginPath()
+        ctx.moveTo(x, 3)
+        ctx.lineTo(x, HEIGHT - 3)
+        ctx.stroke()
+        ctx.fillStyle = color
+        ctx.fillRect(x - 3.5, 2, 7, 5)
+        ctx.fillRect(x - 3.5, HEIGHT - 7, 7, 5)
+        ctx.globalAlpha = 1
+      }
     }
 
     // Playhead, shared with the main timeline and the player.
@@ -388,15 +444,19 @@ export default function MiniTimeline({
     wordDefectMap,
     activeWordIds,
     padSec,
-    waveLut
+    waveLut,
+    cut
   ])
 
-  const xFromEvent = (event: ReactPointerEvent<HTMLDivElement>): number => {
+  const xFromClientX = (clientX: number): number => {
     const wrap = wrapRef.current
     if (!wrap) return 0
     const rect = wrap.getBoundingClientRect()
-    return clamp(event.clientX - rect.left, 0, rect.width)
+    return clamp(clientX - rect.left, 0, rect.width)
   }
+
+  const xFromEvent = (event: ReactPointerEvent<HTMLDivElement>): number =>
+    xFromClientX(event.clientX)
 
   const timeFromEvent = (event: ReactPointerEvent<HTMLDivElement>): number => {
     const wrap = wrapRef.current
@@ -407,12 +467,11 @@ export default function MiniTimeline({
 
   const currentEdgeAt = (x: number): DefectEdge | null => {
     const wrap = wrapRef.current
-    if (!wrap) return null
-    const current = defectRef.current
+    if (!wrap || !cut) return null
     return miniEdgeAt(
       x,
-      current.start,
-      current.end,
+      cut.start,
+      cut.end,
       viewRef.current,
       wrap.getBoundingClientRect().width
     )
@@ -423,7 +482,16 @@ export default function MiniTimeline({
     setHoverEdge(null)
     const current = viewRef.current
     const anchor = (current.start + current.end) / 2
-    setView(framedWindow(defectRef.current, duration, zoomRef.current, padSec, anchor))
+    setView(
+      framedWindow(
+        spanRef.current.start,
+        spanRef.current.end,
+        duration,
+        zoomRef.current,
+        padSec,
+        anchor
+      )
+    )
   }
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
@@ -446,15 +514,18 @@ export default function MiniTimeline({
     event.stopPropagation()
     const x = xFromEvent(event)
     if (dragRef.current) {
-      const current = defectRef.current
+      if (!cut) {
+        dragRef.current = null
+        return
+      }
       const time = timeFromEvent(event)
       const bounds = clampDefectEdge(
-        { start: current.start, end: current.end },
+        { start: cut.start, end: cut.end },
         dragRef.current,
         time,
         duration
       )
-      setDefectBounds(current.id, bounds.start, bounds.end)
+      setCutBounds(defect.id, bounds.start, bounds.end, dragRef.current)
       return
     }
     if (scrubRef.current) {
@@ -539,13 +610,17 @@ export default function MiniTimeline({
       <div
         className="mini-timeline-canvas"
         ref={wrapRef}
-        title={`${rangeLabel}. Потяните края; Ctrl/⌘+колесо — масштаб, Shift+колесо — прокрутка. Двойной клик — сбросить масштаб.`}
+        title={`${rangeLabel}. Потяните ручки выреза; Ctrl/⌘+колесо — масштаб, Shift+колесо — прокрутка. Двойной клик по ручке сбрасывает вырез, вне ручки — масштаб.`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onDoubleClick={(event) => {
           event.stopPropagation()
+          if (currentEdgeAt(xFromClientX(event.clientX))) {
+            resetCutBounds(defect.id)
+            return
+          }
           resetZoom()
         }}
         onPointerLeave={() => {
@@ -574,7 +649,7 @@ export default function MiniTimeline({
         </div>
       ) : null}
       <div className="mini-timeline-foot">
-        <span>{formatTimecode(defect.start, true)}</span>
+        <span>{formatTimecode(cut ? cut.start : defect.start, true)}</span>
         <span className="mini-zoom">
           <button
             type="button"
@@ -593,7 +668,7 @@ export default function MiniTimeline({
             +
           </button>
         </span>
-        <span>{formatTimecode(defect.end, true)}</span>
+        <span>{formatTimecode(cut ? cut.end : defect.end, true)}</span>
       </div>
     </div>
   )

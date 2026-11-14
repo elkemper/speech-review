@@ -1,11 +1,11 @@
 import { create } from 'zustand'
 import { DEFAULT_SETTINGS } from '@shared/settings'
-import { findWordIdsInRange } from '@shared/defects'
 import { formatTimecode } from '@shared/format'
 import {
   markIdsForDefectId,
   manualDefectIdForMark,
   mergeMarkNeighbours,
+  mergeMarksAtSpan,
   reconcileConfirmedIds
 } from '@shared/marks'
 import type {
@@ -132,7 +132,13 @@ interface AppStore {
   removeDefect: (defectId: string, relatedIds?: string[]) => void
   removeDefects: (items: Array<{ id: string; relatedIds?: string[] }>) => void
   splitManualGroup: (defectId: string) => void
-  setDefectBounds: (defectId: string, start: number, end: number) => void
+  setCutBounds: (
+    defectId: string,
+    start: number,
+    end: number,
+    edge?: 'start' | 'end'
+  ) => void
+  resetCutBounds: (defectId: string) => void
   undo: () => void
   redo: () => void
   jumpHistory: (index: number) => void
@@ -697,10 +703,23 @@ export const useApp = create<AppStore>((set, get) => ({
     }
     const marks = mergeMarkNeighbours([...project.marks, mark], [mark.id])
     const activeDefectId = manualDefectIdForMark(marks, mark.id) ?? `manual-${mark.id}`
+    // Adding a mark can rebuild a logical group. The group's fill changed, so
+    // every nested cut override is dropped and the cut is derived again.
+    const cutOverrides = { ...(project.cutOverrides ?? {}) }
+    const affectedMarkIds = markIdsForDefectId(activeDefectId, marks)
+    for (const markId of affectedMarkIds) delete cutOverrides[`manual-${markId}`]
+    for (const item of marks) {
+      if (!affectedMarkIds.includes(item.id)) continue
+      const previous = project.marks.find((mark) => mark.id === item.id)
+      if (previous?.groupId) {
+        delete cutOverrides[`manual-group-${previous.groupId}`]
+      }
+    }
     set({
       project: {
         ...project,
         marks,
+        cutOverrides,
         confirmedDefectIds: reconcileConfirmedIds(
           project.marks,
           marks,
@@ -745,7 +764,7 @@ export const useApp = create<AppStore>((set, get) => ({
     const dismissed = new Set(project.dismissedDefectIds)
     const dismissedMarks = [...(project.dismissedMarks ?? [])]
     const archivedIds = new Set(dismissedMarks.map((mark) => mark.id))
-    const overrides = { ...project.defectOverrides }
+    const overrides = { ...(project.cutOverrides ?? {}) }
     const removedMarkIds = new Set<string>()
     let manualCount = 0
 
@@ -788,7 +807,7 @@ export const useApp = create<AppStore>((set, get) => ({
         dismissedDefectIds: [...dismissed],
         dismissedMarks,
         defectNotes: notes,
-        defectOverrides: overrides
+        cutOverrides: overrides
       },
       activeDefectId: null
     })
@@ -825,12 +844,15 @@ export const useApp = create<AppStore>((set, get) => ({
       const singleId = `manual-${mark.id}`
       if (groupNote) notes[singleId] = groupNote
     }
+    const cutOverrides = { ...(project.cutOverrides ?? {}) }
+    delete cutOverrides[defectId]
     set({
       project: {
         ...project,
         marks,
         confirmedDefectIds: confirmed,
-        defectNotes: notes
+        defectNotes: notes,
+        cutOverrides
       },
       activeDefectId: `manual-${groupMarks[0].id}`
     })
@@ -839,73 +861,77 @@ export const useApp = create<AppStore>((set, get) => ({
     get().notify(`Метка разделена на ${groupMarks.length} отдельных`)
   },
 
-  setDefectBounds: (defectId, start, end) => {
+  setCutBounds: (defectId, start, end, edge) => {
     const project = get().project
     if (!project) return
     const before = snapshotEditable(project, get().settings)
     const duration = Math.max(0.1, project.duration)
     const bounds = clampBounds(start, end, duration)
     const markIds = markIdsForDefectId(defectId, project.marks)
+    const overrides = { ...(project.cutOverrides ?? {}) }
 
-    if (markIds.length > 0) {
-      const groupMarks = project.marks.filter((mark) => markIds.includes(mark.id))
-      const groupStart = Math.min(...groupMarks.map((mark) => mark.start))
-      const groupEnd = Math.max(...groupMarks.map((mark) => mark.end))
-      const startChanged = Math.abs(bounds.start - groupStart) > 1e-6
-      const endChanged = Math.abs(bounds.end - groupEnd) > 1e-6
-      const firstMark = groupMarks.reduce((a, b) => (a.start <= b.start ? a : b))
-      const lastMark = groupMarks.reduce((a, b) => (a.end >= b.end ? a : b))
-      const changedIds: string[] = []
-      const words = project.transcript?.words ?? []
-
-      let marks = project.marks.map((mark) => {
-        if (startChanged && mark.id === firstMark.id) {
-          changedIds.push(mark.id)
-          const start = bounds.start
-          return {
-            ...mark,
-            start,
-            wordIds: findWordIdsInRange(words, start, Math.max(start, mark.end))
-          }
-        }
-        if (endChanged && mark.id === lastMark.id) {
-          changedIds.push(mark.id)
-          const end = bounds.end
-          return {
-            ...mark,
-            end,
-            wordIds: findWordIdsInRange(words, Math.min(mark.start, end), end)
-          }
-        }
-        return mark
-      })
-      if (changedIds.length === 0) return
-
-      marks = mergeMarkNeighbours(marks, changedIds)
-      const changedId = changedIds[0]
-      const activeId = manualDefectIdForMark(marks, changedId) ?? defectId
-      const confirmed = reconcileConfirmedIds(
-        project.marks,
-        marks,
-        project.confirmedDefectIds
-      )
-      set({
-        project: { ...project, marks, confirmedDefectIds: confirmed },
-        activeDefectId: activeId
-      })
+    if (markIds.length === 1 && !defectId.startsWith('manual-group-')) {
+      // A single manual mark can capture its neighbours when the cut handle
+      // reaches them. The mark keeps its original bounds; only the group ids
+      // and the cut override change.
+      const merged = mergeMarksAtSpan(project.marks, markIds[0], bounds, { edge })
+      if (merged.activeDefectId) {
+        for (const id of merged.affectedMarkIds) delete overrides[`manual-${id}`]
+        for (const id of merged.affectedGroupIds) delete overrides[`manual-group-${id}`]
+        overrides[merged.activeDefectId] = bounds
+        const confirmed = reconcileConfirmedIds(
+          project.marks,
+          merged.marks,
+          project.confirmedDefectIds
+        )
+        set({
+          project: {
+            ...project,
+            marks: merged.marks,
+            confirmedDefectIds: confirmed,
+            cutOverrides: overrides
+          },
+          activeDefectId: merged.activeDefectId
+        })
+      } else {
+        overrides[defectId] = bounds
+        set({ project: { ...project, cutOverrides: overrides } })
+      }
     } else {
-      set({
-        project: {
-          ...project,
-          defectOverrides: {
-            ...project.defectOverrides,
-            [defectId]: { start: bounds.start, end: bounds.end }
+      // Automatic defects and logical groups only move their own cut. A manual
+      // group drops the overrides of its nested marks: the group handle is the
+      // only boundary from now on.
+      if (markIds.length > 1) {
+        for (const markId of markIds) delete overrides[`manual-${markId}`]
+        for (const mark of project.marks) {
+          if (markIds.includes(mark.id) && mark.groupId) {
+            delete overrides[`manual-group-${mark.groupId}`]
           }
         }
-      })
+      }
+      overrides[defectId] = bounds
+      set({ project: { ...project, cutOverrides: overrides } })
     }
 
-    recordProjectChange(set, get, before, 'Границы дефекта', `bounds:${defectId}`)
+    recordProjectChange(set, get, before, 'Границы выреза', `cut:${defectId}`)
+    get().scheduleSave()
+  },
+
+  resetCutBounds: (defectId) => {
+    const project = get().project
+    if (!project) return
+    if (!project.cutOverrides?.[defectId]) return
+    const before = snapshotEditable(project, get().settings)
+    const overrides = { ...(project.cutOverrides ?? {}) }
+    delete overrides[defectId]
+    set({ project: { ...project, cutOverrides: overrides } })
+    recordProjectChange(
+      set,
+      get,
+      before,
+      'Сброшены границы выреза',
+      `cut:${defectId}`
+    )
     get().scheduleSave()
   },
 
@@ -1161,9 +1187,9 @@ function attachListeners(
         ...partial.project,
         marks: state.project.marks,
         bookmarks: state.project.bookmarks ?? partial.project.bookmarks ?? [],
-        defectOverrides: keepReview
-          ? state.project.defectOverrides
-          : partial.project.defectOverrides,
+        cutOverrides: keepReview
+          ? state.project.cutOverrides
+          : partial.project.cutOverrides,
         confirmedDefectIds: keepReview
           ? state.project.confirmedDefectIds
           : partial.project.confirmedDefectIds,
@@ -1189,7 +1215,7 @@ function attachListeners(
           ...done.project,
           marks: state.project.marks,
           bookmarks: state.project.bookmarks ?? done.project.bookmarks ?? [],
-          defectOverrides: state.project.defectOverrides,
+          cutOverrides: state.project.cutOverrides,
           confirmedDefectIds: state.project.confirmedDefectIds,
           dismissedDefectIds: state.project.dismissedDefectIds,
           dismissedMarks: state.project.dismissedMarks,

@@ -106,7 +106,7 @@ word, without changing the minimum-duration rule globally.
   mini-timeline, timeline markers and skip intervals.
 - Candidate cards show the «кандидат» badge and are excluded from export and
   confirmation progress while they stay candidates.
-- Promotion is implicit through existing editable state: bounds override,
+- Promotion is implicit through existing editable state: a cut edit,
   confirmation, deletion or a note makes the id `promoted` and it survives
   switching and reload.
 - If the user only clicked and then moved to another word/defect, the candidate
@@ -175,7 +175,7 @@ word, without changing the minimum-duration rule globally.
 - [ ] Revealed candidates are skipped, and disappear after switching away.
 - [ ] A below-threshold filler is not bold and its tooltip explains that it is
       below the threshold and is not skipped.
-- [ ] Bounds, confirm, delete or note keep the promoted defect.
+- [ ] Cut edit, confirm, delete or note keep the promoted defect.
 
 ## Verification
 

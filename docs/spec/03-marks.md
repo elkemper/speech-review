@@ -42,11 +42,11 @@ As a user, I want to select several words and create one mark over all of them.
 **Status:** Done · **Priority:** P0
 
 As a user, I want adjacent marks to become one logical mark that can be
-confirmed once, split back, and merged again when a boundary reaches another
+confirmed once, split back, and merged again when a cut handle reaches another
 mark.
 
 - Shared `groupId`; id `manual-group-${groupId}`.
-- Merge on add and on boundary move only.
+- Merge on add and when a cut handle captures a neighbour.
 - Split removes `groupId`, keeps words and copies the group note to each mark.
 - Delete removes the whole group, its notes and confirmation ids.
 - Old adjacent marks do not merge until one is added/moved.
@@ -65,26 +65,32 @@ action.
 - A selection with no defects reports that.
 - Each bulk action is one history entry.
 
-### Story 12 — Manual boundary editing and overrides
+### Story 12 — Cut editing and overrides
 
 **Status:** Done · **Priority:** P1
 
-As a user, I want to drag the boundaries of the selected defect/mark on the
-timeline and have word membership follow.
+As a user, I want to drag the handles of the selected defect/mark on the
+timeline and control the final cut, while the original detected/marked span
+stays visible as the fill.
 
-- Automatic defect: store `Project.defectOverrides[defectId]`.
-- Manual mark: update `start`/`end`, recompute `wordIds` with strict overlap.
-- Dragging onto a neighbour merges the mark into a logical group.
-- Boundaries cannot cross or invert; minimum length is preserved.
+- Every defect uses `Project.cutOverrides[defectId]` for the final cut.
+- `Defect.start/end` and `ManualMark.start/end` are the original span; handles
+  do not move them.
+- A manual mark's cut handle can capture a neighbouring mark: the marks join a
+  logical group, the handle becomes the group cut, and every nested cut
+  override is dropped.
+- The fill is the original defect, the cut is the handle range, and the gap is
+  hatched (padding in the type color outside, neutral background hatch inside).
+- Double-clicking a handle deletes the override and restores the derived cut.
 - Undoable and saved.
-- The active item also shows an in-panel snippet with the same handles:
+- The active item also shows an in-panel snippet with the same cut handles:
   [story 40](10-mini-timeline.md).
 
 ### Story 13 — Confirmation-state reconciliation
 
 **Status:** Done · **Priority:** P0
 
-As a user, I want confirmed state to survive merge, split and boundary moves
+As a user, I want confirmed state to survive merge, split and cut capture
 without silently confirming new marks.
 
 - `reconcileConfirmedIds(before, after, confirmedIds)`.
@@ -113,7 +119,7 @@ actions, so I can decide the fate of a defect without treating the checkmark as
   automatic defect adds its ID to `Project.dismissedDefectIds`. Deleted items
   are excluded from export and skip mode but remain as thin cards with a
   restore button when `showDismissed` is on.
-- The card header is time · type — duration (up to two decimals, `с.`). The
+- The card header is time · type — cut duration (up to two decimals, `с.`). The
   separate severity/confidence badge and the boundary hints are removed.
 - The mini-timeline loses its "границы дефекта" label and the zoom percentage;
   zoom stays on −/+ and resets on double-click.
@@ -150,7 +156,7 @@ actions, so I can decide the fate of a defect without treating the checkmark as
 ### Story 10
 
 - [ ] Adding next to an existing mark shares a `groupId`.
-- [ ] Moving a boundary onto another mark merges.
+- [ ] Dragging a cut handle onto another mark merges.
 - [ ] Group is confirmed/deleted as a whole.
 - [ ] Split preserves words and notes.
 - [ ] Old adjacent marks do not re-merge on render.
@@ -166,11 +172,13 @@ actions, so I can decide the fate of a defect without treating the checkmark as
 
 ### Story 12
 
-- [ ] Selecting a defect/mark shows draggable boundaries.
-- [ ] The same boundaries are editable in the in-panel snippet (story 40).
-- [ ] Automatic edits go to `defectOverrides`.
-- [ ] Manual edits update marks and `wordIds`.
-- [ ] Reaching a neighbour merges.
+- [ ] Selecting a defect/mark shows draggable cut handles.
+- [ ] The same handles are editable in the in-panel snippet (story 40).
+- [ ] Every cut edit goes to `cutOverrides`.
+- [ ] `Defect.start/end` and `ManualMark.start/end` stay unchanged.
+- [ ] A cut handle reaching a neighbour groups the marks and drops nested
+      overrides.
+- [ ] Double-clicking a handle resets the derived cut.
 - [ ] Min length and duration clamps hold.
 - [ ] Every change is undoable and saved.
 
@@ -190,7 +198,7 @@ actions, so I can decide the fate of a defect without treating the checkmark as
 - [ ] A confirmed card collapses to a compact row and stays in export/skip.
 - [ ] A deleted automatic defect is stored in `dismissedDefectIds` and is undoable.
 - [ ] A deleted manual mark is stored in `dismissedMarks` and is undoable.
-- [ ] The header shows time · type — duration with up to two decimals.
+- [ ] The header shows time · type — cut duration with up to two decimals.
 - [ ] Skip mode keeps card actions.
 - [ ] Confirming/deleting in skip mode collapses the card like outside it.
 - [ ] A compact card does not reveal its hidden text on hover.

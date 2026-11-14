@@ -94,6 +94,11 @@ export interface DefectBoundsOverride {
   end: number
 }
 
+export interface CutRange {
+  start: number
+  end: number
+}
+
 export interface DefectRules {
   fillerWords: string[]
   multiWordFillers: string[][]
@@ -145,8 +150,11 @@ export interface Project {
   updatedAt: string
   marks: ManualMark[]
   rules: DefectRules
-  /** User-adjusted boundaries for automatically detected defects, keyed by defect id. */
-  defectOverrides: Record<string, DefectBoundsOverride>
+  /**
+   * User-adjusted final cut ranges keyed by defect id. The defect itself keeps
+   * its detected/marked bounds; these are the handles that decide what is cut.
+   */
+  cutOverrides: Record<string, DefectBoundsOverride>
   /** Defects and marks the user confirmed as real. */
   confirmedDefectIds: string[]
   /** Automatically detected defects the user deleted as false positives. */
@@ -203,11 +211,28 @@ export type ExportField =
   | 'confirmed'
   | 'text'
   | 'note'
+  | 'cut'
+  | 'defect_start_tc'
+  | 'defect_end_tc'
+  | 'defect_start_sec'
+  | 'defect_end_sec'
+  | 'defect_duration_sec'
 
 export interface ExportSettings {
   fields: ExportField[]
   delimiter: ';' | ','
   includeHeader: boolean
+}
+
+/**
+ * A defect prepared for export. `start`/`end` are the original detected or
+ * marked span; `cutStart`/`cutEnd` are the final cut bounds. A `null` cut means
+ * the defect is not removed at all (for example a pause shorter than the kept
+ * room tone).
+ */
+export interface ExportDefect extends Defect {
+  cutStart: number | null
+  cutEnd: number | null
 }
 
 export interface SkipPadding {
@@ -321,8 +346,10 @@ export interface MediaRegistration {
 
 export interface ExportRequest {
   project: Project
-  defects: Defect[]
+  defects: ExportDefect[]
   marks: ManualMark[]
+  /** Merged final cuts, in playback order. Empty when nothing is cut. */
+  cuts: CutRange[]
   format: 'csv' | 'json'
   exportSettings: ExportSettings
 }

@@ -40,14 +40,24 @@ together.
   default, split evenly between both edges. `0` removes the whole silence.
 - The pause type padding applies on top of the keep and can widen the cut into
   the kept silence.
-- A pause cut shorter than 0.2 s is not performed, and a pause shorter than the
-  kept silence is left untouched.
+- A derived pause cut shorter than 0.2 s is not performed, and a pause shorter
+  than the kept silence is left untouched. An explicit `cutOverrides` range is
+  honoured even when shorter.
 - A grouped pause uses `groupPadding`, not the keep.
+- `Project.cutOverrides[defectId]` is the final cut. It wins over every padding
+  setting; double-clicking a handle deletes it and restores the derived cut.
+- `buildCutList` is independent of `skipEnabled` and feeds the timeline
+  hatching, the mini timeline and a future video export. `buildSkipIntervals`
+  is `skipEnabled ? buildCutList : []`.
+- The timeline fill is the original defect; the handles are the final cut. The
+  gap is hatched: padding outside the fill in the defect type color, kept
+  room tone inside it as a neutral track-background hatch (a slightly lighter
+  shade of the background) because that part still plays.
 - Defaults: pause `0/0`, filler `0.1/0.2`, group `0.15/0.35`.
 - Padding is clamped to 0–5 s and to the recording; the keep is clamped to
   0–3 s.
 - Settings remain editable when `skipEnabled` is false.
-- Padding changes are undoable together with the skip intervals they produce
+- Padding changes are undoable together with the cut ranges they produce
   (story 47).
 
 ### Story 27 — Listen starts playback
@@ -115,14 +125,19 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 - [ ] Per-type padding is used; group padding for groups; global fallback.
 - [ ] A standalone pause keeps `pauseKeepSec` of silence split across both
       edges; `0` removes the whole silence.
-- [ ] A pause shorter than the keep or a cut shorter than 0.2 s is not cut.
+- [ ] A derived pause shorter than the keep or a cut shorter than 0.2 s is not
+      cut; an explicit override is honoured.
 - [ ] A grouped pause uses group padding and is not affected by the keep.
+- [ ] An explicit cut override wins over padding and survives settings changes.
+- [ ] Double-clicking a handle deletes the override and restores the derived
+      cut.
 - [ ] Padding is clamped to duration.
 - [ ] Overlapping ranges merge.
+- [ ] `buildCutList` works with skip mode off; `buildSkipIntervals` is empty.
 - [ ] Changing padding while paused affects the next skip.
 - [ ] Deleted items remain unskipped.
 - [ ] Controls work while skip is off.
-- [ ] Undo/redo restores padding and recalculates intervals.
+- [ ] Undo/redo restores padding and recalculates cuts.
 
 ### Story 27
 
@@ -159,7 +174,7 @@ As a user, I want bookmarks so I can remember where I stopped and resume later.
 
 ## Verification
 
-- `test/skip.test.ts` covers padding, pause room tone, dismissed filtering,
-  merging, lookup.
+- `test/skip.test.ts` covers padding, pause room tone, cut overrides, cut view,
+  minimum cut, dismissed filtering, merging, lookup and complement ranges.
 - Add a pure "next target" helper test for story 28.
 - Real playback and listen need a macOS run.

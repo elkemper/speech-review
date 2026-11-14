@@ -28,13 +28,13 @@ panel, and hide the defect panel completely.
 **Status:** Done · **Priority:** P0
 
 As a user, I want undo/redo with a log covering marks, confirmation state, notes,
-defect overrides and project settings.
+cut overrides and project settings.
 
 - `Cmd+Z` / `Ctrl+Z` undo; `Shift+Cmd+Z` / `Ctrl+Y` redo.
 - History dialog lists actions with timestamps and supports jumping.
 - Same `mergeKey` within 2 s coalesces.
-- Snapshot = marks + confirmed ids + dismissed ids + notes + overrides + project
-  rules + skip padding.
+- Snapshot = marks + confirmed ids + dismissed ids + notes + cut overrides +
+  project rules + skip padding.
 - Bookmarks, skip mode, playback, selection, filters, transcript, model/language,
   export and UI-only settings excluded.
 - History resets when a project is opened/closed.
@@ -94,7 +94,7 @@ the defect list and skip intervals they recalculated.
 
 ### Story 32
 
-- [ ] Undo/redo works for marks, confirmation, deletion, notes, overrides.
+- [ ] Undo/redo works for marks, confirmation, deletion, notes, cut overrides.
 - [ ] The dialog lists actions and jumps correctly.
 - [ ] Merge key coalesces within 2 s.
 - [ ] Only editable project state and project settings are snapshotted.

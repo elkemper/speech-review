@@ -74,7 +74,10 @@ Speech Review/
 
 `export`:
 
-- `fields` — CSV field order; all fields by default;
+- `fields` — CSV field order; the base fields are the final cut bounds
+  (`start_tc`/`end_tc`/`start_sec`/`end_sec`/`duration_sec`); the original
+  defect bounds are optional (`defect_start_*`/`defect_end_*`) and `cut` says
+  whether the row is removed at all;
 - `delimiter` — `;` or `,`;
 - `includeHeader` — `true` by default.
 
@@ -86,18 +89,18 @@ Speech Review/
 - `paddingByType` — `Record<DefectType, { before, after }>`; defaults give a pause `0/0` and a filler `0.1/0.2`;
 - `groupPadding` — `{ before, after }` for a logical group, default 0.15 / 0.35.
 
-For a pause the keep is applied as negative padding, so the cut shrinks by
-`pauseKeepSec`; the pause type padding still adds on top. A cut shorter than
-0.2 s is skipped instead of performed.
+For a pause the keep is applied as negative padding, so the derived cut shrinks
+by `pauseKeepSec`; the pause type padding still adds on top. A derived cut
+shorter than 0.2 s is skipped instead of performed.
 
-Padding is resolved when skip intervals are built and does not depend on `skipEnabled`: the controls stay editable even when skip mode is off.
+Padding is resolved when the cut list is built and does not depend on `skipEnabled`: the controls stay editable even when skip mode is off. An explicit `Project.cutOverrides[defectId]` wins over every padding field; double-clicking a timeline handle deletes that override and restores the derived cut.
 
 `loadSettings` is tolerant of old or broken files:
 
 - an unknown `modelId`/`backend` is replaced with the default;
 - `rules` is merged with missing `DEFAULT_RULES` fields;
 - `chunkTargetSec` is rounded and clamped to 120–900;
-- `export.fields` is filtered to known fields; an empty list is replaced with the full list; the legacy `reviewed` field is migrated to `confirmed`;
+- `export.fields` is filtered to known fields; an empty list is replaced with the default base fields; the legacy `reviewed` field is migrated to `confirmed`;
 - `playback` is normalized by `normalizePlaybackSettings`: every per-type padding entry is filled from the defaults, padding values are clamped to 0–5 s and `pauseKeepSec` is clamped to 0–3 s;
 - `miniTimelinePadSec` is clamped to 0–15 s (`normalizeMiniTimelinePad`);
 - `waveformContrast` is rounded and clamped to 0–100 (`normalizeWaveformContrast`);
@@ -122,7 +125,7 @@ Padding is resolved when skip intervals are built and does not depend on `skipEn
 | `updatedAt` | ISO string | last write |
 | `marks` | `ManualMark[]` | manual marks |
 | `rules` | `DefectRules` | rules at project time |
-| `defectOverrides` | `Record<string, {start,end}>` | edited automatic defect boundaries |
+| `cutOverrides` | `Record<string, {start,end}>` | final cut ranges keyed by defect ID; the original defect/mark span stays unchanged |
 | `confirmedDefectIds` | string[] | defects/marks confirmed as real |
 | `dismissedDefectIds` | string[] | automatic defects deleted as false positives |
 | `dismissedMarks` | `ManualMark[]` | deleted manual marks kept for restore |
@@ -136,12 +139,12 @@ Project creation:
 1. `projects:create` checks ffmpeg, the audio track and the duration;
 2. name is `basename(path, extname(path))`;
 3. `rules`, `language`, `modelId`, `backend` come from current settings;
-4. `marks`, `defectOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes` and `bookmarks` are empty;
+4. `marks`, `cutOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes` and `bookmarks` are empty;
 5. `transcriptComplete: false`.
 
 Loading:
 
-- missing `marks`, `defectOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `bookmarks`, `transcriptComplete` are filled with safe values;
+- missing `marks`, `cutOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `bookmarks`, `transcriptComplete` are filled with safe values; an old `defectOverrides` map is read as `cutOverrides` so existing boundary edits survive the rename;
 - a project written before this lifecycle change has `reviewedDefectIds` and no new fields. Those ids migrate to `dismissedDefectIds` (automatic) and `dismissedMarks` (manual) because the old checkmark meant "checked and considered not a defect"; `confirmedDefectIds` starts empty;
 - manual ids that were stored in `dismissedDefectIds` by an intermediate build are moved to `dismissedMarks`;
 - `rules` is merged with `DEFAULT_RULES`;
@@ -215,14 +218,16 @@ interface Peaks {
 detectDefectsWithCandidates(transcript, rules, marks, {
   dismissedIds: project.dismissedDefectIds,
   dismissedMarks: project.dismissedMarks,
-  promotedIds // overrides + review ids + note keys, automatic IDs only
+  promotedIds // cut overrides + review ids + note keys, automatic IDs only
 })
-  → applyDefectOverrides(defectResult.defects, project.defectOverrides)
   → inject confirmed/dismissed/note from the project sets
   → append the active minimum-duration candidate as `candidate: true`
+  → cutRangeFor(defect, playback, duration, project.cutOverrides[id])
+     for playback, the timeline and export
 ```
 
-`detectDefects` remains a thin wrapper that returns only `defects`.
+`detectDefects` remains a thin wrapper that returns only `defects`. The cut is a
+separate derived layer: `Defect.start/end` is always the detected or marked span.
 
 Fields:
 
@@ -230,7 +235,7 @@ Fields:
 |---|---|
 | `id` | `auto-${type}-${sequence}` or `manual-${markId}` / `manual-group-${groupId}` |
 | `type` | `filler`, `pause`, `repetition`, `elongation`, `false_start`, `vocal_sound`, `unclear`, `manual` |
-| `start`, `end` | seconds |
+| `start`, `end` | original detected/marked span in seconds; the final cut is derived separately |
 | `wordIds` | words the defect refers to |
 | `markIds` | manual only: IDs of all marks in the logical group |
 | `groupIds` | automatic grouping only: IDs of the underlying automatic defects |
@@ -247,13 +252,15 @@ Automatic IDs are **not stable**: `sequence` is the global insertion order. Chan
 
 `dismissedDefectIds` and `dismissedMarks` are applied inside `detectDefects`. Active automatic defects are grouped without dismissed members; deleted automatic and manual items are returned separately with `dismissed: true` so their thin cards can be restored and focused from the transcript. A deleted automatic group stores both the group ID and member IDs.
 
-A minimum-duration candidate is a rule match that did not pass the per-type filter. It keeps the same `auto-${type}-${sequence}` ID as it would have at a lower threshold. The renderer reveals one candidate at a time when `activeDefectId` matches it and computes `candidate: true`; the candidate is not persisted. Any explicit edit or review action (bounds override, confirmation, deletion, note) puts the ID into `promotedIds`, so the next detection pass returns it as a normal defect and it survives a switch or reload.
+A minimum-duration candidate is a rule match that did not pass the per-type filter. It keeps the same `auto-${type}-${sequence}` ID as it would have at a lower threshold. The renderer reveals one candidate at a time when `activeDefectId` matches it and computes `candidate: true`; the candidate is not persisted. Any explicit edit or review action (cut edit, confirmation, deletion, note) puts the ID into `promotedIds`, so the next detection pass returns it as a normal defect and it survives a switch or reload.
 
-`applyDefectOverrides`:
+`cutRangeFor`:
 
-- returns the same array if overrides are empty;
-- replaces only matching IDs;
-- normalizes reversed bounds (`start = min`, `end = max`).
+- returns an explicit `cutOverrides[defectId]` when present, normalized and clamped to the recording;
+- otherwise applies per-type padding and the pause keep;
+- returns `null` when the derived pause cut is shorter than 0.2 s; an explicit override is honoured even when shorter.
+
+`buildCutList` merges every non-dismissed cut and does **not** depend on `skipEnabled`; `buildSkipIntervals` is `skipEnabled ? buildCutList : []`. `buildCutMap` returns the per-defect cut for drawing. `cutView` splits a defect into the original fill, the final cut, `outer` padding and `inner` kept room tone. The shared module is `src/shared/cuts.ts`; the renderer re-exports it from `src/renderer/src/skip.ts`.
 
 ## 7. Manual marks
 
@@ -273,9 +280,10 @@ interface ManualMark {
 Rules:
 
 - When added, a mark gets the exact `wordIds` and boundaries of the selected words. If there is no selection, the playhead position and a 1.5 s range are used.
-- `mergeMarkNeighbours` merges only **changed** marks with those they touch within a gap of ≤ 0.2 s. Merging happens on add and on boundary move.
+- `mergeMarkNeighbours` merges only **changed** marks with those they touch within a gap of ≤ 0.2 s. Merging happens when a mark is added.
+- A cut drag does not move the mark. `mergeMarksAtSpan` uses the dragged **cut** span for adjacency: if the cut handle reaches a neighbour, the marks join a logical group, the handle becomes the group cut, and every nested cut override is dropped. The marks keep their original `start`/`end`.
 - If a changed mark no longer touches its group, it leaves the group (`groupId = undefined`). Old adjacent marks that the user explicitly split do not merge by themselves.
-- `splitManualGroup` removes `groupId` from every mark in the group. The group note is copied to each single mark.
+- `splitManualGroup` removes `groupId` from every mark in the group and clears the group cut override. The group note is copied to each single mark.
 - `removeDefect` moves all marks in a manual group to `dismissedMarks`, removes their confirmation IDs and clears their notes map entry (the mark itself keeps `note`). Deleting an automatic defect adds its ID (and group member IDs) to `dismissedDefectIds`.
 - `groupManualMarks` groups by `groupId` and computes combined `start`, `end`, `wordIds`, `note`.
 - Automatic defects are grouped by `groupAutoDefects` before manual defects are appended. A group gets the id `auto-group-${firstDefectId}`, combined bounds/words and `groupTypes`. It is used by the list, the transcript, confirmation state and skip mode (which applies `playback.groupPadding`).
@@ -318,7 +326,7 @@ History is stored only in renderer memory and is reset when a project is opened 
   dismissedDefectIds: string[]
   dismissedMarks: ManualMark[]
   defectNotes: Record<string, string>
-  defectOverrides: Record<string, DefectBoundsOverride>
+  cutOverrides: Record<string, DefectBoundsOverride>
   rules: DefectRules
   playback: {
     skipBeforeSec: number
@@ -333,7 +341,7 @@ History is stored only in renderer memory and is reset when a project is opened 
 `HistoryEntry` contains `id`, `label`, `at`, `before`, `after` and an optional `mergeKey`. `HistoryState` is an array of entries plus the index of the last applied one.
 
 - A new entry after undo truncates the redo branch.
-- Entries with the same `mergeKey` within 2 seconds are coalesced (for example, note typing or boundary dragging).
+- Entries with the same `mergeKey` within 2 seconds are coalesced (for example, note typing or cut dragging).
 - `undo`/`redo`/`jumpHistory` apply a snapshot to the project and the global
   settings copy (`rules` and padding fields), then save both. `skipEnabled`
   stays untouched.
@@ -352,15 +360,15 @@ History is stored only in renderer memory and is reset when a project is opened 
 - `writeTranscript(id, transcript, complete, resetReview)`:
   - always writes `transcript.json`;
   - updates `transcriptComplete` and `updatedAt` in `project.json`;
-  - when `resetReview = true`, clears `confirmedDefectIds`, `dismissedDefectIds`, `defectNotes` and `defectOverrides`; `marks` and `dismissedMarks` survive.
+  - when `resetReview = true`, clears `confirmedDefectIds`, `dismissedDefectIds`, `defectNotes` and `cutOverrides`; `marks` and `dismissedMarks` survive.
 - During transcription, the first partial result is written with `resetReview = true` because automatic IDs may have changed. Later partial results use `resetReview = false` so the user's edits in the already visible prefix are not lost. Manual marks are never reset.
-- On the first partial, the renderer replaces automatic confirmation state with the on-disk state and resets history; on later partials and `done`, it keeps local `marks`, `dismissedMarks`, `confirmedDefectIds`, `dismissedDefectIds`, `defectNotes`, `defectOverrides`.
+- On the first partial, the renderer replaces automatic confirmation state with the on-disk state and resets history; on later partials and `done`, it keeps local `marks`, `dismissedMarks`, `confirmedDefectIds`, `dismissedDefectIds`, `defectNotes`, `cutOverrides`.
 
 ## 11. Backward compatibility
 
 There is no explicit project schema version. Compatibility is provided by defaults at load time:
 
-- missing `marks`, `defectOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `bookmarks` → empty objects/arrays;
+- missing `marks`, `cutOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `bookmarks` → empty objects/arrays; an old `defectOverrides` map is read as `cutOverrides`;
 - a legacy project with `reviewedDefectIds` and no new fields migrates automatic IDs to `dismissedDefectIds` and manual marks to `dismissedMarks`; `confirmedDefectIds` starts empty;
 - missing `rules` fields, including `minDurationByType`, `enabledTypes`, `autoGroupEnabled` and `autoGroupGapSec` → values from `normalizeRules`/`DEFAULT_RULES`;
 - old marks without `wordIds` → strict time overlap;

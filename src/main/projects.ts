@@ -71,7 +71,7 @@ export async function createProject(
     updatedAt: now,
     marks: [],
     rules: settings.rules,
-    defectOverrides: {},
+    cutOverrides: {},
     confirmedDefectIds: [],
     dismissedDefectIds: [],
     dismissedMarks: [],
@@ -132,12 +132,20 @@ export async function loadProject(id: string): Promise<LoadedProject> {
     }
   }
 
+  const legacyMeta = meta as ProjectMeta & {
+    defectOverrides?: Record<string, { start: number; end: number }>
+  }
+  const legacyOverrides = legacyMeta.defectOverrides
+  delete legacyMeta.defectOverrides
+
   const project: Project = {
     ...meta,
     marks,
     // Projects created by older builds may not contain every rule field.
     rules: normalizeRules(meta.rules),
-    defectOverrides: meta.defectOverrides ?? {},
+    // Older builds stored boundary edits under `defectOverrides`. Their spans
+    // become cut overrides so existing edits survive the rename.
+    cutOverrides: meta.cutOverrides ?? legacyOverrides ?? {},
     confirmedDefectIds,
     dismissedDefectIds,
     dismissedMarks,
@@ -189,7 +197,8 @@ export async function writeTranscript(
     meta.confirmedDefectIds = []
     meta.dismissedDefectIds = []
     meta.defectNotes = {}
-    meta.defectOverrides = {}
+    meta.cutOverrides = {}
+    delete (meta as Record<string, unknown>).defectOverrides
     delete meta.reviewedDefectIds
   }
   await writeJson(projectFile(id), meta)

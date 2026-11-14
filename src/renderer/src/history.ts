@@ -24,7 +24,7 @@ export interface EditableProjectState {
   dismissedDefectIds: string[]
   dismissedMarks: ManualMark[]
   defectNotes: Record<string, string>
-  defectOverrides: Record<string, DefectBoundsOverride>
+  cutOverrides: Record<string, DefectBoundsOverride>
   rules: DefectRules
   playback: HistoryPlaybackState
 }
@@ -97,8 +97,8 @@ export function snapshotEditable(
       wordIds: mark.wordIds ? [...mark.wordIds] : undefined
     })),
     defectNotes: { ...project.defectNotes },
-    defectOverrides: Object.fromEntries(
-      Object.entries(project.defectOverrides ?? {}).map(([id, bounds]) => [
+    cutOverrides: Object.fromEntries(
+      Object.entries(project.cutOverrides ?? {}).map(([id, bounds]) => [
         id,
         { ...bounds }
       ])
@@ -122,8 +122,8 @@ export function applyEditable(project: Project, state: EditableProjectState): Pr
       wordIds: mark.wordIds ? [...mark.wordIds] : undefined
     })),
     defectNotes: { ...state.defectNotes },
-    defectOverrides: Object.fromEntries(
-      Object.entries(state.defectOverrides ?? {}).map(([id, bounds]) => [id, { ...bounds }])
+    cutOverrides: Object.fromEntries(
+      Object.entries(state.cutOverrides ?? {}).map(([id, bounds]) => [id, { ...bounds }])
     ),
     rules: cloneRules(state.rules)
   }

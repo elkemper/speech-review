@@ -1,6 +1,5 @@
 import type {
   Defect,
-  DefectBoundsOverride,
   DefectRules,
   DefectType,
   ManualMark,
@@ -565,22 +564,6 @@ export function detectDefectsWithCandidates(
     defects,
     candidates: candidates.sort(compareDefects)
   }
-}
-
-export function applyDefectOverrides(
-  defects: Defect[],
-  overrides: Record<string, DefectBoundsOverride> | undefined
-): Defect[] {
-  if (!overrides || Object.keys(overrides).length === 0) return defects
-  return defects.map((defect) => {
-    const override = overrides[defect.id]
-    if (!override) return defect
-    return {
-      ...defect,
-      start: Math.min(override.start, override.end),
-      end: Math.max(override.start, override.end)
-    }
-  })
 }
 
 export function countDefects(defects: Defect[]): Record<DefectType, number> {

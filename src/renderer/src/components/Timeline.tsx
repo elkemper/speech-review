@@ -4,7 +4,14 @@ import type { Defect } from '@shared/types'
 import { DEFECT_COLORS, defectByWordId } from '../defectsUi'
 import { seekTo } from '../player'
 import { rangeForSelection, wordsInRange } from '../selection'
-import { buildSkipIntervals } from '../skip'
+import {
+  buildCutMap,
+  buildSkipIntervals,
+  cutView,
+  subtractRanges,
+  type CutRange
+} from '../skip'
+import { hatchPattern, TRACK_BG, TRACK_BG_LIGHT } from '../hatch'
 import { useApp } from '../store'
 import { buildWaveLut, computeWaveStats, waveAmp } from '../waveform'
 import {
@@ -42,7 +49,8 @@ export default function Timeline({
   const playback = useApp((state) => state.settings.playback)
   const waveContrast = useApp((state) => state.settings.waveformContrast)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
-  const setDefectBounds = useApp((state) => state.setDefectBounds)
+  const setCutBounds = useApp((state) => state.setCutBounds)
+  const resetCutBounds = useApp((state) => state.resetCutBounds)
   const selectTimeRange = useApp((state) => state.selectTimeRange)
   const clearSelection = useApp((state) => state.clearSelection)
   const setFollow = useApp((state) => state.setFollow)
@@ -70,6 +78,17 @@ export default function Timeline({
     () => visibleDefects.find((defect) => defect.id === activeDefectId) ?? null,
     [visibleDefects, activeDefectId]
   )
+  const cutMap = useMemo(
+    () =>
+      buildCutMap(
+        visibleDefects,
+        playback,
+        project?.duration ?? 0,
+        project?.cutOverrides
+      ),
+    [visibleDefects, playback, project?.duration, project?.cutOverrides]
+  )
+  const activeCut = activeDefect ? cutMap.get(activeDefect.id) ?? null : null
   const wordDefectMap = useMemo(() => defectByWordId(visibleDefects), [visibleDefects])
   const activeWordIds = useMemo(
     () => new Set(activeDefect?.wordIds ?? []),
@@ -93,8 +112,13 @@ export default function Timeline({
   }, [words, selection, timeSelection])
   const skipIntervals = useMemo(
     () =>
-      buildSkipIntervals(visibleDefects, playback, project?.duration ?? 0),
-    [visibleDefects, project?.marks, project?.duration, playback]
+      buildSkipIntervals(
+        visibleDefects,
+        playback,
+        project?.duration ?? 0,
+        project?.cutOverrides
+      ),
+    [visibleDefects, project?.marks, project?.duration, project?.cutOverrides, playback]
   )
 
   const draggingRef = useRef(false)
@@ -170,7 +194,7 @@ export default function Timeline({
     const pps = pixelsPerSecond(view, width)
     const toX = (time: number): number => ((time - view.start) / span) * width
 
-    ctx.fillStyle = '#141619'
+    ctx.fillStyle = TRACK_BG
     ctx.fillRect(0, 0, width, HEIGHT)
 
     // Time ruler
@@ -225,6 +249,94 @@ export default function Timeline({
         ctx.lineTo(x + 0.5, mid - waveAmp(waveLut, low) * amp)
       }
       ctx.stroke()
+    }
+
+
+    // Defect markers are the first layer of detail: show them even when the
+    // whole recording is zoomed out, before word boundaries appear. The fill is
+    // the original defect; the cut is drawn separately so the handles can move
+    // without changing what was detected. The kept room tone is left unfilled
+    // so the waveform stays visible under its neutral hatch.
+    {
+      for (const defect of visibleDefects) {
+        if (defect.end < view.start || defect.start > view.end) continue
+        const startX = clamp(toX(defect.start), 0, width)
+        const color = DEFECT_COLORS[defect.type]
+        const active = defect.id === activeDefectId
+        const fillAlpha = defect.confirmed ? 0.12 : active ? 0.28 : 0.2
+        const cut = cutMap.get(defect.id) ?? null
+        const layers = cutView(defect, cut)
+        ctx.globalAlpha = fillAlpha
+        ctx.fillStyle = color
+        for (const range of subtractRanges(layers.defect, layers.inner)) {
+          const x1 = clamp(toX(range.start), 0, width)
+          const x2 = clamp(toX(range.end), 0, width)
+          if (x2 - x1 < 1) continue
+          ctx.fillRect(x1, 16, Math.max(1.5, x2 - x1), HEIGHT - 16)
+        }
+        if (defect.type !== 'pause') {
+          ctx.beginPath()
+          ctx.moveTo(startX - 3.5, 14)
+          ctx.lineTo(startX + 3.5, 14)
+          ctx.lineTo(startX, 19)
+          ctx.closePath()
+          ctx.fill()
+        }
+      }
+      ctx.globalAlpha = 1
+    }
+
+    // Skip-mode ranges
+    if (skipIntervals.length > 0) {
+      ctx.fillStyle = 'rgba(250, 204, 21, 0.07)'
+      for (const interval of skipIntervals) {
+        if (interval.end < view.start || interval.start > view.end) continue
+        const x1 = clamp(toX(interval.start), 0, width)
+        const x2 = clamp(toX(interval.end), 0, width)
+        ctx.fillRect(x1, 16, Math.max(1, x2 - x1), HEIGHT - 16)
+      }
+    }
+
+    // Hatching between the original fill and the final cut. Outer hatching is
+    // padding added by the cut: defect color over the empty track. Inner
+    // hatching is room tone deliberately kept: a neutral, slightly lighter
+    // shade of the track background, with no opaque base so the waveform stays
+    // visible underneath. The active defect is drawn last so overlapping
+    // neighbours cannot cover it.
+    {
+      const drawHatch = (
+        ranges: CutRange[],
+        pattern: CanvasPattern | null,
+        alpha: number,
+        confirmed: boolean
+      ): void => {
+        if (!pattern) return
+        ctx.save()
+        ctx.globalAlpha = alpha * (confirmed ? 0.55 : 1)
+        ctx.fillStyle = pattern
+        for (const range of ranges) {
+          const x1 = clamp(toX(range.start), 0, width)
+          const x2 = clamp(toX(range.end), 0, width)
+          if (x2 - x1 < 1) continue
+          ctx.fillRect(x1, 16, x2 - x1, HEIGHT - 16)
+        }
+        ctx.restore()
+      }
+      const ordered = [...visibleDefects].sort(
+        (a, b) =>
+          Number(a.id === activeDefectId) - Number(b.id === activeDefectId)
+      )
+      for (const defect of ordered) {
+        const cut = cutMap.get(defect.id)
+        if (!cut) continue
+        if (cut.end < view.start || cut.start > view.end) continue
+        const active = defect.id === activeDefectId
+        const layers = cutView(defect, cut)
+        const outerPattern = hatchPattern(ctx, DEFECT_COLORS[defect.type], 0.62)
+        const innerPattern = hatchPattern(ctx, TRACK_BG_LIGHT, 0.9)
+        drawHatch(layers.outer, outerPattern, active ? 1 : 0.85, defect.confirmed)
+        drawHatch(layers.inner, innerPattern, active ? 1 : 0.85, defect.confirmed)
+      }
     }
 
     // Word strip: small marks first, readable labels later. Both are gated per
@@ -290,40 +402,26 @@ export default function Timeline({
       }
     }
 
-    // Defect markers are the first layer of detail: show them even when the
-    // whole recording is zoomed out, before word boundaries appear.
+    // Cut boundary ticks for the non-active defects. The active defect gets
+    // full draggable handles below.
     {
       for (const defect of visibleDefects) {
-        if (defect.end < view.start || defect.start > view.end) continue
-        const x = toX(defect.start)
-        const color = DEFECT_COLORS[defect.type]
-        const active = defect.id === activeDefectId
-        ctx.globalAlpha = defect.confirmed ? 0.18 : active ? 0.95 : 0.6
-        ctx.fillStyle = color
-        if (defect.type === 'pause') {
-          const endX = toX(Math.min(view.end, defect.end))
-          ctx.fillRect(x, 16, Math.max(1.5, endX - x), HEIGHT - 16)
-        } else {
-          ctx.fillRect(x - 1, 16, active ? 2.5 : 1.5, HEIGHT - 16)
+        const cut = cutMap.get(defect.id)
+        if (!cut || defect.id === activeDefectId) continue
+        if (cut.end < view.start || cut.start > view.end) continue
+        ctx.save()
+        ctx.globalAlpha = defect.confirmed ? 0.22 : 0.42
+        ctx.strokeStyle = DEFECT_COLORS[defect.type]
+        ctx.lineWidth = 1
+        for (const time of [cut.start, cut.end]) {
+          if (time < view.start || time > view.end) continue
+          const x = Math.round(toX(time)) + 0.5
           ctx.beginPath()
-          ctx.moveTo(x - 3.5, 14)
-          ctx.lineTo(x + 3.5, 14)
-          ctx.lineTo(x, 19)
-          ctx.closePath()
-          ctx.fill()
+          ctx.moveTo(x, 16)
+          ctx.lineTo(x, HEIGHT)
+          ctx.stroke()
         }
-      }
-      ctx.globalAlpha = 1
-    }
-
-    // Skip-mode ranges
-    if (skipIntervals.length > 0) {
-      ctx.fillStyle = 'rgba(250, 204, 21, 0.07)'
-      for (const interval of skipIntervals) {
-        if (interval.end < view.start || interval.start > view.end) continue
-        const x1 = clamp(toX(interval.start), 0, width)
-        const x2 = clamp(toX(interval.end), 0, width)
-        ctx.fillRect(x1, 16, Math.max(1, x2 - x1), HEIGHT - 16)
+        ctx.restore()
       }
     }
 
@@ -375,14 +473,14 @@ export default function Timeline({
       ctx.strokeRect(x1 + 0.5, 16.5, Math.max(1, x2 - x1 - 1), HEIGHT - 17)
     }
 
-    // Active defect boundaries: both edges are draggable on the timeline.
-    if (activeDefect) {
+    // Active cut handles: both edges are draggable on the timeline.
+    if (activeCut) {
       ctx.save()
       ctx.strokeStyle = 'rgba(244, 193, 105, 0.9)'
       ctx.fillStyle = 'rgba(244, 193, 105, 0.95)'
       ctx.lineWidth = 1.5
       ctx.setLineDash([4, 3])
-      for (const time of [activeDefect.start, activeDefect.end]) {
+      for (const time of [activeCut.start, activeCut.end]) {
         if (time < view.start - 0.5 || time > view.end + 0.5) continue
         const x = toX(time)
         ctx.beginPath()
@@ -422,7 +520,9 @@ export default function Timeline({
     words,
     selectedRange,
     skipIntervals,
+    cutMap,
     activeDefect,
+    activeCut,
     bookmarks,
     HEIGHT,
     wordDefectMap,
@@ -447,8 +547,12 @@ export default function Timeline({
     let nearest: Defect | null = null
     let best = 7
     for (const defect of visibleDefects) {
-      const x = ((defect.start - viewRef.current.start) / span) * rect.width
-      const distance = Math.abs(x - px)
+      const cut = cutMap.get(defect.id)
+      const start = cut ? Math.min(defect.start, cut.start) : defect.start
+      const end = cut ? Math.max(defect.end, cut.end) : defect.end
+      const startX = ((start - viewRef.current.start) / span) * rect.width
+      const endX = ((end - viewRef.current.start) / span) * rect.width
+      const distance = px < startX ? startX - px : px > endX ? px - endX : 0
       if (distance < best) {
         best = distance
         nearest = defect
@@ -458,14 +562,14 @@ export default function Timeline({
   }
 
   const handleAt = (clientX: number): DefectEdge | null => {
-    if (!activeDefect) return null
+    if (!activeDefect || !activeCut) return null
     const wrap = wrapRef.current
     if (!wrap) return null
     const rect = wrap.getBoundingClientRect()
     const span = Math.max(0.001, viewRef.current.end - viewRef.current.start)
     const px = clientX - rect.left
-    const startX = ((activeDefect.start - viewRef.current.start) / span) * rect.width
-    const endX = ((activeDefect.end - viewRef.current.start) / span) * rect.width
+    const startX = ((activeCut.start - viewRef.current.start) / span) * rect.width
+    const endX = ((activeCut.end - viewRef.current.start) / span) * rect.width
     const startDistance = Math.abs(px - startX)
     const endDistance = Math.abs(px - endX)
     const best = Math.min(startDistance, endDistance)
@@ -531,14 +635,24 @@ export default function Timeline({
         return
       }
       boundaryRef.current.defectId = current.id
+      const cut = cutMap.get(current.id)
+      if (!cut) {
+        boundaryRef.current = null
+        return
+      }
       const time = timeFromClientX(event.clientX)
       const bounds = clampDefectEdge(
-        { start: current.start, end: current.end },
+        { start: cut.start, end: cut.end },
         boundaryRef.current.edge,
         time,
         duration
       )
-      setDefectBounds(current.id, bounds.start, bounds.end)
+      setCutBounds(
+        current.id,
+        bounds.start,
+        bounds.end,
+        boundaryRef.current.edge
+      )
       return
     }
 
@@ -584,11 +698,19 @@ export default function Timeline({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onDoubleClick={(event) => {
+        const edge = handleAt(event.clientX)
+        if (!activeDefect || !edge) return
+        event.preventDefault()
+        boundaryRef.current = null
+        setHandleHover(null)
+        resetCutBounds(activeDefect.id)
+      }}
       onPointerLeave={() => {
         setHover(null)
         if (!boundaryRef.current) setHandleHover(null)
       }}
-      title="Клик — перемотка, Shift+драг — выделение области, Ctrl/⌘+колесо — зум, прокрутка — панорама. Границы выбранного дефекта можно двигать мышкой."
+      title="Клик — перемотка, Shift+драг — выделение области, Ctrl/⌘+колесо — зум, прокрутка — панорама. Ручки двигают границы выреза; двойной клик по ручке сбрасывает вырез."
     >
       <canvas ref={canvasRef} />
       <div

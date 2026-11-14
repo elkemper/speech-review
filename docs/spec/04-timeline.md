@@ -98,7 +98,9 @@ manual mark from it without snapping to nearby words.
 - [ ] Zooming never moves a visible label to the other row.
 - [ ] A tile is skipped only when the previous word in its row is closer than 4 px.
 - [ ] No per-word layout state is stored; the rows are a pure function of the index.
-- [ ] Pause defects render as blocks; other defects as markers.
+- [ ] Every defect renders its original span as a fill; the cut handles/ticks
+      and hatching show the final cut: padding is hatched in the defect type
+      color, kept room tone is a neutral, slightly lighter background hatch.
 - [ ] Tests cover the thresholds and the hide-again case.
 - [ ] Marked words use the type color as an underlay (story 41).
 - [ ] Quiet speech stays visible and silence collapses to the baseline (story 42).
@@ -122,6 +124,6 @@ manual mark from it without snapping to nearby words.
 
 ## Verification
 
-- `test/selection.test.ts` covers LOD math and boundary dragging.
+- `test/selection.test.ts` covers LOD math and cut handle dragging.
 - `test/skip.test.ts` covers interval merging.
 - Trackpad behaviour needs a real macOS run.

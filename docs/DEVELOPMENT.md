@@ -191,7 +191,7 @@ If UI, playback, ffmpeg, model or packaging changed:
 - [ ] `npm run fetch:engine` run on the Mac;
 - [ ] model downloads and passes SHA-256;
 - [ ] a real file is transcribed; partial and final transcripts appear;
-- [ ] word click, boundaries, skip, undo/redo and export work;
+- [ ] word click, cut handles, skip, undo/redo and export work;
 - [ ] `npm run package:mac` builds a DMG;
 - [ ] first launch of the DMG verified (ad-hoc signing).
 

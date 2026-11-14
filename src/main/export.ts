@@ -45,6 +45,7 @@ export async function exportProject(
       },
       counts: countDefects(defects),
       defects,
+      cuts: request.cuts ?? [],
       marks
     }
     await writeFile(result.filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')

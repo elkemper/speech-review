@@ -5,7 +5,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent
 } from 'react'
-import { applyDefectOverrides, detectDefectsWithCandidates, sortDefects } from '@shared/defects'
+import { detectDefectsWithCandidates, sortDefects } from '@shared/defects'
 import { formatDuration, formatTimecode } from '@shared/format'
 import { MODEL_SPECS } from '@shared/models'
 import type { Defect, TranscribeProgress } from '@shared/types'
@@ -167,13 +167,13 @@ export default function Workspace() {
   const promotedIds = useMemo<string[]>(() => {
     if (!project) return []
     return [
-      ...Object.keys(project.defectOverrides ?? {}),
+      ...Object.keys(project.cutOverrides ?? {}),
       ...project.confirmedDefectIds,
       ...project.dismissedDefectIds,
       ...Object.keys(project.defectNotes ?? {})
     ].filter((id) => id.startsWith('auto-'))
   }, [
-    project?.defectOverrides,
+    project?.cutOverrides,
     project?.confirmedDefectIds,
     project?.dismissedDefectIds,
     project?.defectNotes
@@ -215,25 +215,23 @@ export default function Workspace() {
     if (!project) return []
     const confirmedIds = new Set(project.confirmedDefectIds)
     const dismissedIds = new Set(project.dismissedDefectIds)
-    const base = applyDefectOverrides(detection.defects, project.defectOverrides).map(
-      (defect) => {
-        const groupDismissed =
-          defect.groupIds && defect.groupIds.length > 0
-            ? defect.groupIds.every((id) => dismissedIds.has(id))
-            : false
-        const dismissed = defect.dismissed || dismissedIds.has(defect.id) || groupDismissed
-        const groupConfirmed =
-          defect.groupIds && defect.groupIds.length > 0
-            ? defect.groupIds.every((id) => confirmedIds.has(id))
-            : false
-        return {
-          ...defect,
-          dismissed,
-          confirmed: !dismissed && (confirmedIds.has(defect.id) || groupConfirmed),
-          note: project.defectNotes[defect.id] ?? defect.note
-        }
+    const base = detection.defects.map((defect) => {
+      const groupDismissed =
+        defect.groupIds && defect.groupIds.length > 0
+          ? defect.groupIds.every((id) => dismissedIds.has(id))
+          : false
+      const dismissed = defect.dismissed || dismissedIds.has(defect.id) || groupDismissed
+      const groupConfirmed =
+        defect.groupIds && defect.groupIds.length > 0
+          ? defect.groupIds.every((id) => confirmedIds.has(id))
+          : false
+      return {
+        ...defect,
+        dismissed,
+        confirmed: !dismissed && (confirmedIds.has(defect.id) || groupConfirmed),
+        note: project.defectNotes[defect.id] ?? defect.note
       }
-    )
+    })
     if (!revealedCandidate) return base
 
     const { reason: _reason, measuredSec: _measuredSec, ...candidate } = revealedCandidate
@@ -248,7 +246,6 @@ export default function Workspace() {
   }, [
     detection.defects,
     revealedCandidate,
-    project?.defectOverrides,
     project?.confirmedDefectIds,
     project?.dismissedDefectIds,
     project?.defectNotes

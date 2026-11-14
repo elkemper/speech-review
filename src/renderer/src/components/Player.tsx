@@ -38,8 +38,13 @@ export default function Player({
 
   const skipIntervals = useMemo(
     () =>
-      buildSkipIntervals(defects, playback, project?.duration ?? 0),
-    [defects, project?.marks, project?.duration, playback]
+      buildSkipIntervals(
+        defects,
+        playback,
+        project?.duration ?? 0,
+        project?.cutOverrides
+      ),
+    [defects, project?.marks, project?.duration, project?.cutOverrides, playback]
   )
   const skipRef = useRef(skipIntervals)
   skipRef.current = skipIntervals

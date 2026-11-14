@@ -8,7 +8,7 @@ import {
   parseRawWords,
   stripTrailingCommas
 } from '../src/shared/transcript'
-import { DEFAULT_RULES, applyDefectOverrides, countDefects, detectDefects } from '../src/shared/defects'
+import { DEFAULT_RULES, countDefects, detectDefects } from '../src/shared/defects'
 import type { Defect, Transcript, Word } from '../src/shared/types'
 
 function fixture(name: string): string {
@@ -215,53 +215,6 @@ describe('manual mark boundaries', () => {
       wordIds: [1],
       note: 'удалённая'
     })
-  })
-})
-
-describe('automatic defect boundary overrides', () => {
-  const base: Defect[] = [
-    {
-      id: 'defect-1',
-      type: 'pause',
-      start: 4,
-      end: 6,
-      wordIds: [],
-      text: '',
-      severity: 'medium',
-      source: 'auto',
-      confirmed: false,
-      dismissed: false,
-      note: ''
-    },
-    {
-      id: 'defect-2',
-      type: 'filler',
-      start: 10,
-      end: 11,
-      wordIds: [3],
-      text: 'ну',
-      severity: 'medium',
-      source: 'auto',
-      confirmed: false,
-      dismissed: false,
-      note: ''
-    }
-  ]
-
-  it('returns the original array when there are no overrides', () => {
-    expect(applyDefectOverrides(base, undefined)).toBe(base)
-    expect(applyDefectOverrides(base, {})).toBe(base)
-  })
-
-  it('replaces only the edited defect bounds', () => {
-    const result = applyDefectOverrides(base, { 'defect-1': { start: 4.5, end: 5.2 } })
-    expect(result[0]).toMatchObject({ id: 'defect-1', start: 4.5, end: 5.2 })
-    expect(result[1]).toBe(base[1])
-  })
-
-  it('normalizes reversed override bounds', () => {
-    const result = applyDefectOverrides(base, { 'defect-2': { start: 12, end: 9 } })
-    expect(result[1]).toMatchObject({ start: 9, end: 12 })
   })
 })
 

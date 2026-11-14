@@ -13,7 +13,7 @@ import {
 } from '../defectsUi'
 import { seekTo } from '../player'
 import { rangeForSelection, defectIdsForSelection } from '../selection'
-import { buildSkipIntervals } from '../skip'
+import { buildSkipIntervals, cutRangeFor } from '../skip'
 import { useApp } from '../store'
 
 const GAP_ROW_MIN_SEC = 2.5
@@ -66,9 +66,29 @@ export default function Transcript({
 
   const skipIntervals = useMemo(
     () =>
-      buildSkipIntervals(defects, playback, project?.duration ?? 0),
-    [defects, project?.marks, project?.duration, playback]
+      buildSkipIntervals(
+        defects,
+        playback,
+        project?.duration ?? 0,
+        project?.cutOverrides
+      ),
+    [defects, project?.marks, project?.duration, project?.cutOverrides, playback]
   )
+
+  const pauseCutDurations = useMemo(() => {
+    const map = new Map<string, number | null>()
+    for (const defect of defects) {
+      if (defect.type !== 'pause') continue
+      const cut = cutRangeFor(
+        defect,
+        playback,
+        project?.duration ?? 0,
+        project?.cutOverrides?.[defect.id]
+      )
+      map.set(defect.id, cut ? cut.end - cut.start : null)
+    }
+    return map
+  }, [defects, playback, project?.duration, project?.cutOverrides])
 
   const isSkippedRange = (start: number, end: number): boolean =>
     skipIntervals.some(
@@ -175,6 +195,7 @@ export default function Transcript({
     if (!word) return null
     const list = wordDefects.get(wordId) ?? []
     const pause = pauseAfter.get(wordId)
+    const pauseCutDuration = pause ? pauseCutDurations.get(pause.id) ?? null : null
     const isActive = activeWord?.id === word.id
     const isSelected = selectedIds.has(word.id)
     const isFocus = selection?.focusId === word.id
@@ -300,7 +321,11 @@ export default function Transcript({
             className={`pause-chip ${pause.severity} ${pause.confirmed ? 'confirmed' : ''} ${
               isSkippedRange(pause.start, pause.end) ? 'skipped' : ''
             }`}
-            title={`${DEFECT_LABELS.pause} · ${(pause.end - pause.start).toFixed(2)} c${
+            title={`${DEFECT_LABELS.pause} · ${(pause.end - pause.start).toFixed(2)} c · ${
+              pauseCutDuration !== null
+                ? `вырез ${pauseCutDuration.toFixed(2)} c`
+                : 'не вырезается'
+            }${
               pause.dismissed
                 ? ' · удалён'
                 : pause.confirmed
@@ -319,7 +344,7 @@ export default function Transcript({
               setFollow(true)
             }}
           >
-            ⏸ {(pause.end - pause.start).toFixed(1)} c
+            ⏸ {pauseCutDuration !== null ? `${pauseCutDuration.toFixed(1)} c` : '—'}
           </button>
         ) : null}{' '}
       </Fragment>
