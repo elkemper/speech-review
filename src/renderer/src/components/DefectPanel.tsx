@@ -56,10 +56,12 @@ function UndoIcon() {
 
 export default function DefectPanel({
   defects,
-  onHide
+  onHide,
+  onVideoExport
 }: {
   defects: Defect[]
   onHide: () => void
+  onVideoExport: () => void
 }) {
   const project = useApp((state) => state.project)
   const filter = useApp((state) => state.filter)
@@ -510,6 +512,9 @@ export default function DefectPanel({
         </button>
         <button className="btn ghost small" onClick={() => void exportAs('json')}>
           JSON
+        </button>
+        <button className="btn ghost small panel-foot-wide" onClick={onVideoExport}>
+          Экспорт видео…
         </button>
       </div>
     </aside>

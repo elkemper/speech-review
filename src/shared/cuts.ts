@@ -153,7 +153,7 @@ export function intervalAt(intervals: CutRange[], time: number): CutRange | null
   return null
 }
 
-/** Ranges that stay after removing every cut. Used by a future video export. */
+/** Ranges that stay after removing every cut. Used by video export. */
 export function complementRanges(cuts: CutRange[], duration: number): CutRange[] {
   if (!(duration > 0)) return []
   const merged = mergeRanges(cuts)

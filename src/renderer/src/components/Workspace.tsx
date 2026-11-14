@@ -17,6 +17,7 @@ import Timeline from './Timeline'
 import Transcript from './Transcript'
 import DefectPanel from './DefectPanel'
 import Bookmarks from './Bookmarks'
+import VideoExportDialog from './VideoExportDialog'
 
 const STEPS: Array<{ phase: TranscribeProgress['phase']; label: string }> = [
   { phase: 'prepare', label: 'Подготовка' },
@@ -84,6 +85,7 @@ export default function Workspace() {
     readStoredNumber('sr.timelineHeight', 120, TIMELINE_MIN, 420)
   )
   const [showBookmarks, setShowBookmarks] = useState(false)
+  const [showVideoExport, setShowVideoExport] = useState(false)
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const rowResizeRef = useRef<{
     kind: 'video' | 'timeline'
@@ -344,6 +346,12 @@ export default function Workspace() {
       </header>
 
       {showBookmarks ? <Bookmarks onClose={() => setShowBookmarks(false)} /> : null}
+      {showVideoExport ? (
+        <VideoExportDialog
+          defects={defects}
+          onClose={() => setShowVideoExport(false)}
+        />
+      ) : null}
 
       <div
         className="workspace-body"
@@ -426,7 +434,11 @@ export default function Workspace() {
               onPointerCancel={endResize}
               title="Перетащите, чтобы изменить ширину панели"
             />
-            <DefectPanel defects={defects} onHide={() => setPanelVisible(false)} />
+            <DefectPanel
+              defects={defects}
+              onHide={() => setPanelVisible(false)}
+              onVideoExport={() => setShowVideoExport(true)}
+            />
           </>
         ) : null}
       </div>

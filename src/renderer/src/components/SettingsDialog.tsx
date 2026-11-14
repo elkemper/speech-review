@@ -560,6 +560,15 @@ export default function SettingsDialog() {
                     применяются к CSV.
                   </div>
                 </section>
+
+                <section className="settings-section">
+                  <h3>Видео</h3>
+                  <div className="hint">
+                    Разрешение, качество, энкодер и режим без перекодирования задаются
+                    в окне «Экспорт видео» в панели дефектов. Параметры последнего
+                    экспорта сохраняются.
+                  </div>
+                </section>
               </>
             ) : null}
           </div>

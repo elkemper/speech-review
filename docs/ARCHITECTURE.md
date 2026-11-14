@@ -58,13 +58,13 @@ User-facing features are listed in `README.md`; the requirement index is `docs/S
 | Area | Modules | Responsibility |
 |---|---|---|
 | App shell | `src/main/index.ts`, `src/preload/index.ts`, `src/renderer/src/App.tsx`, `src/renderer/src/components/Welcome.tsx`, `src/renderer/src/components/Workspace.tsx` | lifecycle, window, menu, typed bridge, entry screen and main grid |
-| IPC and persistence | `src/main/ipc.ts`, `src/main/projects.ts`, `src/main/settings.ts`, `src/main/paths.ts`, `src/main/export.ts` | handlers and dialogs, project files, settings normalization, paths, export writing |
+| IPC and persistence | `src/main/ipc.ts`, `src/main/projects.ts`, `src/main/settings.ts`, `src/main/paths.ts`, `src/main/export.ts`, `src/main/videoExport.ts` | handlers and dialogs, project files, settings normalization, paths, CSV/JSON/video export |
 | Media | `src/main/mediaServer.ts` | privileged `app-media://` scheme with Range support |
 | Engine | `src/main/engine/ffmpeg.ts`, `chunks.ts`, `wav.ts`, `models.ts`, `crisperwhisper.ts`, `proc.ts` | probe/extract/silence, chunk plan, WAV slicing/peaks, model state, CLI invocation, child processes |
-| Shared domain | `src/shared/types.ts`, `transcript.ts`, `defects.ts`, `marks.ts`, `settings.ts`, `models.ts`, `exportCsv.ts`, `format.ts`, `ipc.ts`, `api.ts` | canonical types, pure rules, parsing, export and formatting |
+| Shared domain | `src/shared/types.ts`, `transcript.ts`, `defects.ts`, `marks.ts`, `settings.ts`, `models.ts`, `exportCsv.ts`, `videoExport.ts`, `format.ts`, `ipc.ts`, `api.ts` | canonical types, pure rules, parsing, export and formatting |
 | Renderer state | `src/renderer/src/store.ts`, `history.ts`, `settingsHistory.ts` | app state, save orchestration, undo/redo snapshots and settings labels |
 | Renderer logic | `src/renderer/src/player.ts`, `skip.ts`, `selection.ts`, `timelineView.ts`, `defectsUi.ts`, `defectCardView.ts`, `miniTimeline.ts`, `waveform.ts`, `hooks/useHotkeys.ts` | playback control, intervals, selection, timeline math, labels/cards, mini window, waveform, hotkeys |
-| UI components | `src/renderer/src/components/Player.tsx`, `Timeline.tsx`, `Transcript.tsx`, `DefectPanel.tsx`, `SettingsDialog.tsx`, `DefectRulesSection.tsx`, `SettingsRangeField.tsx`, `HistoryDialog.tsx`, `Bookmarks.tsx`, `MiniTimeline.tsx` | rendering and user interaction |
+| UI components | `src/renderer/src/components/Player.tsx`, `Timeline.tsx`, `Transcript.tsx`, `DefectPanel.tsx`, `SettingsDialog.tsx`, `DefectRulesSection.tsx`, `SettingsRangeField.tsx`, `HistoryDialog.tsx`, `Bookmarks.tsx`, `MiniTimeline.tsx`, `VideoExportDialog.tsx` | rendering and user interaction |
 
 `AGENTS.md` contains the full repository tree; this table is the responsibility map.
 
@@ -84,7 +84,7 @@ User-facing features are listed in `README.md`; the requirement index is `docs/S
 3. The store saves the project with the current settings and calls `transcribe:start`.
 4. Main runs the job and emits `progress`, `partial`, `done` or `error`.
 5. The renderer derives defects from the transcript, project rules and manual marks, and updates the timeline, transcript and defect panel.
-6. Editable changes are debounced to disk and recorded in history. Export calls `export:project`; main opens a save dialog and writes the file.
+6. Editable changes are debounced to disk and recorded in history. Export calls `export:project` for CSV/JSON or `export:video` for the clean video; main opens a save dialog, runs ffmpeg for video, and writes the file.
 
 Behavior of each screen and action is defined in the spec files listed in §10.
 
@@ -136,10 +136,10 @@ transcript + rules + marks
   → Defect[] shown by the UI and used by skip intervals
 ```
 
-- `src/shared/defects.ts` owns detection and grouping. `src/shared/marks.ts` owns logical marks and confirmation reconciliation. `src/shared/cuts.ts` owns the final cut range, the cut list and the complement used by a future video export. All three are pure and tested without Electron.
+- `src/shared/defects.ts` owns detection and grouping. `src/shared/marks.ts` owns logical marks and confirmation reconciliation. `src/shared/cuts.ts` owns the final cut range, the cut list and the complement used by video export. All three are pure and tested without Electron.
 - `Project` is the source of truth for editable state: marks, cut overrides, confirmed IDs, dismissed IDs/marks, notes, rules and skip padding.
 - History (`history.ts`) snapshots only that editable state; `skipEnabled` is player state. See `docs/SPEC.md` (story 32/47) and `DATA_MODEL.md` §9.
-- `src/renderer/src/skip.ts` re-exports `shared/cuts.ts`. `buildCutList` derives every non-dismissed cut, applies per-type or group padding plus the pause room tone, clamps to the duration and merges overlaps; it does not depend on skip mode. `buildSkipIntervals` is the same list only while skip mode is on.
+- `src/renderer/src/skip.ts` re-exports `shared/cuts.ts`. `buildCutList` derives every non-dismissed cut, applies per-type or group padding plus the pause room tone, clamps to the duration and merges overlaps; it does not depend on skip mode. `buildSkipIntervals` is the same list only while skip mode is on. Video export uses the same list through `complementRanges`.
 - A revealed minimum-duration candidate is computed from the active ID and disappears when selection changes; only an explicit cut edit, confirmation, deletion or note promotes it into project state.
 
 The rules themselves — thresholds, enable flags, grouping conditions, candidate promotion and confirmation semantics — are specified in `docs/spec/02-defects.md` and `docs/spec/03-marks.md` and stored as described in `DATA_MODEL.md` §6–8. Do not restate them here.
@@ -169,7 +169,7 @@ Main IPC groups:
 | Projects | `projects:list`, `projects:create`, `projects:load`, `projects:save`, `projects:delete` |
 | Transcription | `transcribe:start`, `transcribe:cancel`; events: `transcribe:progress`, `transcribe:partial`, `transcribe:done`, `transcribe:error` |
 | Models | `models:download`, `models:state`, `models:delete`; event: `models:progress` |
-| Export/shell | `export:project`, `shell:show-item` |
+| Export/shell | `export:project`, `export:video`, `export:video:cancel`, `shell:show-item`; event: `export:video:progress` |
 
 `invoke` channels return a result and fail through a rejected promise. Progress, partial, done, error and model-progress channels are main→renderer events and are subscribed to through preload.
 
@@ -185,7 +185,7 @@ Main IPC groups:
 | Playback, skip/padding, listen, bookmarks, clean playback | [`06-playback.md`](spec/06-playback.md), [`06a`](spec/06a-clean-playback.md) |
 | Layout, undo/redo, visual language | [`07-layout-history-visual.md`](spec/07-layout-history-visual.md), [`07a`](spec/07a-visual-refresh.md) |
 | Progress, chunk length, streaming ASR | [`08-processing-progress.md`](spec/08-processing-progress.md), [`08a`](spec/08a-streaming-asr.md) |
-| CSV and JSON export | [`09-export.md`](spec/09-export.md) |
+| CSV, JSON and video export | [`09-export.md`](spec/09-export.md) |
 
 Status triage and cross-cutting product invariants are in [`SPEC.md`](SPEC.md).
 
@@ -194,6 +194,8 @@ Status triage and cross-cutting product invariants are in [`SPEC.md`](SPEC.md).
 - The model is reloaded between chunks, and interrupted transcription cannot be resumed.
 - Automatic IDs depend on detection order, so changing rules can reset the review mapping.
 - No diarization, transcript search, SRT/VTT or light theme.
+- Video export in stream-copy mode cuts at keyframes; only a re-encode is
+  frame-accurate. Audio-only export is not implemented.
 - No e2e tests; Electron, real media playback, the engine and packaging are not verified in the Linux development container.
 
 Full deferred list — `docs/BACKLOG.md`; platform and test limits — `docs/TESTING.md` and `docs/DEVELOPMENT.md`.

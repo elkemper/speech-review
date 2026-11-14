@@ -11,7 +11,7 @@ npm run typecheck     # checks main/preload/shared and renderer types separately
 npm run build         # checks that the production build succeeds
 ```
 
-Current state: **189 tests in 13 files**. A run takes less than a second in the Linux container.
+Current state: **202 tests in 14 files**. A run takes less than a second in the Linux container.
 
 ## 2. Configuration
 
@@ -48,6 +48,7 @@ Current state: **189 tests in 13 files**. A run takes less than a second in the 
 | `test/marks.test.ts` | 14 | merge on add, split, logical mark ID, combined bounds/words/notes, confirmation reconciliation on merge/split, new marks, cut-span capture, edge-specific capture and nested override scope |
 | `test/selection.test.ts` | 39 | selection range in both directions, exact mark boundaries, exact time range, defect overlap, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, cut handle dragging, bulk confirmation/deletion of a selection, mini timeline zoom/pan and colored word mapping |
 | `test/skip.test.ts` | 27 | padding and interval merging, pause room tone and minimum cut, cut overrides, cut view hatching, complement and subtract ranges, all non-dismissed items, dismissed and candidate filtering, clamp/disabled, interval lookup |
+| `test/videoExport.test.ts` | 13 | video settings normalization, filter graph, CRF/q:v encoder args, copy args, concat-list escaping, duration and progress parsing |
 | `test/waveform.test.ts` | 9 | waveform statistics (noise floor, loud reference, degenerate input), contrast lookup table (linear mode, gamma lift, gate, monotonicity), signed mapping |
 
 ## 4. Fixtures
@@ -74,6 +75,7 @@ Expectations that must not be changed without replacing the fixture:
 - project save/load/delete and defect-state reset;
 - partial transcripts and confirmation-state merging in the renderer;
 - IPC contracts and preload;
+- real ffmpeg video export, VideoToolbox and stream-copy keyframe behaviour;
 - React components, canvas timeline rendering, transcript virtualization;
 - real `audiocpp_cli` and Metal execution;
 - DMG packaging and ad-hoc signing.
@@ -98,6 +100,8 @@ These are deliberate MVP limitations. When improving these areas, extract a pure
 - [ ] If IDs, confirmation state, grouping, minimum duration, skip padding or cut handles changed, tests in `core`, `marks`, `selection`, `skip` or `grouping` are updated.
 - [ ] If the parser/chunking/WAV changed, `core` or `engine` is updated.
 - [ ] If CSV changed, `export` is updated.
+- [ ] If the video export command, filter graph or concat list changed,
+      `videoExport` is updated.
 
 ## 8. Environment limitations
 

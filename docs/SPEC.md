@@ -50,7 +50,7 @@ only the area it is working on.
 | [`07a-visual-refresh.md`](spec/07a-visual-refresh.md) | 33 detail | Photoshop/Audacity-style refresh |
 | [`08-processing-progress.md`](spec/08-processing-progress.md) | 35–37 | Progress semantics, chunk length, streaming |
 | [`08a-streaming-asr.md`](spec/08a-streaming-asr.md) | 37 detail | Streaming recognition |
-| [`09-export.md`](spec/09-export.md) | 38–39 | CSV and JSON |
+| [`09-export.md`](spec/09-export.md) | 38–39, 48 | CSV, JSON and video export |
 | [`10-mini-timeline.md`](spec/10-mini-timeline.md) | 40 | Selected defect snippet with editable cut handles |
 
 ## Product invariants
@@ -87,6 +87,10 @@ Applies to every story.
 12. **Atomic writes** (`*.tmp` + `rename`) for project, transcript, peaks and
     settings.
 13. **Do not replace `node_modules`** in the Linux container.
+14. **Video export uses the same cut model.** `buildCutList` plus
+    `complementRanges` produce the exported ranges; do not add a second cut
+    model. Stream-copy export is keyframe-bound, re-encode is frame-accurate.
+    Audio-only export is backlog.
 
 ## Decisions
 
@@ -96,6 +100,9 @@ Applies to every story.
   mini-timeline), Export (CSV fields/format). Skip mode is controlled in the
   player, not in Settings; there is no scope selector. The earlier "Recognition" tab
   wording is superseded; recognition settings live in General.
+- **Video export** is a dialog from the defect panel, not a Settings tab. It
+  uses the cut list, supports software CRF and hardware VideoToolbox quality
+  presets, and keeps its last choices in `settings.videoExport`.
 - **Clean playback** (story 29) is a separate mode from review skip. It must
   not weaken invariant 6.
 - **Partial recognition** is chunk-by-chunk. No intra-chunk streaming yet
@@ -138,10 +145,11 @@ Applies to every story.
 | 29 / `06a` | Clean playback without marked places (needs approval) |
 | 33 / `07a` | Visual refresh toward Photoshop/Audacity 3 |
 | 37 / `08a` | Streaming ASR |
+| `BACKLOG` §22 | Audio-only export and audio-file cuts |
 
 ### Done — do not regress
 
-Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–47.
+Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48.
 Verification only (implemented, needs a pass): 9, 24.
 
 ## Related documents

@@ -73,10 +73,6 @@ CSV/JSON already exist. Useful for editing:
 - EDL/FCPXML with a cut list;
 - `file:///...#t=12.34` links for jumping from a table.
 
-### Video export from the cut list
-
-`buildCutList` in `src/shared/cuts.ts` already returns the final merged cuts, and `complementRanges` returns the ranges that stay. A future "export cut video" command can feed those ranges to ffmpeg (`select`/`aselect` + concat) without touching the original. The CSV base columns and the JSON `cuts` array are already the editor-facing form; the original defect bounds are optional columns. Do not introduce a second cut model: playback, the timeline hatching and video export must all use the same `buildCutList`.
-
 ## 9. Transcript search
 
 There is no word search field. Needed:
@@ -162,3 +158,19 @@ Pauses are shown as separate chips and separator rows, but they cannot be turned
 ## 21. Light theme and appearance switcher
 
 The theme is currently dark only, in the spirit of Photoshop. Needed: a light palette, a switcher in settings, and persistence of the choice. Defect color contrast on a light background should be checked separately.
+
+## 22. Audio-only export and audio-file cuts
+
+Video export is implemented as story 48. Recordings without a video track still
+cannot be exported: the app creates a project for MP3/WAV/M4A, but the export
+dialog rejects a source without a video stream.
+
+Needed:
+
+- an audio-only path that uses the same `buildCutList`/`complementRanges` and
+  stream-copy or AAC re-encode;
+- an output container that follows the source (M4A/MP3/WAV/Opus);
+- the same progress, cancellation and `.part`/rename safety as video export.
+
+Do not introduce a second cut model: playback, the timeline hatching, CSV/JSON
+and both export paths must use the same `buildCutList`.

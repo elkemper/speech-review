@@ -9,7 +9,8 @@ import type {
   MediaInfo,
   ModelId,
   Settings,
-  TranscribeRequest
+  TranscribeRequest,
+  VideoExportRequest
 } from '@shared/types'
 import { engineBinary, ffmpegBinary } from './paths'
 import { probeMedia } from './engine/ffmpeg'
@@ -24,6 +25,7 @@ import {
   saveProject
 } from './projects'
 import { exportProject } from './export'
+import { cancelVideoExport, exportVideo } from './videoExport'
 import { loadSettings, saveSettings } from './settings'
 
 const MEDIA_EXTENSIONS = new Set([
@@ -172,6 +174,15 @@ export function registerIpc(dependencies: IpcDependencies): TranscriptionManager
 
   ipcMain.handle(IPC.exportProject, async (_event, request: ExportRequest) => {
     return exportProject(getWindow(), request)
+  })
+
+  ipcMain.handle(IPC.exportVideo, async (_event, request: VideoExportRequest) => {
+    return exportVideo(getWindow(), request, (progress) =>
+      send(IPC.videoExportProgress, progress)
+    )
+  })
+  ipcMain.handle(IPC.exportVideoCancel, async () => {
+    cancelVideoExport()
   })
 
   ipcMain.handle(IPC.shellShowItem, async (_event, path: string) => {

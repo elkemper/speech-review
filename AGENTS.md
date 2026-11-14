@@ -34,7 +34,8 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 - **`node_modules` is the macOS arm64 install.** It is kept in the repository workspace for packaging. Do **not** run `npm install`, `npm ci`, or replace `node_modules` in the Linux development container. `node_modules_linux/` is a stale Linux tree; it is gitignored and excluded from Vitest. If a dependency must change, edit `package.json`/`package-lock.json` and ask the user to install on the Mac.
 - **Dark theme only.** Do not add a light theme or a theme switcher unless the task explicitly asks for it.
 - **Word confidence / `unclear` is backlog.** `audiocpp_cli` currently writes `confidence: 0`. The parser stores `null` when no positive confidence exists and the `unclear` rule is disabled. Do not enable it by default or treat `0` as a low-confidence signal.
-- **Skip mode cuts every defect and manual mark except dismissed ones.** Confirmation is a review marker only and does not affect playback. See `src/shared/cuts.ts`.
+- **Skip mode cuts every defect and manual mark except dismissed ones.** Confirmation is a review marker only and does not affect playback or video export. See `src/shared/cuts.ts`.
+- **Video export uses the same cut list.** `buildCutList` plus `complementRanges` are the only source of exported ranges; do not introduce a second cut model. Stream-copy export is keyframe-bound; re-encode is frame-accurate. Audio-only export is deferred.
 - **Do not silently change defect-lifecycle semantics.** Automatic defect IDs are order-based; manual marks have explicit group IDs; confirmed state is reconciled when marks merge/split; deleted manual marks live in `dismissedMarks`, deleted automatic IDs in `dismissedDefectIds`. See `docs/DATA_MODEL.md`.
 - **History is for editable project state only:** marks, confirmed IDs, dismissed IDs, dismissed marks, notes, cut overrides, the project defect rules and the skip padding that drives recalculation. Do not put skip mode, playback position, filters, selection, transcript, model/language/export or UI-only settings into undo/redo snapshots. While the settings dialog is open, undo is limited to settings changes made since it was opened.
 - **Do not commit generated or binary artifacts:** `out/`, `dist/`, `resources/engine/`, `resources/ffmpeg/`, `node_modules/`, `node_modules_linux/` are ignored.
@@ -52,6 +53,7 @@ src/
 │   ├── paths.ts          userData, resources, models, projects, tmp paths
 │   ├── mediaServer.ts    app-media:// protocol with HTTP Range support
 │   ├── export.ts         CSV/JSON save dialog and file writing
+│   ├── videoExport.ts    video export dialog, ffmpeg args, progress and cancel
 │   └── engine/
 │       ├── chunks.ts     silence-aware chunk planner
 │       ├── crisperwhisper.ts  audiocpp_cli invocation and words.json parsing
@@ -71,6 +73,7 @@ src/
 │   ├── marks.ts          logical manual marks, confirmation reconciliation
 │   ├── cuts.ts           final cut ranges, merging, complement for video export
 │   ├── exportCsv.ts      CSV formatting
+│   ├── videoExport.ts    pure ffmpeg args, filter graph and concat list
 │   └── format.ts         timecodes, bytes, clamp
 └── renderer/src/         React renderer
     ├── store.ts          zustand app state, persistence orchestration, history
@@ -84,7 +87,7 @@ src/
     ├── hooks/useHotkeys.ts
     └── components/       Welcome, Workspace, Player, Timeline, Transcript,
                           DefectPanel, SettingsDialog, DefectRulesSection,
-                          SettingsRangeField, HistoryDialog
+                          SettingsRangeField, HistoryDialog, VideoExportDialog
 scripts/                  engine/ffmpeg fetch, platform/resource checks, after-pack
 test/                     Vitest suites and fixtures
 ```
@@ -94,7 +97,7 @@ test/                     Vitest suites and fixtures
 | Command | What it does | Works in this Linux container? |
 |---|---|---|
 | `npm run typecheck` | `tsc --noEmit` for node and web configs | Yes |
-| `npm test` | Vitest run (189 tests / 13 files) | Yes |
+| `npm test` | Vitest run (202 tests / 14 files) | Yes |
 | `npm run test:watch` | Vitest watch mode | Yes |
 | `npm run build` | electron-vite production build into `out/` | Yes |
 | `npm run dev` | electron-vite dev + Electron | **No** (needs macOS + macOS Electron) |
@@ -140,7 +143,7 @@ If you changed UI behavior or runtime code, also state clearly that Electron, `a
 - **Cut edits:** `Project.cutOverrides[defectId]` stores the final cut range for every defect. `Defect.start/end` and `ManualMark.start/end` remain the detected/marked span (the fill). The timeline handles edit the cut, not the defect. An explicit override wins over padding and `pauseKeepSec`; a double-click on a handle resets it to the derived cut.
 - **Manual grouping is explicit.** `mergeMarkNeighbours` runs when a mark is added, and `mergeMarksAtSpan` runs when a cut handle captures a neighbour. The marks keep their original bounds, the captured marks join a group, and every nested cut override is dropped. Do not regroup all marks on every render; that would undo an intentional split.
 - **First partial transcript resets defect lifecycle state** (`confirmedDefectIds`, `dismissedDefectIds`, notes, cut overrides) because automatic IDs may change. Later partials preserve the user's local edits to the already visible prefix. `marks` and `dismissedMarks` survive.
-- **Cut ranges** are derived by `cutRangeFor` from per-type padding and `pauseKeepSec`, unless `cutOverrides` has an explicit range. `buildCutList` is independent of skip mode and is the source for timeline hatching, the mini timeline and future video export; `buildSkipIntervals` is `skipEnabled ? buildCutList : []`. Padding is resolved per defect type, and a logical group (manual or automatic) uses `playback.groupPadding` instead of per-member padding. A standalone pause keeps `playback.pauseKeepSec` of room tone split across both edges (0 removes the whole silence); a derived cut shorter than 0.2 s is not performed, while an explicit override is honoured. There is no skip scope: automatic defects and manual marks are cut together.
+- **Cut ranges** are derived by `cutRangeFor` from per-type padding and `pauseKeepSec`, unless `cutOverrides` has an explicit range. `buildCutList` is independent of skip mode and is the source for timeline hatching, the mini timeline, JSON export and video export; `buildSkipIntervals` is `skipEnabled ? buildCutList : []`. Padding is resolved per defect type, and a logical group (manual or automatic) uses `playback.groupPadding` instead of per-member padding. A standalone pause keeps `playback.pauseKeepSec` of room tone split across both edges (0 removes the whole silence); a derived cut shorter than 0.2 s is not performed, while an explicit override is honoured. There is no skip scope: automatic defects and manual marks are cut together.
 - **Automatic grouping** is opt-in through `rules.autoGroupEnabled` plus `rules.autoGroupGapSec` (and a gap of 0 disables it at the data level). Neighbouring automatic defects merge only when the gap is within the limit and no real spoken word sits inside the gap. The result carries `groupIds` / `groupTypes` and the id `auto-group-${firstId}`.
 - **Defect types can be switched off** with `rules.enabledTypes`. A disabled type produces no defects, but the detection sequence still advances, so the ids of the other types stay stable. `manual` is never filtered.
 - **Minimum duration** is a per-type rule (`rules.minDurationByType`). For pauses it measures the silence and is the only pause threshold: the default is 1.2 s, it is clamped to 0.3–10 s, and a shorter gap is neither a defect nor a candidate. For repetitions it measures the shorter repeated word. For other types a match below the limit is returned as a hidden `DefectCandidate` with the same automatic ID; it is not a defect until `promotedIds` contains it.

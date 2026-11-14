@@ -18,7 +18,9 @@ import type {
   TranscribeError,
   TranscribePartial,
   TranscribeProgress,
-  TranscribeRequest
+  TranscribeRequest,
+  VideoExportProgress,
+  VideoExportRequest
 } from '@shared/types'
 
 function subscribe<T>(channel: string, callback: (payload: T) => void): () => void {
@@ -76,6 +78,11 @@ const api: AppApi = {
 
   exportProject: (input: ExportRequest): Promise<string | null> =>
     ipcRenderer.invoke(IPC.exportProject, input),
+  exportVideo: (input: VideoExportRequest): Promise<string | null> =>
+    ipcRenderer.invoke(IPC.exportVideo, input),
+  cancelVideoExport: (): Promise<void> => ipcRenderer.invoke(IPC.exportVideoCancel),
+  onVideoExportProgress: (callback: (progress: VideoExportProgress) => void): (() => void) =>
+    subscribe(IPC.videoExportProgress, callback),
 
   showItemInFolder: (path: string): Promise<void> =>
     ipcRenderer.invoke(IPC.shellShowItem, path)

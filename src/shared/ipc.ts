@@ -16,10 +16,13 @@ export const IPC = {
   modelsState: 'models:state',
   modelsDelete: 'models:delete',
   exportProject: 'export:project',
+  exportVideo: 'export:video',
+  exportVideoCancel: 'export:video:cancel',
   shellShowItem: 'shell:show-item',
   transcribeProgress: 'transcribe:progress',
   transcribePartial: 'transcribe:partial',
   transcribeDone: 'transcribe:done',
   transcribeError: 'transcribe:error',
-  modelProgress: 'models:progress'
+  modelProgress: 'models:progress',
+  videoExportProgress: 'export:video:progress'
 } as const

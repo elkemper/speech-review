@@ -224,6 +224,22 @@ export interface ExportSettings {
   includeHeader: boolean
 }
 
+export type VideoExportResolution = 'source' | '1080' | '720' | '480'
+export type VideoExportQuality = 'high' | 'balanced' | 'compact'
+export type VideoExportEncoder =
+  | 'h264'
+  | 'hevc'
+  | 'h264_videotoolbox'
+  | 'hevc_videotoolbox'
+
+export interface VideoExportSettings {
+  /** Stream copy: no re-encode, cuts snap to keyframes. */
+  copyMode: boolean
+  resolution: VideoExportResolution
+  quality: VideoExportQuality
+  encoder: VideoExportEncoder
+}
+
 /**
  * A defect prepared for export. `start`/`end` are the original detected or
  * marked span; `cutStart`/`cutEnd` are the final cut bounds. A `null` cut means
@@ -263,6 +279,7 @@ export interface Settings {
   rules: DefectRules
   chunkTargetSec: number
   export: ExportSettings
+  videoExport: VideoExportSettings
   playback: PlaybackSettings
   /** Context shown on each side of the selected defect in the mini timeline. */
   miniTimelinePadSec: number
@@ -352,4 +369,24 @@ export interface ExportRequest {
   cuts: CutRange[]
   format: 'csv' | 'json'
   exportSettings: ExportSettings
+}
+
+export interface VideoExportRequest {
+  projectId: string
+  projectName: string
+  videoPath: string
+  duration: number
+  /** Merged final cuts. The main process derives the kept ranges from them. */
+  cuts: CutRange[]
+  settings: VideoExportSettings
+}
+
+export interface VideoExportProgress {
+  projectId: string
+  phase: 'prepare' | 'render' | 'finalize'
+  /** 0–100. Stays below 100 until ffmpeg exits successfully. */
+  percent: number
+  processedSec: number
+  totalSec: number
+  message: string
 }

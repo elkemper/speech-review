@@ -30,6 +30,7 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Skip mode: during playback, automatically cut every defect and manual mark except deleted ones, with configurable padding. Confirmation does not affect playback.
 - Deleted defects stay as thin cards with an undo button when "Show deleted defects" is enabled. Confirmed cards collapse to a compact row with an undo button. Pending cards have delete/confirm buttons on the left.
 - Export defects to CSV (Excel) and JSON; CSV fields and delimiter are configurable. The base CSV columns are the final cut bounds; the original defect bounds are optional extra columns. JSON also contains the merged `cuts` list for a video editor.
+- Export a clean video from the current marks: resolution, three quality presets, software H.264/HEVC or hardware VideoToolbox encoders, and a no-re-encode mode for fast keyframe-bound cutting. Progress can be cancelled; the source file is never modified.
 - Photoshop-like dark theme, automatic project save after every action.
 
 ## Requirements
@@ -57,7 +58,7 @@ Then in the app:
 1. Open **Settings** → **General** → **Download model** (Q8_0, ~1.6 GB). A downloaded model can also be deleted there.
 2. Click **Open recording** and choose MP4/MOV/MKV/MP3/WAV.
 3. Click **Transcribe**. Finished chunks appear in the transcript as they are processed.
-4. Review defects on the right: confirm real ones or delete false positives, then export the result.
+4. Review defects on the right: confirm real ones or delete false positives, then export CSV/JSON or a clean video with **Экспорт видео…**.
 
 The model is downloaded from Hugging Face and verified by SHA-256. It does not need to be downloaded again.
 

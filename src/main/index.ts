@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { cacheDir, isDev, modelsDir, projectsDir, tempDir } from './paths'
 import { registerMediaProtocol } from './mediaServer'
 import { registerIpc } from './ipc'
+import { cancelVideoExport } from './videoExport'
 import type { TranscriptionManager } from './jobs'
 
 protocol.registerSchemesAsPrivileged([
@@ -217,5 +218,6 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     manager?.cancelAll()
+    cancelVideoExport()
   })
 }

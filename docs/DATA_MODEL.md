@@ -44,6 +44,7 @@ Speech Review/
 | `rules` | `DEFAULT_RULES` | defect rules |
 | `chunkTargetSec` | `600` | target chunk length, 120–900 s |
 | `export` | see below | CSV fields and format |
+| `videoExport` | see below | video export resolution, quality, encoder and copy mode |
 | `playback` | see below | skip mode and padding |
 | `miniTimelinePadSec` | `3` | context on each side of the selected defect in the mini timeline |
 | `waveformContrast` | `55` | display-only waveform contrast, 0 = linear |
@@ -81,6 +82,14 @@ Speech Review/
 - `delimiter` — `;` or `,`;
 - `includeHeader` — `true` by default.
 
+`videoExport`:
+
+- `copyMode` — `false` by default; `true` means stream copy and keyframe-bound cuts;
+- `resolution` — `source` / `1080` / `720` / `480`;
+- `quality` — `high` / `balanced` / `compact`;
+- `encoder` — `h264` / `hevc` / `h264_videotoolbox` / `hevc_videotoolbox`.
+  The software encoders use CRF; VideoToolbox uses `-q:v`.
+
 `playback`:
 
 - `skipEnabled` — `false` by default;
@@ -101,6 +110,7 @@ Padding is resolved when the cut list is built and does not depend on `skipEnabl
 - `rules` is merged with missing `DEFAULT_RULES` fields;
 - `chunkTargetSec` is rounded and clamped to 120–900;
 - `export.fields` is filtered to known fields; an empty list is replaced with the default base fields; the legacy `reviewed` field is migrated to `confirmed`;
+- `videoExport` is normalized by `normalizeVideoExportSettings`: unknown resolution, quality or encoder values fall back to `source` / `balanced` / `h264`, and `copyMode` becomes `true` only for a literal `true`;
 - `playback` is normalized by `normalizePlaybackSettings`: every per-type padding entry is filled from the defaults, padding values are clamped to 0–5 s and `pauseKeepSec` is clamped to 0–3 s;
 - `miniTimelinePadSec` is clamped to 0–15 s (`normalizeMiniTimelinePad`);
 - `waveformContrast` is rounded and clamped to 0–100 (`normalizeWaveformContrast`);
@@ -414,3 +424,13 @@ JSON:
 ```
 
 JSON always contains the full set of defect fields and the original manual marks; field settings apply only to CSV. `counts` contains every defect type, including zeros, and a grouped defect is counted once per type in `groupTypes`.
+
+Video export:
+
+- takes the merged `cuts` from `buildCutList`, derives the kept ranges with
+  `complementRanges` and never creates a second cut model;
+- writes the result to a `.part-<uuid>` file in the destination directory and
+  renames it only after ffmpeg exits successfully;
+- stores only the last dialog choices in `settings.videoExport`, not in the
+  project or history;
+- does not modify the source file. Audio-only export is deferred.

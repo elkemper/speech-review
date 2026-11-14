@@ -2,8 +2,10 @@
 
 [Index](../SPEC.md) · Prev: [08 — Processing](08-processing-progress.md)
 
-**Files:** `src/shared/exportCsv.ts`, `src/main/export.ts`,
+**Files:** `src/shared/exportCsv.ts`, `src/shared/videoExport.ts`,
+`src/main/export.ts`, `src/main/videoExport.ts`,
 `src/renderer/src/components/DefectPanel.tsx`,
+`src/renderer/src/components/VideoExportDialog.tsx`,
 `src/renderer/src/components/SettingsDialog.tsx` (Export tab).
 
 ## Stories
@@ -43,6 +45,40 @@ type and the merged cut list for a video editor.
 - Grouped defect counts once per type in `groupTypes`.
 - Field selection applies to CSV only.
 
+### Story 48 — Video export from the cut list
+
+**Status:** Done · **Priority:** P1
+
+As a user, I want to save a clean video with every marked place removed, choosing
+resolution, quality, encoder or a fast stream-copy cut.
+
+- The entry point is a full-width **«Экспорт видео…»** button under the CSV and
+  JSON buttons in the defect panel.
+- Export uses the same cut model as playback and JSON export:
+  `buildCutList` + `complementRanges`. Confirmation does not matter; dismissed
+  defects and manual marks are excluded, and a transient minimum-duration
+  candidate is not exported.
+- Re-encoding: `trim`/`atrim` per kept range + `concat`, optional
+  `scale=-2:<height>`, H.264/HEVC, AAC 192 kbps, MP4/MOV.
+- Resolution: source / 1080p / 720p / 480p.
+- Quality is three presets. Software encoders use CRF: H.264 18/23/28 and HEVC
+  22/27/32. VideoToolbox has no CRF, so the same presets are sent to the
+  hardware encoder as `-q:v` 75/60/45.
+- Encoders: H.264 and HEVC, each in software (`libx264`/`libx265`) and hardware
+  (`h264_videotoolbox`/`hevc_videotoolbox`) variants.
+- **«Без перекодирования»** uses the concat demuxer with `inpoint`/`outpoint`
+  and `-c copy`. It keeps the source container, disables resolution/quality/
+  encoder controls and warns that cuts snap to keyframes.
+- The save dialog defaults to `<project>-clean.<ext>` in Downloads. The output
+  path cannot equal the source path. ffmpeg writes a `.part-<uuid>` file in the
+  destination directory and the result is renamed into place only on success.
+- One export runs at a time. Progress comes from `-progress pipe:1`; the dialog
+  can cancel the ffmpeg process. The source file is never modified.
+- The last choices live in `settings.videoExport` and are not part of undo/redo
+  or project state.
+- Audio-only recordings are out of scope; export reports that there is no video
+  track. Audio-file export is tracked in `docs/BACKLOG.md`.
+
 ## Acceptance criteria
 
 ### Story 38
@@ -68,8 +104,28 @@ type and the merged cut list for a video editor.
 - [ ] Field selection does not reduce JSON.
 - [ ] Exact manual mark notes and ids are preserved.
 
+### Story 48
+
+- [ ] The button sits under the CSV/JSON buttons and opens the video dialog.
+- [ ] The dialog shows the number of cuts and the removed/remaining duration.
+- [ ] Every non-dismissed cut is removed; dismissed items and candidates are not.
+- [ ] Re-encode uses `trim`/`atrim` + `concat`, resets timestamps and optionally
+      scales to the selected height.
+- [ ] Software H.264/HEVC use the configured CRF; hardware encoders use `-q:v`.
+- [ ] HEVC in MP4/MOV gets the `hvc1` tag.
+- [ ] Stream-copy mode uses `-c copy`, keeps the source container and disables
+      the resolution/quality/encoder controls.
+- [ ] The source file is never overwritten; a successful export replaces the
+      destination atomically.
+- [ ] Progress and cancellation work; a cancelled or failed export leaves no
+      partial output.
+- [ ] `settings.videoExport` persists and does not enter history.
+- [ ] An audio-only source is rejected with a clear message.
+
 ## Verification
 
 - `test/export.test.ts` covers fields, escaping, delimiter, header, cut vs
   defect bounds and uncut rows.
+- `test/videoExport.test.ts` covers settings normalization, filter graph,
+  CRF/q:v args, copy args, concat-list escaping and progress parsing.
 - JSON shape is covered indirectly; extend the test when the shape changes.

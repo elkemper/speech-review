@@ -17,7 +17,9 @@ import type {
   TranscribeError,
   TranscribePartial,
   TranscribeProgress,
-  TranscribeRequest
+  TranscribeRequest,
+  VideoExportProgress,
+  VideoExportRequest
 } from './types'
 
 export interface AppApi {
@@ -51,6 +53,9 @@ export interface AppApi {
   onMenuAction(callback: (action: string) => void): () => void
 
   exportProject(input: ExportRequest): Promise<string | null>
+  exportVideo(input: VideoExportRequest): Promise<string | null>
+  cancelVideoExport(): Promise<void>
+  onVideoExportProgress(callback: (progress: VideoExportProgress) => void): () => void
 
   showItemInFolder(path: string): Promise<void>
 }

@@ -10,6 +10,7 @@ import {
   normalizeChunkTarget,
   normalizeMiniTimelinePad,
   normalizePlaybackSettings,
+  normalizeVideoExportSettings,
   normalizeWaveformContrast
 } from '@shared/settings'
 import type {
@@ -25,6 +26,7 @@ const DEFAULTS: Settings = {
   ...DEFAULT_SETTINGS,
   rules: normalizeRules(DEFAULT_SETTINGS.rules),
   export: { ...DEFAULT_SETTINGS.export, fields: [...DEFAULT_SETTINGS.export.fields] },
+  videoExport: { ...DEFAULT_SETTINGS.videoExport },
   playback: normalizePlaybackSettings(DEFAULT_SETTINGS.playback)
 }
 
@@ -76,6 +78,7 @@ export async function loadSettings(): Promise<Settings> {
       rules: normalizeRules(parsed.rules),
       chunkTargetSec: normalizeChunkTarget(parsed.chunkTargetSec),
       export: normalizeExport(parsed.export),
+      videoExport: normalizeVideoExportSettings(parsed.videoExport),
       playback: normalizePlaybackSettings(parsed.playback),
       miniTimelinePadSec: normalizeMiniTimelinePad(parsed.miniTimelinePadSec),
       waveformContrast: normalizeWaveformContrast(parsed.waveformContrast),
@@ -86,6 +89,7 @@ export async function loadSettings(): Promise<Settings> {
       ...DEFAULTS,
       rules: normalizeRules(DEFAULT_SETTINGS.rules),
       export: { ...DEFAULT_EXPORT_SETTINGS, fields: [...DEFAULT_EXPORT_SETTINGS.fields] },
+      videoExport: { ...DEFAULT_SETTINGS.videoExport },
       playback: normalizePlaybackSettings(DEFAULT_PLAYBACK_SETTINGS)
     }
   }

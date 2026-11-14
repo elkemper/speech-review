@@ -5,7 +5,11 @@ import type {
   ExportSettings,
   PlaybackSettings,
   Settings,
-  SkipPadding
+  SkipPadding,
+  VideoExportEncoder,
+  VideoExportQuality,
+  VideoExportResolution,
+  VideoExportSettings
 } from './types'
 
 export const DEFAULT_EXPORT_FIELDS: ExportField[] = [
@@ -56,6 +60,69 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   fields: [...DEFAULT_EXPORT_FIELDS],
   delimiter: ';',
   includeHeader: true
+}
+
+export const VIDEO_EXPORT_RESOLUTIONS: VideoExportResolution[] = [
+  'source',
+  '1080',
+  '720',
+  '480'
+]
+
+export const VIDEO_EXPORT_QUALITIES: VideoExportQuality[] = [
+  'high',
+  'balanced',
+  'compact'
+]
+
+export const VIDEO_EXPORT_ENCODERS: VideoExportEncoder[] = [
+  'h264',
+  'hevc',
+  'h264_videotoolbox',
+  'hevc_videotoolbox'
+]
+
+export const VIDEO_EXPORT_RESOLUTION_LABELS: Record<VideoExportResolution, string> = {
+  source: 'Как в источнике',
+  '1080': '1080p',
+  '720': '720p',
+  '480': '480p'
+}
+
+export const VIDEO_EXPORT_QUALITY_LABELS: Record<VideoExportQuality, string> = {
+  high: 'Высокое',
+  balanced: 'Сбалансированное',
+  compact: 'Компактное'
+}
+
+export const VIDEO_EXPORT_ENCODER_LABELS: Record<VideoExportEncoder, string> = {
+  h264: 'H.264 · программный',
+  hevc: 'HEVC · программный',
+  h264_videotoolbox: 'H.264 · аппаратный',
+  hevc_videotoolbox: 'HEVC · аппаратный'
+}
+
+export const DEFAULT_VIDEO_EXPORT_SETTINGS: VideoExportSettings = {
+  copyMode: false,
+  resolution: 'source',
+  quality: 'balanced',
+  encoder: 'h264'
+}
+
+export function normalizeVideoExportSettings(value: unknown): VideoExportSettings {
+  const raw = (value ?? {}) as Partial<VideoExportSettings>
+  return {
+    copyMode: raw.copyMode === true,
+    resolution: VIDEO_EXPORT_RESOLUTIONS.includes(raw.resolution as VideoExportResolution)
+      ? (raw.resolution as VideoExportResolution)
+      : DEFAULT_VIDEO_EXPORT_SETTINGS.resolution,
+    quality: VIDEO_EXPORT_QUALITIES.includes(raw.quality as VideoExportQuality)
+      ? (raw.quality as VideoExportQuality)
+      : DEFAULT_VIDEO_EXPORT_SETTINGS.quality,
+    encoder: VIDEO_EXPORT_ENCODERS.includes(raw.encoder as VideoExportEncoder)
+      ? (raw.encoder as VideoExportEncoder)
+      : DEFAULT_VIDEO_EXPORT_SETTINGS.encoder
+  }
 }
 
 /**
@@ -117,6 +184,7 @@ export const DEFAULT_SETTINGS: Settings = {
   rules: DEFAULT_RULES,
   chunkTargetSec: DEFAULT_CHUNK_TARGET_SEC,
   export: DEFAULT_EXPORT_SETTINGS,
+  videoExport: DEFAULT_VIDEO_EXPORT_SETTINGS,
   playback: DEFAULT_PLAYBACK_SETTINGS,
   miniTimelinePadSec: DEFAULT_MINI_TIMELINE_PAD_SEC,
   waveformContrast: DEFAULT_WAVEFORM_CONTRAST,

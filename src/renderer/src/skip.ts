@@ -1,6 +1,6 @@
 // The cut model lives in `src/shared/cuts.ts` so the main process can reuse the
-// exact same list for a future video export. Renderer code keeps importing from
-// here to avoid touching every call site.
+// exact same list for video export. Renderer code keeps importing from here to
+// avoid touching every call site.
 export {
   buildCutList,
   buildCutMap,

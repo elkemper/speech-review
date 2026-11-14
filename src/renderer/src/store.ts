@@ -21,7 +21,8 @@ import type {
   Project,
   ProjectSummary,
   Settings,
-  TranscribeProgress
+  TranscribeProgress,
+  VideoExportSettings
 } from '@shared/types'
 import {
   markRangeForSelection,
@@ -64,9 +65,12 @@ export interface Toast {
 export type DefectFilter = 'all' | 'filler' | 'pause' | 'repetition' | 'elongation' | 'false_start' | 'vocal_sound' | 'unclear' | 'manual'
 
 /** Nested settings objects accept partial patches; the store merges them. */
-export type SettingsPatch = Partial<Omit<Settings, 'rules' | 'export' | 'playback'>> & {
+export type SettingsPatch = Partial<
+  Omit<Settings, 'rules' | 'export' | 'playback' | 'videoExport'>
+> & {
   rules?: Partial<DefectRules>
   export?: Partial<ExportSettings>
+  videoExport?: Partial<VideoExportSettings>
   playback?: Partial<PlaybackSettings>
 }
 
@@ -170,6 +174,7 @@ const FALLBACK_SETTINGS: Settings = {
     enabledTypes: { ...DEFAULT_SETTINGS.rules.enabledTypes }
   },
   export: { ...DEFAULT_SETTINGS.export, fields: [...DEFAULT_SETTINGS.export.fields] },
+  videoExport: { ...DEFAULT_SETTINGS.videoExport },
   playback: {
     ...DEFAULT_SETTINGS.playback,
     paddingByType: Object.fromEntries(
@@ -461,6 +466,7 @@ export const useApp = create<AppStore>((set, get) => ({
       ...patch,
       rules: { ...current.rules, ...patch.rules },
       export: { ...current.export, ...patch.export },
+      videoExport: { ...current.videoExport, ...patch.videoExport },
       playback: { ...current.playback, ...patch.playback }
     }
 

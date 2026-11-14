@@ -16,6 +16,7 @@ function parseDurationLine(text: string): number | null {
 export interface ProbeResult {
   duration: number
   hasAudio: boolean
+  hasVideo: boolean
 }
 
 export async function probeMedia(ffmpeg: string, input: string, signal?: AbortSignal): Promise<ProbeResult> {
@@ -24,9 +25,14 @@ export async function probeMedia(ffmpeg: string, input: string, signal?: AbortSi
   if (duration === null) {
     throw new Error(`Не удалось прочитать файл: ${tail(result.stderr, 6) || 'неизвестный формат'}`)
   }
+  const videoLines = result.stderr
+    .split('\n')
+    .filter((line) => /Stream #\d+:\d+.*: Video:/i.test(line))
   return {
     duration,
-    hasAudio: /Stream #\d+:\d+.*: Audio:/i.test(result.stderr)
+    hasAudio: /Stream #\d+:\d+.*: Audio:/i.test(result.stderr),
+    // Cover art in an audio file is a video stream with `(attached pic)`.
+    hasVideo: videoLines.some((line) => !/\(attached pic\)/i.test(line))
   }
 }
 

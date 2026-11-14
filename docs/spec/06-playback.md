@@ -47,7 +47,7 @@ together.
 - `Project.cutOverrides[defectId]` is the final cut. It wins over every padding
   setting; double-clicking a handle deletes it and restores the derived cut.
 - `buildCutList` is independent of `skipEnabled` and feeds the timeline
-  hatching, the mini timeline and a future video export. `buildSkipIntervals`
+  hatching, the mini timeline, JSON export and video export. `buildSkipIntervals`
   is `skipEnabled ? buildCutList : []`.
 - The timeline fill is the original defect; the handles are the final cut. The
   gap is hatched: padding outside the fill in the defect type color, kept
