@@ -103,7 +103,6 @@ export const VIDEO_EXPORT_ENCODER_LABELS: Record<VideoExportEncoder, string> = {
 }
 
 export const DEFAULT_VIDEO_EXPORT_SETTINGS: VideoExportSettings = {
-  copyMode: false,
   resolution: 'source',
   quality: 'balanced',
   encoder: 'h264'
@@ -112,7 +111,6 @@ export const DEFAULT_VIDEO_EXPORT_SETTINGS: VideoExportSettings = {
 export function normalizeVideoExportSettings(value: unknown): VideoExportSettings {
   const raw = (value ?? {}) as Partial<VideoExportSettings>
   return {
-    copyMode: raw.copyMode === true,
     resolution: VIDEO_EXPORT_RESOLUTIONS.includes(raw.resolution as VideoExportResolution)
       ? (raw.resolution as VideoExportResolution)
       : DEFAULT_VIDEO_EXPORT_SETTINGS.resolution,

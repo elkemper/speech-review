@@ -35,7 +35,7 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 - **Dark theme only.** Do not add a light theme or a theme switcher unless the task explicitly asks for it.
 - **Word confidence / `unclear` is backlog.** `audiocpp_cli` currently writes `confidence: 0`. The parser stores `null` when no positive confidence exists and the `unclear` rule is disabled. Do not enable it by default or treat `0` as a low-confidence signal.
 - **Skip mode cuts every defect and manual mark except dismissed ones.** Confirmation is a review marker only and does not affect playback or video export. See `src/shared/cuts.ts`.
-- **Video export uses the same cut list.** `buildCutList` plus `complementRanges` are the only source of exported ranges; do not introduce a second cut model. Stream-copy export is keyframe-bound; re-encode is frame-accurate. Audio-only export is deferred.
+- **Video export uses the same cut list.** `buildCutList` plus `complementRanges` are the only source of exported ranges; do not introduce a second cut model. Export always re-encodes, so cuts are frame-accurate. Audio-only export is deferred.
 - **Do not silently change defect-lifecycle semantics.** Automatic defect IDs are order-based; manual marks have explicit group IDs; confirmed state is reconciled when marks merge/split; deleted manual marks live in `dismissedMarks`, deleted automatic IDs in `dismissedDefectIds`. See `docs/DATA_MODEL.md`.
 - **History is for editable project state only:** marks, confirmed IDs, dismissed IDs, dismissed marks, notes, cut overrides, the project defect rules and the skip padding that drives recalculation. Do not put skip mode, playback position, filters, selection, transcript, model/language/export or UI-only settings into undo/redo snapshots. While the settings dialog is open, undo is limited to settings changes made since it was opened.
 - **Do not commit generated or binary artifacts:** `out/`, `dist/`, `resources/engine/`, `resources/ffmpeg/`, `node_modules/`, `node_modules_linux/` are ignored.
@@ -73,7 +73,7 @@ src/
 │   ├── marks.ts          logical manual marks, confirmation reconciliation
 │   ├── cuts.ts           final cut ranges, merging, complement for video export
 │   ├── exportCsv.ts      CSV formatting
-│   ├── videoExport.ts    pure ffmpeg args, filter graph and concat list
+│   ├── videoExport.ts    pure ffmpeg args and filter graph
 │   └── format.ts         timecodes, bytes, clamp
 └── renderer/src/         React renderer
     ├── store.ts          zustand app state, persistence orchestration, history

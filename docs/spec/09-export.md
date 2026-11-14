@@ -50,7 +50,7 @@ type and the merged cut list for a video editor.
 **Status:** Done · **Priority:** P1
 
 As a user, I want to save a clean video with every marked place removed, choosing
-resolution, quality, encoder or a fast stream-copy cut.
+resolution, quality and encoder.
 
 - The entry point is a full-width **«Экспорт видео…»** button under the CSV and
   JSON buttons in the defect panel.
@@ -66,10 +66,7 @@ resolution, quality, encoder or a fast stream-copy cut.
   hardware encoder as `-q:v` 75/60/45.
 - Encoders: H.264 and HEVC, each in software (`libx264`/`libx265`) and hardware
   (`h264_videotoolbox`/`hevc_videotoolbox`) variants.
-- **«Без перекодирования»** uses the concat demuxer with `inpoint`/`outpoint`
-  and `-c copy`. It keeps the source container, disables resolution/quality/
-  encoder controls and warns that cuts snap to keyframes.
-- The save dialog defaults to `<project>-clean.<ext>` in Downloads. The output
+- The save dialog defaults to `<project>-clean.mp4` in Downloads. The output
   path cannot equal the source path. ffmpeg writes a `.part-<uuid>` file in the
   destination directory and the result is renamed into place only on success.
 - One export runs at a time. Progress comes from `-progress pipe:1`; the dialog
@@ -113,8 +110,6 @@ resolution, quality, encoder or a fast stream-copy cut.
       scales to the selected height.
 - [ ] Software H.264/HEVC use the configured CRF; hardware encoders use `-q:v`.
 - [ ] HEVC in MP4/MOV gets the `hvc1` tag.
-- [ ] Stream-copy mode uses `-c copy`, keeps the source container and disables
-      the resolution/quality/encoder controls.
 - [ ] The source file is never overwritten; a successful export replaces the
       destination atomically.
 - [ ] Progress and cancellation work; a cancelled or failed export leaves no
@@ -127,5 +122,5 @@ resolution, quality, encoder or a fast stream-copy cut.
 - `test/export.test.ts` covers fields, escaping, delimiter, header, cut vs
   defect bounds and uncut rows.
 - `test/videoExport.test.ts` covers settings normalization, filter graph,
-  CRF/q:v args, copy args, concat-list escaping and progress parsing.
+  CRF/q:v args, kept ranges, duration and progress parsing.
 - JSON shape is covered indirectly; extend the test when the shape changes.

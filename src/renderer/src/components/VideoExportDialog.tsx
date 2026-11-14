@@ -203,7 +203,7 @@ export default function VideoExportDialog({
                 <span>Разрешение</span>
                 <select
                   value={options.resolution}
-                  disabled={running || options.copyMode}
+                  disabled={running}
                   onChange={(event) =>
                     setOption(
                       'resolution',
@@ -223,7 +223,7 @@ export default function VideoExportDialog({
                 <span>Качество</span>
                 <select
                   value={options.quality}
-                  disabled={running || options.copyMode}
+                  disabled={running}
                   onChange={(event) =>
                     setOption(
                       'quality',
@@ -245,7 +245,7 @@ export default function VideoExportDialog({
               <span>Энкодер</span>
               <select
                 value={options.encoder}
-                disabled={running || options.copyMode}
+                disabled={running}
                 onChange={(event) =>
                   setOption(
                     'encoder',
@@ -276,23 +276,6 @@ export default function VideoExportDialog({
                 </optgroup>
               </select>
             </label>
-
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={options.copyMode}
-                disabled={running}
-                onChange={(event) => setOption('copyMode', event.target.checked)}
-              />
-              Без перекодирования
-            </label>
-            {options.copyMode ? (
-              <div className="hint">
-                Видео и звук копируются без потери качества, но границы привязываются к
-                ключевым кадрам. Рядом с меткой может остаться лишний фрагмент; формат
-                файла остаётся как у исходника.
-              </div>
-            ) : null}
           </section>
 
           {running || progress ? (

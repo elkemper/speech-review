@@ -168,9 +168,17 @@ dialog rejects a source without a video stream.
 Needed:
 
 - an audio-only path that uses the same `buildCutList`/`complementRanges` and
-  stream-copy or AAC re-encode;
+  AAC re-encode;
 - an output container that follows the source (M4A/MP3/WAV/Opus);
 - the same progress, cancellation and `.part`/rename safety as video export.
 
 Do not introduce a second cut model: playback, the timeline hatching, CSV/JSON
 and both export paths must use the same `buildCutList`.
+
+## 23. Stream-copy video export (без перекодирования)
+
+Video export always re-encodes so that cuts are frame-accurate. A fast
+keyframe-bound mode was removed; it would use the concat demuxer with
+`inpoint`/`outpoint` and `-c copy`, keep the source container, and warn that
+boundaries snap to keyframes. Return it only if the speed/quality trade-off is
+requested again, and reuse `buildCutList`/`complementRanges`.

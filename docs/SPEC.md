@@ -89,8 +89,8 @@ Applies to every story.
 13. **Do not replace `node_modules`** in the Linux container.
 14. **Video export uses the same cut model.** `buildCutList` plus
     `complementRanges` produce the exported ranges; do not add a second cut
-    model. Stream-copy export is keyframe-bound, re-encode is frame-accurate.
-    Audio-only export is backlog.
+    model. Export always re-encodes, so cuts are frame-accurate. Audio-only
+    export is backlog.
 
 ## Decisions
 
@@ -146,6 +146,7 @@ Applies to every story.
 | 33 / `07a` | Visual refresh toward Photoshop/Audacity 3 |
 | 37 / `08a` | Streaming ASR |
 | `BACKLOG` §22 | Audio-only export and audio-file cuts |
+| `BACKLOG` §23 | Stream-copy video export without re-encoding |
 
 ### Done — do not regress
 

@@ -209,73 +209,9 @@ export function buildReencodeArgs(input: ReencodeArgsInput): string[] {
   return args
 }
 
-export interface CopyArgsInput {
-  output: string
-  concatListPath: string
-}
-
-/** Full ffmpeg command for stream-copy cutting. */
-export function buildCopyArgs(input: CopyArgsInput): string[] {
-  return [
-    '-hide_banner',
-    '-nostdin',
-    '-y',
-    '-fflags',
-    '+genpts',
-    '-f',
-    'concat',
-    '-safe',
-    '0',
-    '-i',
-    input.concatListPath,
-    '-map',
-    '0:v:0',
-    '-map',
-    '0:a:0?',
-    '-c',
-    'copy',
-    '-map_metadata',
-    '0',
-    '-avoid_negative_ts',
-    'make_zero',
-    '-progress',
-    'pipe:1',
-    '-nostats',
-    '-loglevel',
-    'error',
-    input.output
-  ]
-}
-
 function isMovContainer(path: string): boolean {
   const lower = path.toLowerCase()
   return lower.endsWith('.mp4') || lower.endsWith('.m4v') || lower.endsWith('.mov')
-}
-
-function concatPath(path: string): string {
-  // The concat demuxer uses shell-like quoting: an apostrophe is written as
-  // '\'' inside a single-quoted path.
-  return `'${path.replace(/'/g, "'\\''")}'`
-}
-
-/**
- * Concat-demuxer script for stream copy. Every kept range becomes one entry of
- * the same source file with `inpoint`/`outpoint`; `-c copy` then snaps the
- * boundaries to keyframes.
- */
-export function buildConcatList(input: string, keep: CutRange[]): string {
-  const ranges = mergeRanges(keep).filter((range) => range.end - range.start > 0.000001)
-  if (ranges.length === 0) {
-    throw new Error('Нет фрагментов для экспорта')
-  }
-
-  const lines = ['ffconcat version 1.0']
-  for (const range of ranges) {
-    lines.push(`file ${concatPath(input)}`)
-    lines.push(`inpoint ${seconds(range.start)}`)
-    lines.push(`outpoint ${seconds(range.end)}`)
-  }
-  return `${lines.join('\n')}\n`
 }
 
 /** Parses ffmpeg's `-progress pipe:1` output and returns seconds. */

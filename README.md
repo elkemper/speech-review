@@ -30,7 +30,7 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Skip mode: during playback, automatically cut every defect and manual mark except deleted ones, with configurable padding. Confirmation does not affect playback.
 - Deleted defects stay as thin cards with an undo button when "Show deleted defects" is enabled. Confirmed cards collapse to a compact row with an undo button. Pending cards have delete/confirm buttons on the left.
 - Export defects to CSV (Excel) and JSON; CSV fields and delimiter are configurable. The base CSV columns are the final cut bounds; the original defect bounds are optional extra columns. JSON also contains the merged `cuts` list for a video editor.
-- Export a clean video from the current marks: resolution, three quality presets, software H.264/HEVC or hardware VideoToolbox encoders, and a no-re-encode mode for fast keyframe-bound cutting. Progress can be cancelled; the source file is never modified.
+- Export a clean video from the current marks: resolution, three quality presets, and software H.264/HEVC or hardware VideoToolbox encoders. Progress can be cancelled; the source file is never modified.
 - Photoshop-like dark theme, automatic project save after every action.
 
 ## Requirements

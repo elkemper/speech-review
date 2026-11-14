@@ -233,8 +233,6 @@ export type VideoExportEncoder =
   | 'hevc_videotoolbox'
 
 export interface VideoExportSettings {
-  /** Stream copy: no re-encode, cuts snap to keyframes. */
-  copyMode: boolean
   resolution: VideoExportResolution
   quality: VideoExportQuality
   encoder: VideoExportEncoder

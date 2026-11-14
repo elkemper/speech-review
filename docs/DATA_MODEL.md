@@ -44,7 +44,7 @@ Speech Review/
 | `rules` | `DEFAULT_RULES` | defect rules |
 | `chunkTargetSec` | `600` | target chunk length, 120–900 s |
 | `export` | see below | CSV fields and format |
-| `videoExport` | see below | video export resolution, quality, encoder and copy mode |
+| `videoExport` | see below | video export resolution, quality and encoder |
 | `playback` | see below | skip mode and padding |
 | `miniTimelinePadSec` | `3` | context on each side of the selected defect in the mini timeline |
 | `waveformContrast` | `55` | display-only waveform contrast, 0 = linear |
@@ -84,7 +84,6 @@ Speech Review/
 
 `videoExport`:
 
-- `copyMode` — `false` by default; `true` means stream copy and keyframe-bound cuts;
 - `resolution` — `source` / `1080` / `720` / `480`;
 - `quality` — `high` / `balanced` / `compact`;
 - `encoder` — `h264` / `hevc` / `h264_videotoolbox` / `hevc_videotoolbox`.
@@ -110,7 +109,7 @@ Padding is resolved when the cut list is built and does not depend on `skipEnabl
 - `rules` is merged with missing `DEFAULT_RULES` fields;
 - `chunkTargetSec` is rounded and clamped to 120–900;
 - `export.fields` is filtered to known fields; an empty list is replaced with the default base fields; the legacy `reviewed` field is migrated to `confirmed`;
-- `videoExport` is normalized by `normalizeVideoExportSettings`: unknown resolution, quality or encoder values fall back to `source` / `balanced` / `h264`, and `copyMode` becomes `true` only for a literal `true`;
+- `videoExport` is normalized by `normalizeVideoExportSettings`: unknown resolution, quality or encoder values fall back to `source` / `balanced` / `h264`;
 - `playback` is normalized by `normalizePlaybackSettings`: every per-type padding entry is filled from the defaults, padding values are clamped to 0–5 s and `pauseKeepSec` is clamped to 0–3 s;
 - `miniTimelinePadSec` is clamped to 0–15 s (`normalizeMiniTimelinePad`);
 - `waveformContrast` is rounded and clamped to 0–100 (`normalizeWaveformContrast`);

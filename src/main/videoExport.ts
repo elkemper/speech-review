@@ -6,8 +6,6 @@ import { extname, join, resolve } from 'node:path'
 import { normalizeVideoExportSettings } from '@shared/settings'
 import type { VideoExportProgress, VideoExportRequest } from '@shared/types'
 import {
-  buildConcatList,
-  buildCopyArgs,
   buildReencodeArgs,
   buildVideoFilterGraph,
   exportDuration,
@@ -34,14 +32,6 @@ async function executable(path: string): Promise<boolean> {
   return access(path, constants.X_OK)
     .then(() => true)
     .catch(() => false)
-}
-
-/** Keep a stream-copy output in a container that matches the source codecs. */
-function copyExtension(input: string): string {
-  const extension = extname(input).toLowerCase()
-  if (extension === '.m4v') return '.mp4'
-  if (['.mp4', '.mov', '.mkv', '.webm'].includes(extension)) return extension
-  return '.mkv'
 }
 
 function ensureExtension(path: string, extension: string): string {
@@ -87,17 +77,15 @@ async function runVideoExport(
       'В исходном файле нет видеодорожки. Экспорт аудиофайлов пока не поддерживается.'
     )
   }
-  if (!settings.copyMode && !probe.hasAudio) {
+  if (!probe.hasAudio) {
     throw new Error('В исходном файле нет аудиодорожки')
   }
 
-  const extension = settings.copyMode ? copyExtension(request.videoPath) : '.mp4'
-  const filters = settings.copyMode
-    ? [{ name: 'Видео', extensions: [extension.slice(1)] }]
-    : [
-        { name: 'MP4', extensions: ['mp4'] },
-        { name: 'MOV', extensions: ['mov'] }
-      ]
+  const extension = '.mp4'
+  const filters = [
+    { name: 'MP4', extensions: ['mp4'] },
+    { name: 'MOV', extensions: ['mov'] }
+  ]
   const saveOptions = {
     title: 'Экспорт видео',
     defaultPath: join(
@@ -115,11 +103,8 @@ async function runVideoExport(
   if (resolve(output) === resolve(request.videoPath)) {
     throw new Error('Нельзя перезаписать исходный видеофайл')
   }
-  if (
-    !settings.copyMode &&
-    !['.mp4', '.m4v', '.mov'].includes(extname(output).toLowerCase())
-  ) {
-    throw new Error('Перекодированное видео можно сохранить только в MP4 или MOV')
+  if (!['.mp4', '.m4v', '.mov'].includes(extname(output).toLowerCase())) {
+    throw new Error('Видео можно сохранить только в MP4 или MOV')
   }
 
   const workDir = await mkdtemp(join(tempDir(), 'video-export-'))
@@ -128,27 +113,20 @@ async function runVideoExport(
   active = controller
 
   try {
-    let args: string[]
-    if (settings.copyMode) {
-      const concatList = join(workDir, 'concat.txt')
-      await writeFile(concatList, buildConcatList(request.videoPath, keep), 'utf8')
-      args = buildCopyArgs({ output: temporary, concatListPath: concatList })
-    } else {
-      const filterScript = join(workDir, 'filter.txt')
-      await writeFile(
-        filterScript,
-        buildVideoFilterGraph(keep, settings.resolution),
-        'utf8'
-      )
-      args = buildReencodeArgs({
-        input: request.videoPath,
-        output: temporary,
-        filterScriptPath: filterScript,
-        settings
-      })
-    }
+    const filterScript = join(workDir, 'filter.txt')
+    await writeFile(
+      filterScript,
+      buildVideoFilterGraph(keep, settings.resolution),
+      'utf8'
+    )
+    const args = buildReencodeArgs({
+      input: request.videoPath,
+      output: temporary,
+      filterScriptPath: filterScript,
+      settings
+    })
 
-    const message = settings.copyMode ? 'Копирую фрагменты…' : 'Кодирую видео…'
+    const message = 'Кодирую видео…'
     onProgress({
       projectId: request.projectId,
       phase: 'render',

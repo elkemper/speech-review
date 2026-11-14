@@ -194,8 +194,8 @@ Status triage and cross-cutting product invariants are in [`SPEC.md`](SPEC.md).
 - The model is reloaded between chunks, and interrupted transcription cannot be resumed.
 - Automatic IDs depend on detection order, so changing rules can reset the review mapping.
 - No diarization, transcript search, SRT/VTT or light theme.
-- Video export in stream-copy mode cuts at keyframes; only a re-encode is
-  frame-accurate. Audio-only export is not implemented.
+- Video export always re-encodes; there is no fast stream-copy mode, and
+  audio-only export is not implemented.
 - No e2e tests; Electron, real media playback, the engine and packaging are not verified in the Linux development container.
 
 Full deferred list — `docs/BACKLOG.md`; platform and test limits — `docs/TESTING.md` and `docs/DEVELOPMENT.md`.

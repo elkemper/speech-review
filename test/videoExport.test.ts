@@ -4,8 +4,6 @@ import {
   normalizeVideoExportSettings
 } from '../src/shared/settings'
 import {
-  buildConcatList,
-  buildCopyArgs,
   buildReencodeArgs,
   buildVideoFilterGraph,
   exportDuration,
@@ -24,13 +22,11 @@ describe('video export settings', () => {
     expect(normalizeVideoExportSettings(null)).toEqual(DEFAULT_VIDEO_EXPORT_SETTINGS)
     expect(
       normalizeVideoExportSettings({
-        copyMode: true,
         resolution: '4k',
         quality: 'tiny',
         encoder: 'av1'
       })
     ).toEqual({
-      copyMode: true,
       resolution: 'source',
       quality: 'balanced',
       encoder: 'h264'
@@ -158,36 +154,6 @@ describe('ffmpeg arguments', () => {
     })
     expect(args).not.toContain('+faststart')
     expect(args).not.toContain('hvc1')
-  })
-
-  it('uses stream copy without video filters or CRF', () => {
-    const args = buildCopyArgs({
-      output: '/out.mp4',
-      concatListPath: '/concat.txt'
-    })
-    expect(args).toContain('concat')
-    expect(args).toContain('copy')
-    expect(args).toContain('0:v:0')
-    expect(args).toContain('0:a:0?')
-    expect(args).not.toContain('-filter_complex_script')
-    expect(args).not.toContain('-crf')
-    expect(args).not.toContain('-c:v')
-  })
-})
-
-describe('copy-mode concat list', () => {
-  it('writes one quoted entry per range and escapes apostrophes', () => {
-    const list = buildConcatList("/tmp/it's clip.mp4", [
-      { start: 0, end: 2.5 },
-      { start: 4, end: 9.25 }
-    ])
-    expect(list.startsWith('ffconcat version 1.0')).toBe(true)
-    expect(list).toContain("file '/tmp/it'\\''s clip.mp4'")
-    expect(list).toContain('inpoint 0.000000')
-    expect(list).toContain('outpoint 2.500000')
-    expect(list).toContain('inpoint 4.000000')
-    expect(list).toContain('outpoint 9.250000')
-    expect(() => buildConcatList('/tmp/in.mp4', [])).toThrow()
   })
 })
 
