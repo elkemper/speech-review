@@ -377,14 +377,14 @@ body[data-platform^="darwin"] .titlebar {
 
 .brand-s {
   display: inline-block;
-  transform: translateY(0.06em) scaleY(1.106);
+  transform: translateY(0.06em) scaleY(1.16);
 }
 
 .brand-r {
   text-decoration-line: underline;
   text-decoration-thickness: 0.085em;
   text-decoration-color: currentColor;
-  text-underline-offset: 0.11em;
+  text-underline-offset: 0.1em;
 }
 
 .brand-name {

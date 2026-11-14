@@ -134,7 +134,7 @@ or right-click → **Open** → **Open**.
 
 ### App icon
 
-The logo is the `SR` monogram on an accent gradient: the `S` is stretched slightly taller than the `R` (down towards the underline, without reaching it), and the `R` is underlined. It exists in three places and they should stay visually in sync:
+The logo is the `SR` monogram on an accent gradient: the `S` is stretched a little taller than the `R`, down to the underline level, and the `R` is underlined. It exists in three places and they should stay visually in sync:
 
 - `build/icon.png` — 1024×1024 source (also used for the Dock icon in `npm run dev`);
 - `build/icon.icns` — app icon and DMG volume icon, contains PNG sizes from 16 to 1024 px;
