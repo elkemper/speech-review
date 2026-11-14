@@ -184,6 +184,10 @@ if (!gotLock) {
   })
 
   app.whenReady().then(async () => {
+    if (process.platform === 'darwin' && isDev) {
+      app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
+    }
+
     app.setAboutPanelOptions({
       applicationName: 'Speech Review',
       applicationVersion: app.getVersion(),

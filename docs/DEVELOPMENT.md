@@ -118,6 +118,7 @@ Order:
 Configuration — `electron-builder.yml`:
 
 - `extraResources` places `resources/engine` and `resources/ffmpeg` inside the bundle;
+- `mac.icon` and `dmg.icon` both point to `build/icon.icns` (the app icon and the mounted-DMG volume icon);
 - `asar: true`;
 - `afterPack` performs ad-hoc signing with `codesign --force --deep --sign -`;
 - no notarization, `hardenedRuntime: false`, `identity: null`.
@@ -130,6 +131,25 @@ open "/Applications/Speech Review.app"
 ```
 
 or right-click → **Open** → **Open**.
+
+### App icon
+
+The logo is the `SR` monogram on an accent gradient: the `S` is stretched slightly taller than the `R` (down towards the underline, without reaching it), and the `R` is underlined. It exists in three places and they should stay visually in sync:
+
+- `build/icon.png` — 1024×1024 source (also used for the Dock icon in `npm run dev`);
+- `build/icon.icns` — app icon and DMG volume icon, contains PNG sizes from 16 to 1024 px;
+- `src/renderer/src/components/BrandMark.tsx` and `.brand-mark` in `styles.css` — the in-app header and splash mark.
+
+To regenerate `build/icon.icns` after replacing `build/icon.png`, on macOS:
+
+```bash
+mkdir -p /tmp/icon.iconset
+for s in 16 32 64 128 256 512; do
+  sips -z $s $s build/icon.png --out /tmp/icon.iconset/icon_${s}x${s}.png
+  sips -z $((s * 2)) $((s * 2)) build/icon.png --out /tmp/icon.iconset/icon_${s}x${s}@2x.png
+done
+iconutil -c icns /tmp/icon.iconset -o build/icon.icns
+```
 
 ## 7. Debugging
 

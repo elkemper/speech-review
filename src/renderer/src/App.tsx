@@ -4,6 +4,7 @@ import Welcome from './components/Welcome'
 import Workspace from './components/Workspace'
 import SettingsDialog from './components/SettingsDialog'
 import HistoryDialog from './components/HistoryDialog'
+import BrandMark from './components/BrandMark'
 
 export default function App() {
   const loading = useApp((state) => state.loading)
@@ -72,7 +73,7 @@ export default function App() {
   if (loading && !status) {
     return (
       <div className="splash">
-        <div className="splash-mark">SR</div>
+        <BrandMark large />
         <div className="splash-text">Speech Review</div>
         <div className="spinner" />
       </div>

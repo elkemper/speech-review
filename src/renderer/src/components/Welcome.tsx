@@ -1,6 +1,7 @@
 import { MODEL_SPECS } from '@shared/models'
 import { formatBytes, formatDuration } from '@shared/format'
 import { useApp } from '../store'
+import BrandMark from './BrandMark'
 
 function StatusPill({ ok, label }: { ok: boolean; label: string }) {
   return (
@@ -43,7 +44,7 @@ export default function Welcome() {
     <div className="welcome">
       <header className="titlebar">
         <div className="brand">
-          <span className="brand-mark">SR</span>
+          <BrandMark />
           <span className="brand-name">Speech Review</span>
         </div>
         <div className="titlebar-right">

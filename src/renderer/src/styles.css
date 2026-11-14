@@ -352,16 +352,39 @@ body[data-platform^="darwin"] .titlebar {
 }
 
 .brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
+  --mark-size: 30px;
+  width: var(--mark-size);
+  height: var(--mark-size);
+  flex: none;
+  border-radius: calc(var(--mark-size) * 0.3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: calc(var(--mark-size) * 0.1);
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   color: #07101f;
-  font-size: 11px;
+  font-size: calc(var(--mark-size) * 0.4);
   font-weight: 900;
   letter-spacing: -0.03em;
+  line-height: 1;
+  user-select: none;
+}
+
+.brand-mark.large {
+  --mark-size: 58px;
+  border-radius: 17px;
+}
+
+.brand-s {
+  display: inline-block;
+  transform: translateY(0.06em) scaleY(1.106);
+}
+
+.brand-r {
+  text-decoration-line: underline;
+  text-decoration-thickness: 0.085em;
+  text-decoration-color: currentColor;
+  text-underline-offset: 0.11em;
 }
 
 .brand-name {
@@ -1852,19 +1875,6 @@ kbd {
   align-items: center;
   justify-content: center;
   gap: 14px;
-}
-
-.splash-mark {
-  width: 58px;
-  height: 58px;
-  border-radius: 17px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: #07101f;
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: -0.05em;
 }
 
 .splash-text {

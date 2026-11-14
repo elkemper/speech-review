@@ -25,6 +25,7 @@ mac:
     - target: dmg
       arch:
         - arm64
+  icon: build/icon.icns
   category: public.app-category.productivity
   darkModeSupport: true
   identity: null
@@ -35,6 +36,7 @@ mac:
 
 dmg:
   artifactName: Speech-Review-${version}-${arch}.${ext}
+  icon: build/icon.icns
   window:
     width: 560
     height: 380
