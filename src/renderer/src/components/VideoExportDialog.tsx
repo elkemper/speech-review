@@ -276,12 +276,6 @@ export default function VideoExportDialog({
                 </optgroup>
               </select>
             </label>
-            <div className="hint">
-              {options.encoder === 'h264_videotoolbox' ||
-              options.encoder === 'hevc_videotoolbox'
-                ? 'VideoToolbox не использует CRF: пресеты передаются в аппаратный энкодер как q:v (1–100, больше — лучше).'
-                : 'CRF задаёт постоянное качество: меньше значение — выше качество и размер.'}
-            </div>
 
             <label className="check">
               <input
