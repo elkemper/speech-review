@@ -15,6 +15,7 @@ export const IPC = {
   modelsDownload: 'models:download',
   modelsState: 'models:state',
   modelsDelete: 'models:delete',
+  modelsCheckUpdates: 'models:check-updates',
   exportProject: 'export:project',
   exportVideo: 'export:video',
   exportVideoCancel: 'export:video:cancel',

@@ -14,7 +14,13 @@ import type {
 } from '@shared/types'
 import { engineBinary, ffmpegBinary } from './paths'
 import { probeMedia } from './engine/ffmpeg'
-import { downloadModel, deleteModel, modelState, modelStates } from './engine/models'
+import {
+  checkModelUpdates,
+  downloadModel,
+  deleteModel,
+  modelState,
+  modelStates
+} from './engine/models'
 import { registerMedia } from './mediaServer'
 import { TranscriptionManager } from './jobs'
 import {
@@ -171,6 +177,7 @@ export function registerIpc(dependencies: IpcDependencies): TranscriptionManager
   ipcMain.handle(IPC.modelsDelete, async (_event, id: ModelId) => {
     await deleteModel(id)
   })
+  ipcMain.handle(IPC.modelsCheckUpdates, async () => checkModelUpdates())
 
   ipcMain.handle(IPC.exportProject, async (_event, request: ExportRequest) => {
     return exportProject(getWindow(), request)

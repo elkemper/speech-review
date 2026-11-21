@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "fetch:engine": "node scripts/fetch-engine.mjs",
+    "models:update": "node scripts/update-model-manifest.mjs",
     "check:resources": "node scripts/check-resources.mjs",
     "package:mac": "node scripts/check-platform.mjs && node scripts/check-resources.mjs && npm run build && electron-builder --mac --arm64",
     "predev": "node scripts/check-platform.mjs",

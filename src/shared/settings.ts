@@ -1,8 +1,10 @@
 import { DEFAULT_RULES } from './defects'
+import { MODEL_ORDER } from './models'
 import type {
   DefectType,
   ExportField,
   ExportSettings,
+  ModelId,
   PlaybackSettings,
   Settings,
   SkipPadding,
@@ -228,6 +230,20 @@ export function normalizeSkipPadding(
     before: clampNumber(raw.before, 0, 5, fallback.before),
     after: clampNumber(raw.after, 0, 5, fallback.after)
   }
+}
+
+/**
+ * Installed model versions. Only known model ids with non-empty string
+ * versions are kept; everything else came from a broken or future file.
+ */
+export function normalizeModelVersions(value: unknown): Partial<Record<ModelId, string>> {
+  const raw = (value ?? {}) as Record<string, unknown>
+  const result: Partial<Record<ModelId, string>> = {}
+  for (const id of MODEL_ORDER) {
+    const version = raw[id]
+    if (typeof version === 'string' && version.length > 0) result[id] = version
+  }
+  return result
 }
 
 /** Settings files from older builds miss per-type padding, so fill every entry. */

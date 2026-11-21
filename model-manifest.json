@@ -1,0 +1,33 @@
+{
+  "formatVersion": 1,
+  "generatedAt": "2026-11-21T00:00:00.000Z",
+  "models": [
+    {
+      "id": "q8_0",
+      "version": "2026.11.1",
+      "releasedAt": "2026-11-10",
+      "file": "crisperwhisper-2-large-q8_0.gguf",
+      "size": 1716306528,
+      "sha256": "392e636876d6d5ae8716f0f98b78480b61bb8c199d63f20523e95308b3425c2e",
+      "url": "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/CrisperWhisper2.0-GGUF/crisperwhisper-2-large-q8_0.gguf"
+    },
+    {
+      "id": "bf16",
+      "version": "2026.11.1",
+      "releasedAt": "2026-11-10",
+      "file": "crisperwhisper-2-large-bf16.gguf",
+      "size": 3092563712,
+      "sha256": "7f2ddc0fc5a419441fcf2be713696cc5d6bcd8a8db65b4acbea4879534e47c1b",
+      "url": "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/CrisperWhisper2.0-GGUF/crisperwhisper-2-large-bf16.gguf"
+    },
+    {
+      "id": "q4_k",
+      "version": "2026.11.1",
+      "releasedAt": "2026-11-10",
+      "file": "crisperwhisper-2-large-q4_k.gguf",
+      "size": 982302624,
+      "sha256": "13399e818dfe966e613dc0ba3db73d27bf9dd23ff63d7d946c77c75dd0ee1913",
+      "url": "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/CrisperWhisper2.0-GGUF/crisperwhisper-2-large-q4_k.gguf"
+    }
+  ]
+}

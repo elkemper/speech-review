@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { formatBytes } from '@shared/format'
-import { MODEL_ORDER, MODEL_SPECS } from '@shared/models'
+import { BUILTIN_VERSION, MODEL_ORDER, MODEL_SPECS } from '@shared/models'
 import {
   DEFAULT_EXPORT_FIELDS,
   EXPORT_FIELDS,
@@ -12,7 +12,12 @@ import {
   MIN_MINI_TIMELINE_PAD_SEC,
   MIN_WAVEFORM_CONTRAST
 } from '@shared/settings'
-import type { ExportField, ModelId, ModelStateInfo } from '@shared/types'
+import type {
+  ExportField,
+  ModelId,
+  ModelUpdate,
+  ModelStateInfo
+} from '@shared/types'
 import { useApp } from '../store'
 import DefectRulesSection from './DefectRulesSection'
 import { RangeField } from './SettingsRangeField'
@@ -58,16 +63,21 @@ export default function SettingsDialog() {
   const jobId = useApp((state) => state.jobId)
   const downloadingModel = useApp((state) => state.downloadingModel)
   const modelDownload = useApp((state) => state.modelDownload)
+  const modelUpdateCheck = useApp((state) => state.modelUpdateCheck)
+  const checkingModelUpdates = useApp((state) => state.checkingModelUpdates)
   const setShowSettings = useApp((state) => state.setShowSettings)
   const updateSettings = useApp((state) => state.updateSettings)
   const setRules = useApp((state) => state.setRules)
   const downloadModel = useApp((state) => state.downloadModel)
+  const checkModelUpdates = useApp((state) => state.checkModelUpdates)
   const refreshStatus = useApp((state) => state.refreshStatus)
   const notify = useApp((state) => state.notify)
 
   const [tab, setTab] = useState<SettingsTab>('general')
   const [modelStates, setModelStates] = useState<ModelStateInfo[]>([])
   const [deletingModel, setDeletingModel] = useState<ModelId | null>(null)
+  const setModelUpdateCheck = (value: typeof modelUpdateCheck): void =>
+    useApp.setState({ modelUpdateCheck: value })
   const projectOpen = Boolean(project)
   const recognitionActive = Boolean(jobId)
   const settingsLocked = recognitionActive
@@ -113,6 +123,11 @@ export default function SettingsDialog() {
   const exportSettings = settings.export
   const playback = settings.playback
   const busy = downloadingModel || deletingModel !== null || Boolean(jobId)
+  const updateByModelId = new Map<ModelId, ModelUpdate>(
+    (modelUpdateCheck?.updates ?? []).map((update) => [update.modelId, update])
+  )
+  const installedVersion = (id: ModelId): string =>
+    settings.modelVersions?.[id] ?? BUILTIN_VERSION
 
   const toggleField = (field: ExportField): void => {
     const selected = new Set(exportSettings.fields)
@@ -136,6 +151,7 @@ export default function SettingsDialog() {
       await window.api.deleteModel(id)
       setModelStates(await window.api.getModelStates())
       await refreshStatus()
+      setModelUpdateCheck(null)
       notify('Модель удалена', 'success')
     } catch (error) {
       notify(error instanceof Error ? error.message : String(error), 'error')
@@ -238,13 +254,34 @@ export default function SettingsDialog() {
                 <section className="settings-section">
                   <div className="section-title-row">
                     <h3>Модель распознавания</h3>
-                    <span className="muted small">скачанные модели можно удалять</span>
+                    <div className="row-actions">
+                      <button
+                        className="link-btn"
+                        disabled={busy || checkingModelUpdates}
+                        onClick={() => void checkModelUpdates()}
+                      >
+                        {checkingModelUpdates ? 'Проверяю…' : 'проверить обновления'}
+                      </button>
+                      <span className="muted small">скачанные модели можно удалять</span>
+                    </div>
                   </div>
+                  {modelUpdateCheck ? (
+                    <div className="muted small">
+                      {!modelUpdateCheck.reachable
+                        ? 'Не удалось проверить обновления: нет доступа к манифесту'
+                        : modelUpdateCheck.updates.length === 0
+                          ? 'Проверено: установлены актуальные версии моделей'
+                          : `Проверено: доступны обновления для ${modelUpdateCheck.updates.length} ${
+                              modelUpdateCheck.updates.length === 1 ? 'модели' : 'моделей'
+                            }`}
+                    </div>
+                  ) : null}
                   <div className="model-options">
                     {MODEL_ORDER.map((id) => {
                       const model = MODEL_SPECS[id]
                       const state = stateById.get(id)
                       const selected = settings.modelId === id
+                      const update = updateByModelId.get(id)
                       return (
                         <div
                           key={id}
@@ -268,8 +305,11 @@ export default function SettingsDialog() {
                           <div className="model-option-note">{model.note}</div>
                           <div className="model-option-foot">
                             <span className={`badge ${state?.ready ? 'ok' : ''}`}>
-                              {state?.ready ? 'скачана' : 'не скачана'}
+                              {state?.ready ? `скачана · v${installedVersion(id)}` : 'не скачана'}
                             </span>
+                            {update && state?.ready ? (
+                              <span className="badge">доступна v{update.availableVersion}</span>
+                            ) : null}
                             {state?.ready ? (
                               <button
                                 className="link-btn danger"
@@ -293,7 +333,7 @@ export default function SettingsDialog() {
                       <div className="model-current-label">{spec.label}</div>
                       <div className="muted small">
                         {selectedReady
-                          ? `Скачана · ${formatBytes(
+                          ? `Скачана · v${installedVersion(settings.modelId)} · ${formatBytes(
                               selectedState?.bytes ?? status?.modelBytes ?? spec.size
                             )} · SHA-256 проверен`
                           : `Не скачана · нужно ${formatBytes(spec.size)}`}
@@ -319,6 +359,34 @@ export default function SettingsDialog() {
                       )}
                     </div>
                   </div>
+
+                  {updateByModelId.get(settings.modelId) && selectedReady ? (
+                    <div className="model-current">
+                      <div>
+                        <div className="model-current-label">
+                          Доступна версия v{updateByModelId.get(settings.modelId)?.availableVersion}
+                        </div>
+                        <div className="muted small">
+                          {updateByModelId.get(settings.modelId)?.installedVersion
+                            ? `Установлена v${
+                                updateByModelId.get(settings.modelId)?.installedVersion
+                              }`
+                            : 'Установлена неизвестная версия'}{' '}
+                          · размер загрузки{' '}
+                          {formatBytes(updateByModelId.get(settings.modelId)?.size ?? spec.size)}
+                        </div>
+                      </div>
+                      <div className="row-actions">
+                        <button
+                          className="btn primary"
+                          disabled={busy}
+                          onClick={() => void downloadModel(settings.modelId)}
+                        >
+                          Обновить
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {downloadingThis && modelDownload ? (
                     <div className="model-progress">

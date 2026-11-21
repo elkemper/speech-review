@@ -9,6 +9,7 @@ import type {
   ModelDownloadProgress,
   ModelId,
   ModelStateInfo,
+  ModelUpdateCheckResult,
   Peaks,
   Project,
   ProjectSummary,
@@ -62,6 +63,8 @@ const api: AppApi = {
   getModelStates: (): Promise<ModelStateInfo[]> => ipcRenderer.invoke(IPC.modelsState),
   deleteModel: (modelId: ModelId): Promise<void> =>
     ipcRenderer.invoke(IPC.modelsDelete, modelId),
+  checkModelUpdates: (): Promise<ModelUpdateCheckResult> =>
+    ipcRenderer.invoke(IPC.modelsCheckUpdates),
 
   onProgress: (callback: (progress: TranscribeProgress) => void): (() => void) =>
     subscribe(IPC.transcribeProgress, callback),

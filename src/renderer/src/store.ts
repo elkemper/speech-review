@@ -16,6 +16,7 @@ import type {
   ManualMark,
   ModelDownloadProgress,
   ModelId,
+  ModelUpdateCheckResult,
   Peaks,
   PlaybackSettings,
   Project,
@@ -102,6 +103,9 @@ interface AppStore {
   progress: TranscribeProgress | null
   modelDownload: ModelDownloadProgress | null
   downloadingModel: boolean
+  /** Result of the last explicit model update check (UI-only state). */
+  modelUpdateCheck: ModelUpdateCheckResult | null
+  checkingModelUpdates: boolean
 
   showSettings: boolean
   showHistory: boolean
@@ -121,6 +125,7 @@ interface AppStore {
   startTranscription: () => Promise<void>
   cancelTranscription: () => Promise<void>
   downloadModel: (id: ModelId) => Promise<void>
+  checkModelUpdates: () => Promise<void>
   updateSettings: (patch: SettingsPatch, history?: SettingsHistoryMeta) => void
   setRules: (patch: Partial<DefectRules>, history?: SettingsHistoryMeta) => void
   toggleSkip: () => void
@@ -221,6 +226,8 @@ export const useApp = create<AppStore>((set, get) => ({
   progress: null,
   modelDownload: null,
   downloadingModel: false,
+  modelUpdateCheck: null,
+  checkingModelUpdates: false,
 
   showSettings: false,
   showHistory: false,
@@ -445,7 +452,15 @@ export const useApp = create<AppStore>((set, get) => ({
     })
     try {
       await window.api.downloadModel(id)
+      // Main records the installed version in settings.json; reload it so the
+      // renderer copy (and its later saves) do not drop the new version.
+      const persisted = await window.api.getSettings().catch(() => null)
+      if (persisted?.modelVersions) {
+        set({ settings: { ...get().settings, modelVersions: persisted.modelVersions } })
+      }
       await get().refreshStatus()
+      // The installed version changed; a stale check result would be wrong.
+      set({ modelUpdateCheck: null })
       get().notify('Модель скачана и проверена', 'success')
     } catch (error) {
       set({ error: cleanError(error) })
@@ -454,6 +469,19 @@ export const useApp = create<AppStore>((set, get) => ({
       setTimeout(() => {
         if (!get().downloadingModel) set({ modelDownload: null })
       }, 2500)
+    }
+  },
+
+  checkModelUpdates: async () => {
+    if (get().checkingModelUpdates) return
+    set({ checkingModelUpdates: true })
+    try {
+      const result = await window.api.checkModelUpdates()
+      set({ modelUpdateCheck: result })
+    } catch (error) {
+      get().notify(error instanceof Error ? error.message : String(error), 'error')
+    } finally {
+      set({ checkingModelUpdates: false })
     }
   },
 

@@ -52,6 +52,7 @@ only the area it is working on.
 | [`08a-streaming-asr.md`](spec/08a-streaming-asr.md) | 37 detail | Streaming recognition |
 | [`09-export.md`](spec/09-export.md) | 38–39, 48 | CSV, JSON and video export |
 | [`10-mini-timeline.md`](spec/10-mini-timeline.md) | 40 | Selected defect snippet with editable cut handles |
+| [`11-model-updates.md`](spec/11-model-updates.md) | 49 | Model update discovery through a runtime manifest |
 
 ## Product invariants
 

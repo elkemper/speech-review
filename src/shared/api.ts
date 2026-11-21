@@ -8,6 +8,7 @@ import type {
   ModelDownloadProgress,
   ModelId,
   ModelStateInfo,
+  ModelUpdateCheckResult,
   Peaks,
   Project,
   ProjectSummary,
@@ -44,6 +45,7 @@ export interface AppApi {
   downloadModel(modelId: ModelId): Promise<{ path: string }>
   getModelStates(): Promise<ModelStateInfo[]>
   deleteModel(modelId: ModelId): Promise<void>
+  checkModelUpdates(): Promise<ModelUpdateCheckResult>
 
   onProgress(callback: (progress: TranscribeProgress) => void): () => void
   onPartial(callback: (partial: TranscribePartial) => void): () => void

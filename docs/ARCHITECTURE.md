@@ -104,7 +104,7 @@ Behavior of each screen and action is defined in the spec files listed in §10.
 
 Details:
 
-1. **Model check.** `ensureModel` verifies size and SHA-256. The result is cached in `<model>.sha256`, so the 1.7 GB file is not hashed on every launch.
+1. **Model check.** `ensureModel` verifies size and SHA-256. The result is cached in `<model>.sha256`, so the 1.7 GB file is not hashed on every launch. The marker also records the installed version. Update discovery against `model-manifest.json` (raw.githubusercontent) runs only when the user clicks «проверить обновления» — see `docs/spec/11-model-updates.md`.
 2. **Audio extraction.** ffmpeg runs `-vn -map 0:a:0 -ac 1 -ar 16000 -c:a pcm_s16le`; progress is read from `-progress pipe:1`.
 3. **Pauses.** `silencedetect=noise=-38dB:d=0.45`. The intervals are used only for chunking.
 4. **Peaks.** `computePeaks` reads the 16-bit WAV in blocks and stores min/max per bucket. A peaks failure does not fail transcription: `peaks` stays `null`.
@@ -168,7 +168,7 @@ Main IPC groups:
 | Media | `media:open`, `media:open-path`, `media:register` |
 | Projects | `projects:list`, `projects:create`, `projects:load`, `projects:save`, `projects:delete` |
 | Transcription | `transcribe:start`, `transcribe:cancel`; events: `transcribe:progress`, `transcribe:partial`, `transcribe:done`, `transcribe:error` |
-| Models | `models:download`, `models:state`, `models:delete`; event: `models:progress` |
+| Models | `models:download`, `models:state`, `models:delete`, `models:check-updates`; event: `models:progress` |
 | Export/shell | `export:project`, `export:video`, `export:video:cancel`, `shell:show-item`; event: `export:video:progress` |
 
 `invoke` channels return a result and fail through a rejected promise. Progress, partial, done, error and model-progress channels are main→renderer events and are subscribed to through preload.

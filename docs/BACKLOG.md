@@ -134,7 +134,7 @@ The app does not update itself. For a single user this is not critical, but mult
 - Full keyboard navigation in the defect panel.
 - Configurable hotkeys.
 - Undo/redo for notes.
-- An "About" screen with engine and model versions.
+- An "About" screen with engine and model versions. Model versions are already tracked (see `docs/spec/11-model-updates.md`); only the screen is missing.
 - A "model is loading" indicator with phases, not just a percentage.
 - Dark/light theme.
 

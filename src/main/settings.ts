@@ -9,6 +9,7 @@ import {
   EXPORT_FIELDS,
   normalizeChunkTarget,
   normalizeMiniTimelinePad,
+  normalizeModelVersions,
   normalizePlaybackSettings,
   normalizeVideoExportSettings,
   normalizeWaveformContrast
@@ -82,7 +83,8 @@ export async function loadSettings(): Promise<Settings> {
       playback: normalizePlaybackSettings(parsed.playback),
       miniTimelinePadSec: normalizeMiniTimelinePad(parsed.miniTimelinePadSec),
       waveformContrast: normalizeWaveformContrast(parsed.waveformContrast),
-      showDismissed: parsed.showDismissed !== false
+      showDismissed: parsed.showDismissed !== false,
+      modelVersions: normalizeModelVersions(parsed.modelVersions)
     }
   } catch {
     return {

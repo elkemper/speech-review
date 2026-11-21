@@ -285,6 +285,8 @@ export interface Settings {
   waveformContrast: number
   /** Show deleted defects as thin cards so they can be restored. */
   showDismissed: boolean
+  /** Installed version per model id, written after a successful download. */
+  modelVersions?: Partial<Record<ModelId, string>>
 }
 
 export type TranscribePhase =
@@ -337,6 +339,24 @@ export interface ModelDownloadProgress {
   modelId: ModelId
   percent: number
   message: string
+}
+
+/** One model with a newer build in the manifest than the installed one. */
+export interface ModelUpdate {
+  modelId: ModelId
+  /** Null when the installed build predates version tracking. */
+  installedVersion: string | null
+  availableVersion: string
+  size: number
+}
+
+export interface ModelUpdateCheckResult {
+  checkedAt: string
+  /** False when the manifest could not be fetched; `updates` is empty then. */
+  reachable: boolean
+  /** ISO timestamp of the manifest generation, informational. */
+  manifestGeneratedAt: string
+  updates: ModelUpdate[]
 }
 
 export interface TranscribeRequest {
