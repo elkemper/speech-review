@@ -21,6 +21,12 @@ vocal sounds detected by rules that apply immediately, without re-transcribing.
 - Automatic ids are `auto-${type}-w${wordIds.join('_')}`, derived from the type
   and the covered words rather than from detection order (story 51).
 - Rule changes recompute the open project and save with a debounce.
+- The filler word lists come from `FILLER_LEXICONS` and follow the recognition
+  language (`Settings.language` / `Project.language`), not the interface
+  language. The Russian list is `DEFAULT_RULES`; the English list adds `uh`,
+  `um`, `like`, `you know`, `i mean`, … Switching the recognition language
+  swaps an untouched default list and keeps a customized one; see
+  `DATA_MODEL.md` §6.
 
 ### Story 5 — Minimum duration per type
 
@@ -123,6 +129,11 @@ word, without changing the minimum-duration rule globally.
 - [ ] Types: filler, pause, repetition, elongation, false start, vocal sound;
       `unclear` stays disabled while confidence is `0`.
 - [ ] Multi-word fillers ("как бы", "в общем") are one defect.
+- [ ] With the English recognition language, `um`, `like`, `you know` are
+      fillers and Russian fillers (`ну`, `вот`) are not.
+- [ ] Changing the recognition language swaps an untouched default filler list
+      and keeps a customized one.
+- [ ] The interface language never changes the filler lists.
 - [ ] Automatic ids are derived from the type and the covered words, and are
       unique within one detection pass (story 51).
 - [ ] Rule changes update the open project and save.

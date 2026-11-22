@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises'
+import { translate } from '@shared/i18n'
 import { parseRawWords } from '@shared/transcript'
 import type { Backend, RawWord } from '@shared/types'
 import { runProcess, tail } from './proc'
+import { currentUiLanguage } from '../uiLanguage'
 
 export interface ChunkTranscriptionOptions {
   cli: string
@@ -66,7 +68,10 @@ export async function transcribeChunk(options: ChunkTranscriptionOptions): Promi
   if (result.code !== 0) {
     const details = tail(`${result.stdout}\n${result.stderr}`, 18)
     throw new Error(
-      `CrisperWhisper завершился с кодом ${result.code}:\n${details || 'нет вывода'}`
+      translate(currentUiLanguage(), 'error.crisperWhisperExit', {
+        code: result.code,
+        details: details || '—'
+      })
     )
   }
 
@@ -75,7 +80,11 @@ export async function transcribeChunk(options: ChunkTranscriptionOptions): Promi
     jsonText = await readFile(options.outputJson, 'utf8')
   } catch {
     const details = tail(`${result.stdout}\n${result.stderr}`, 18)
-    throw new Error(`CrisperWhisper не создал файл слов. Лог:\n${details || 'пусто'}`)
+    throw new Error(
+      translate(currentUiLanguage(), 'error.crisperWhisperNoWords', {
+        details: details || '—'
+      })
+    )
   }
 
   const raw = parseRawWords(jsonText)

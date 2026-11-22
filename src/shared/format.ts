@@ -1,3 +1,5 @@
+import { localeTag, translate, type UiLanguage } from './i18n'
+
 export function formatTimecode(seconds: number, withMillis = false): string {
   const safe = Math.max(0, Number.isFinite(seconds) ? seconds : 0)
   const totalMs = Math.round(safe * 1000)
@@ -14,16 +16,22 @@ export function formatDuration(seconds: number): string {
   return formatTimecode(seconds)
 }
 
-/** Compact duration for defect cards: up to 2 decimals, Russian comma. */
-export function formatShortSeconds(seconds: number): string {
+/** Compact duration for defect cards: up to 2 decimals with the locale separator. */
+export function formatShortSeconds(seconds: number, lang: UiLanguage = 'ru'): string {
   const safe = Math.max(0, Number.isFinite(seconds) ? seconds : 0)
   const rounded = Math.round(safe * 100) / 100
-  return `${String(rounded).replace('.', ',')} с.`
+  const value = lang === 'ru' ? String(rounded).replace('.', ',') : String(rounded)
+  return translate(lang, 'unit.shortSeconds', { value })
 }
 
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 Б'
-  const units = ['Б', 'КБ', 'МБ', 'ГБ']
+export function formatBytes(bytes: number, lang: UiLanguage = 'ru'): string {
+  const units = [
+    translate(lang, 'unit.bytes.0'),
+    translate(lang, 'unit.bytes.kb'),
+    translate(lang, 'unit.bytes.mb'),
+    translate(lang, 'unit.bytes.gb')
+  ]
+  if (!Number.isFinite(bytes) || bytes <= 0) return `0 ${units[0]}`
   let value = bytes
   let unit = 0
   while (value >= 1024 && unit < units.length - 1) {
@@ -31,6 +39,44 @@ export function formatBytes(bytes: number): string {
     unit++
   }
   return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`
+}
+
+/** Human-readable remaining time, e.g. `~2 min 10 s`. */
+export function formatEta(seconds: number | undefined, lang: UiLanguage = 'ru'): string {
+  if (seconds === undefined || !Number.isFinite(seconds)) return ''
+  if (seconds < 60) {
+    return translate(lang, 'unit.etaSeconds', { seconds: Math.max(1, Math.round(seconds)) })
+  }
+  // Round once, then split, so 119.7 never renders as `1 min 60 s`.
+  const total = Math.round(seconds)
+  const minutes = Math.floor(total / 60)
+  const rest = total % 60
+  return rest > 0
+    ? translate(lang, 'unit.etaMinutesSeconds', { minutes, seconds: rest })
+    : translate(lang, 'unit.etaMinutes', { minutes })
+}
+
+/** Clock time for dialogs, in the active locale. */
+export function formatClock(value: string, lang: UiLanguage = 'ru'): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString(localeTag(lang), {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+/** Short project date for the welcome screen, in the active locale. */
+export function formatProjectDate(value: string, lang: UiLanguage = 'ru'): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(localeTag(lang), {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 export function clamp(value: number, min: number, max: number): number {

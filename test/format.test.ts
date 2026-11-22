@@ -75,6 +75,8 @@ describe('number formatting', () => {
     expect(formatShortSeconds(12)).toBe('12 с.')
     expect(formatShortSeconds(-1)).toBe('0 с.')
     expect(formatShortSeconds(Number.NaN)).toBe('0 с.')
+    expect(formatShortSeconds(0.8333, 'en')).toBe('0.83 s')
+    expect(formatShortSeconds(12, 'en')).toBe('12 s')
   })
 
   it('computes the slider fill percentage', () => {

@@ -1,3 +1,4 @@
+import { translate } from './i18n'
 import type { RawWord, Segment, Transcript, Word, WordKind } from './types'
 
 export const DEFAULT_SAMPLE_RATE = 16000
@@ -80,7 +81,7 @@ export function parseRawWords(jsonText: string): RawWord[] {
   } else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { words?: unknown }).words)) {
     list = (parsed as { words: unknown[] }).words
   } else {
-    throw new Error('words.json: ожидался массив слов')
+    throw new Error(translate('en', 'error.wordsNotArray'))
   }
 
   const words = list as Array<Record<string, unknown>>
@@ -89,13 +90,13 @@ export function parseRawWords(jsonText: string): RawWord[] {
     const end = item.end_sample
     const text = item.word
     if (typeof start !== 'number' || !Number.isFinite(start)) {
-      throw new Error(`words.json: start_sample не число в записи ${index}`)
+      throw new Error(translate('en', 'error.wordsStart', { index }))
     }
     if (typeof end !== 'number' || !Number.isFinite(end)) {
-      throw new Error(`words.json: end_sample не число в записи ${index}`)
+      throw new Error(translate('en', 'error.wordsEnd', { index }))
     }
     if (typeof text !== 'string') {
-      throw new Error(`words.json: word не строка в записи ${index}`)
+      throw new Error(translate('en', 'error.wordsWord', { index }))
     }
     const confidence = typeof item.confidence === 'number' ? item.confidence : undefined
     return {

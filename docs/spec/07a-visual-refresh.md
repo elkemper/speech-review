@@ -22,7 +22,7 @@ editor.
 - Clear selected/active/hover/disabled states.
 - Defect colors remain the semantic signal; do not decorate randomly.
 - Waveform and timeline read as an editor, not a card.
-- Keep the Russian UI and dark-only theme.
+- Keep the Russian and English UI catalogues and dark-only theme.
 
 ### Non-goals
 

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { access, mkdir, rm } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { join } from 'node:path'
+import { translate } from '@shared/i18n'
 import { buildTranscript } from '@shared/transcript'
 import type {
   Peaks,
@@ -21,6 +22,7 @@ import { planChunks } from './engine/chunks'
 import { ensureModel } from './engine/models'
 import { transcribeChunk } from './engine/crisperwhisper'
 import { loadProject, savePeaks, saveProject, writeTranscript } from './projects'
+import { currentUiLanguage } from './uiLanguage'
 
 export interface TranscriptionEvents {
   progress: (progress: TranscribeProgress) => void
@@ -33,6 +35,10 @@ interface Job {
   id: string
   projectId: string
   controller: AbortController
+}
+
+function t(key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]): string {
+  return translate(currentUiLanguage(), key, params)
 }
 
 function errorMessage(error: unknown): string {
@@ -48,7 +54,7 @@ export class TranscriptionManager {
   start(request: TranscribeRequest): StartTranscriptionResult {
     for (const existing of this.jobs.values()) {
       if (existing.projectId === request.projectId) {
-        throw new Error('Для этого проекта уже идёт распознавание')
+        throw new Error(t('error.recognitionRunning'))
       }
     }
 
@@ -113,28 +119,28 @@ export class TranscriptionManager {
     const jobDir = join(tempDir(), 'jobs', job.id)
 
     try {
-      this.progress(job.id, 'prepare', 1, 'Готовлю задачу…')
+      this.progress(job.id, 'prepare', 1, t('progress.prepareJob'))
 
       const loaded = await loadProject(request.projectId)
       const project = loaded.project
       const videoPath = project.video.path
-      if (!videoPath) throw new Error('В проекте не указан видеофайл')
+      if (!videoPath) throw new Error(t('error.noVideoPath'))
 
       await access(videoPath, constants.R_OK)
       await mkdir(jobDir, { recursive: true })
 
       const ffmpeg = ffmpegBinary()
-      if (!ffmpeg) throw new Error('ffmpeg не найден. Запустите npm run fetch:engine.')
+      if (!ffmpeg) throw new Error(t('error.ffmpegMissing'))
       await access(ffmpeg, constants.X_OK)
 
       const cli = engineBinary()
       await access(cli, constants.X_OK).catch(() => {
         throw new Error(
-          'Движок audio.cpp не найден в resources/engine. Запустите npm run fetch:engine.'
+          t('error.engineMissing')
         )
       })
 
-      this.progress(job.id, 'prepare', 3, 'Проверяю модель…')
+      this.progress(job.id, 'prepare', 3, t('progress.checkModel'))
       const model = await ensureModel(request.modelId)
 
       project.language = request.language
@@ -145,9 +151,9 @@ export class TranscriptionManager {
 
       const audioPath = join(jobDir, 'audio.wav')
       const probe = await probeMedia(ffmpeg, videoPath, signal)
-      if (!probe.hasAudio) throw new Error('В выбранном файле нет аудиодорожки')
+      if (!probe.hasAudio) throw new Error(t('error.noAudioTrack'))
 
-      this.progress(job.id, 'audio', 4, 'Извлекаю аудио 16 кГц…')
+      this.progress(job.id, 'audio', 4, t('progress.extractAudio'))
       await extractAudio({
         ffmpeg,
         input: videoPath,
@@ -155,14 +161,14 @@ export class TranscriptionManager {
         duration: probe.duration,
         signal,
         onProgress: (fraction) => {
-          this.progress(job.id, 'audio', 4 + fraction * 26, `Извлекаю аудио… ${Math.round(fraction * 100)}%`)
+          this.progress(job.id, 'audio', 4 + fraction * 26, t('progress.extractAudioPercent', { percent: Math.round(fraction * 100) }))
         }
       })
 
       const info = await readWavInfo(audioPath)
-      if (info.duration <= 0.1) throw new Error('Аудиодорожка пустая')
+      if (info.duration <= 0.1) throw new Error(t('error.emptyAudio'))
 
-      this.progress(job.id, 'silence', 31, 'Ищу паузы для нарезки…', undefined, undefined, {
+      this.progress(job.id, 'silence', 31, t('progress.detectSilence'), undefined, undefined, {
         indeterminate: true
       })
       const silences = await detectSilences(ffmpeg, audioPath, info.duration, {
@@ -171,7 +177,7 @@ export class TranscriptionManager {
         minSilenceSec: 0.45
       })
 
-      this.progress(job.id, 'peaks', 33, 'Строю осциллограмму…', undefined, undefined, {
+      this.progress(job.id, 'peaks', 33, t('progress.buildPeaks'), undefined, undefined, {
         indeterminate: true
       })
       let peaks: Peaks | null = null
@@ -180,7 +186,7 @@ export class TranscriptionManager {
           peaksPerSecond: 150,
           signal,
           onProgress: (fraction) => {
-            this.progress(job.id, 'peaks', 33 + fraction * 11, 'Строю осциллограмму…', undefined, undefined, {
+            this.progress(job.id, 'peaks', 33 + fraction * 11, t('progress.buildPeaks'), undefined, undefined, {
               indeterminate: true
             })
           }
@@ -201,7 +207,7 @@ export class TranscriptionManager {
         maxSec,
         firstChunkSec
       })
-      if (chunks.length === 0) throw new Error('Не удалось разбить запись на фрагменты')
+      if (chunks.length === 0) throw new Error(t('error.chunkPlanFailed'))
 
       const totalSec = chunks.reduce((sum, chunk) => sum + chunk.duration, 0)
       let processedSec = 0
@@ -228,7 +234,7 @@ export class TranscriptionManager {
           job.id,
           'transcribe',
           transcribePercent(),
-          `Распознаю фрагмент ${i + 1} из ${chunks.length}…`,
+          t('progress.transcribeChunk', { index: i + 1, count: chunks.length }),
           i + 1,
           chunks.length,
           {
@@ -262,7 +268,7 @@ export class TranscriptionManager {
           job.id,
           'transcribe',
           transcribePercent(),
-          `Распознан фрагмент ${i + 1} из ${chunks.length}`,
+          t('progress.chunkDone', { index: i + 1, count: chunks.length }),
           i + 1,
           chunks.length,
           {
@@ -294,11 +300,11 @@ export class TranscriptionManager {
           })
         } catch (error) {
           if (signal.aborted) throw error
-          console.warn('Не удалось сохранить промежуточный транскрипт', error)
+          console.warn(t('error.intermediateTranscript'), error)
         }
       }
 
-      this.progress(job.id, 'merge', 98, 'Собираю транскрипт…', undefined, undefined, {
+      this.progress(job.id, 'merge', 98, t('progress.merge'), undefined, undefined, {
         indeterminate: true
       })
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -312,7 +318,7 @@ export class TranscriptionManager {
 
       await writeTranscript(project.id, transcript, true, false)
       const updated = await loadProject(project.id)
-      this.progress(job.id, 'done', 100, 'Готово')
+      this.progress(job.id, 'done', 100, t('progress.done'))
 
       this.events.done({
         jobId: job.id,

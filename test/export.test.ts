@@ -32,7 +32,7 @@ describe('CSV export', () => {
     const csv = buildCsv([defect()], settings)
     expect(csv.startsWith('\uFEFF')).toBe(true)
     expect(csv).toContain('start_tc;end_tc;type;text;note')
-    expect(csv).toContain('00:00:01.500;00:00:02.000;филлер;ну;')
+    expect(csv).toContain('00:00:01.500;00:00:02.000;filler;ну;')
     expect(csv).not.toContain('severity')
   })
 
@@ -58,7 +58,7 @@ describe('CSV export', () => {
     expect(exportValue(item, 'defect_start_tc')).toBe('00:00:01.000')
     expect(exportValue(item, 'defect_end_tc')).toBe('00:00:03.000')
     expect(exportValue(item, 'defect_duration_sec')).toBe('2.000')
-    expect(exportValue(item, 'cut')).toBe('да')
+    expect(exportValue(item, 'cut')).toBe('yes')
   })
 
   it('leaves cut fields empty when the defect is not removed', () => {
@@ -68,8 +68,20 @@ describe('CSV export', () => {
     expect(exportValue(item, 'start_sec')).toBe('')
     expect(exportValue(item, 'end_sec')).toBe('')
     expect(exportValue(item, 'duration_sec')).toBe('')
-    expect(exportValue(item, 'cut')).toBe('нет')
+    expect(exportValue(item, 'cut')).toBe('no')
     expect(exportValue(item, 'defect_start_tc')).toBe('00:00:01.000')
+  })
+
+  it('exports the synthetic manual label in English, independent of the UI language', () => {
+    const base = { type: 'manual' as const, source: 'manual' as const, wordIds: [], note: '' }
+    expect(exportValue(defect({ ...base, text: 'ручная метка' }), 'text')).toBe('manual mark')
+    expect(exportValue(defect({ ...base, text: 'manual mark' }), 'text')).toBe('manual mark')
+    // A note or real user text stays as-is.
+    expect(exportValue(defect({ ...base, text: 'x', note: 'проверить' }), 'text')).toBe('x')
+    expect(exportValue(defect({ ...base, text: 'своя подпись' }), 'text')).toBe('своя подпись')
+    expect(exportValue(defect({ type: 'filler', text: 'ручная метка' }), 'text')).toBe(
+      'ручная метка'
+    )
   })
 
   it('maps every field without throwing', () => {
@@ -95,7 +107,7 @@ describe('CSV export', () => {
     for (const field of fields) {
       expect(exportValue(defect({ confirmed: true }), field)).not.toBeUndefined()
     }
-    expect(exportValue(defect(), 'confirmed')).toBe('нет')
-    expect(exportValue(defect({ confirmed: true }), 'confirmed')).toBe('да')
+    expect(exportValue(defect(), 'confirmed')).toBe('no')
+    expect(exportValue(defect({ confirmed: true }), 'confirmed')).toBe('yes')
   })
 })

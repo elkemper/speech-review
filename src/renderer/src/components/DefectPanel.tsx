@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { formatShortSeconds, formatTimecode } from '@shared/format'
+import { defectTypeLabel } from '@shared/labels'
 import type { Defect, DefectType, ExportDefect } from '@shared/types'
-import { DEFECT_COLORS, DEFECT_LABELS, TYPE_ORDER } from '../defectsUi'
+import { DEFECT_COLORS, TYPE_ORDER } from '../defectsUi'
 import { defectCardView } from '../defectCardView'
 import { playFrom, seekTo, toggleLoopForDefect } from '../player'
 import { defectIdsForSelection, defectIdsInRange } from '../selection'
 import { buildCutList, cutRangeFor } from '../skip'
 import { useApp, type DefectFilter } from '../store'
+import { useT, useUiLanguage } from '../i18n'
 import MiniTimeline from './MiniTimeline'
 
 function TrashIcon() {
@@ -85,6 +87,8 @@ export default function DefectPanel({
   const exportSettings = useApp((state) => state.settings.export)
   const playback = useApp((state) => state.settings.playback)
   const showDismissed = useApp((state) => state.settings.showDismissed)
+  const t = useT()
+  const lang = useUiLanguage()
 
   const itemRefs = useRef(new Map<string, HTMLDivElement>())
 
@@ -155,14 +159,14 @@ export default function DefectPanel({
       queueDefects.find((defect) => !defect.confirmed && defect.start > currentTime + 0.05) ??
       queueDefects.find((defect) => !defect.confirmed)
     if (next) selectDefect(next)
-    else notify('Все дефекты подтверждены', 'success')
+    else notify(t('panel.allConfirmed'), 'success')
   }
 
   const confirmSelection = (): void => {
     if (selectedDefectIds.length === 0) return
     confirmMany(
       defects.filter((defect) => selectedDefectIds.includes(defect.id)),
-      `Подтверждено выделение: ${selectedDefectIds.length}`
+      t('panel.confirmedSelection', { count: selectedDefectIds.length })
     )
   }
 
@@ -174,7 +178,7 @@ export default function DefectPanel({
         relatedIds: defects.find((defect) => defect.id === id)?.groupIds
       }))
     )
-    notify(`Удалено: ${selectedDefectIds.length}`)
+    notify(t('panel.deletedCount', { count: selectedDefectIds.length }))
   }
 
   const exportAs = async (format: 'csv' | 'json'): Promise<void> => {
@@ -205,17 +209,17 @@ export default function DefectPanel({
         format,
         exportSettings
       })
-      if (path) notify(`Экспортировано: ${path}`, 'success')
+      if (path) notify(t('panel.exported', { path }), 'success')
     } catch (error) {
       notify(error instanceof Error ? error.message : String(error), 'error')
     }
   }
 
   const filterChips: Array<{ id: DefectFilter; label: string; count: number }> = [
-    { id: 'all', label: 'все', count: queueDefects.length },
+    { id: 'all', label: t('panel.filterAll'), count: queueDefects.length },
     ...TYPE_ORDER.filter((type) => (counts.get(type) ?? 0) > 0).map((type) => ({
       id: type as DefectFilter,
-      label: DEFECT_LABELS[type],
+      label: defectTypeLabel(lang, type),
       count: counts.get(type) ?? 0
     }))
   ]
@@ -224,16 +228,16 @@ export default function DefectPanel({
     <aside className="defect-panel">
       <div className="panel-head">
         <div>
-          <h2>Дефекты</h2>
+          <h2>{t('panel.title')}</h2>
           <div className="panel-sub">
-            {confirmedCount} из {queueDefects.length} подтверждено
+            {t('panel.confirmedOf', { confirmed: confirmedCount, total: queueDefects.length })}
           </div>
         </div>
         <div className="panel-head-actions">
-          <button className="btn small" onClick={addMark} title="Добавить ручную метку (M)">
-            ＋ метка
+          <button className="btn small" onClick={addMark} title={t('panel.addMarkTitle')}>
+            {t('panel.addMark')}
           </button>
-          <button className="icon-btn" onClick={onHide} title="Скрыть панель дефектов">
+          <button className="icon-btn" onClick={onHide} title={t('panel.hideTitle')}>
             ⟩
           </button>
         </div>
@@ -265,16 +269,16 @@ export default function DefectPanel({
             <button
               className="link-btn"
               onClick={confirmSelection}
-              title="Подтвердить все дефекты в выделении (Shift+Enter)"
+              title={t('panel.confirmSelectionTitle')}
             >
-              подтвердить выделение ({selectedDefectIds.length})
+              {t('panel.confirmSelection', { count: selectedDefectIds.length })}
             </button>
             <button
               className="link-btn danger"
               onClick={removeSelection}
-              title="Удалить все дефекты в выделении (Shift+R)"
+              title={t('panel.deleteSelectionTitle')}
             >
-              удалить выделение ({selectedDefectIds.length})
+              {t('panel.deleteSelection', { count: selectedDefectIds.length })}
             </button>
           </div>
         ) : (
@@ -283,7 +287,7 @@ export default function DefectPanel({
             onClick={goNextUnconfirmed}
             disabled={unconfirmedCount === 0}
           >
-            следующий неподтверждённый →
+            {t('panel.nextUnconfirmed')}
           </button>
         )}
       </div>
@@ -292,10 +296,10 @@ export default function DefectPanel({
         {filtered.length === 0 ? (
           <div className="panel-empty">
             {defects.length === 0
-              ? 'Дефектов пока нет. Запустите распознавание или добавьте ручную метку.'
+              ? t('panel.empty')
               : queueDefects.length === 0 && !showDismissed
-                ? 'Все дефекты удалены и скрыты по настройке.'
-                : 'Под текущий фильтр ничего не попадает.'}
+                ? t('panel.emptyDismissed')
+                : t('panel.emptyFilter')}
           </div>
         ) : (
           filtered.map((defect) => {
@@ -328,8 +332,8 @@ export default function DefectPanel({
                     <button
                       type="button"
                       className="rail-btn delete"
-                      title="Удалить дефект (R)"
-                      aria-label="Удалить дефект"
+                      title={t('panel.deleteTitle')}
+                      aria-label={t('panel.deleteAria')}
                       onClick={() => removeDefect(defect.id, defect.groupIds)}
                     >
                       <TrashIcon />
@@ -337,9 +341,14 @@ export default function DefectPanel({
                     <button
                       type="button"
                       className="rail-btn confirm"
-                      title="Подтвердить дефект (Enter)"
-                      aria-label="Подтвердить дефект"
-                      onClick={() => confirmDefect(defect, `Подтверждён: ${defect.text}`)}
+                      title={t('panel.confirmTitle')}
+                      aria-label={t('panel.confirmAria')}
+                      onClick={() =>
+                        confirmDefect(
+                          defect,
+                          t('panel.confirmedToast', { text: defect.text })
+                        )
+                      }
                     >
                       <CheckIcon />
                     </button>
@@ -363,64 +372,69 @@ export default function DefectPanel({
                       className="defect-type"
                       style={{ color: DEFECT_COLORS[defect.type] }}
                     >
-                      {DEFECT_LABELS[defect.type]}
+                      {defectTypeLabel(lang, defect.type)}
                     </span>
                     <span className="defect-sep">—</span>
                     <span
                       className="defect-duration"
                       title={
                         cut
-                          ? `вырез ${formatTimecode(cut.start, true)}–${formatTimecode(
-                              cut.end,
-                              true
-                            )} · дефект ${formatTimecode(
-                              defect.start,
-                              true
-                            )}–${formatTimecode(defect.end, true)}`
-                          : `не вырезается · дефект ${formatTimecode(
-                              defect.start,
-                              true
-                            )}–${formatTimecode(defect.end, true)}`
+                          ? t('panel.cutAndDefect', {
+                              cut: `${formatTimecode(cut.start, true)}–${formatTimecode(
+                                cut.end,
+                                true
+                              )}`,
+                              defect: `${formatTimecode(
+                                defect.start,
+                                true
+                              )}–${formatTimecode(defect.end, true)}`
+                            })
+                          : t('panel.notCutDefect', {
+                              defect: `${formatTimecode(
+                                defect.start,
+                                true
+                              )}–${formatTimecode(defect.end, true)}`
+                            })
                       }
                     >
-                      {cutDuration !== null ? formatShortSeconds(cutDuration) : '—'}
+                      {cutDuration !== null ? formatShortSeconds(cutDuration, lang) : '—'}
                     </span>
                     {defect.candidate ? (
-                      <span className="badge candidate">кандидат</span>
+                      <span className="badge candidate">{t('panel.badgeCandidate')}</span>
                     ) : null}
                     {view.showManualBadge ? (
-                      <span className="badge">ручная</span>
+                      <span className="badge">{t('panel.badgeManual')}</span>
                     ) : null}
                     {view.showGroupBadge ? (
                       <span
                         className="badge logical"
-                        title={`Автоматически объединены: ${(defect.groupTypes ?? [])
-                          .map((type) => DEFECT_LABELS[type])
-                          .join(' + ')}`}
+                        title={t('panel.groupTooltip', {
+                          types: (defect.groupTypes ?? [])
+                            .map((type) => defectTypeLabel(lang, type))
+                            .join(' + ')
+                        })}
                       >
-                        группа · {defect.groupIds?.length ?? 0}
+                        {t('panel.groupBadge', { count: defect.groupIds?.length ?? 0 })}
                       </span>
                     ) : null}
                     {view.showLogicalBadge ? (
-                      <span className="badge logical" title="Несколько соседних меток объединены">
-                        логическая · {defect.markIds?.length ?? 0}
+                      <span className="badge logical" title={t('panel.logicalTooltip')}>
+                        {t('panel.logicalBadge', { count: defect.markIds?.length ?? 0 })}
                       </span>
                     ) : null}
                     {showUndo ? (
                       <button
                         type="button"
                         className="card-undo"
-                        title={
-                          dismissed ? 'Вернуть дефект' : 'Снять подтверждение'
-                        }
-                        aria-label={dismissed ? 'Вернуть дефект' : 'Снять подтверждение'}
+                        title={dismissed ? t('panel.restore') : t('panel.unconfirm')}
+                        aria-label={dismissed ? t('panel.restore') : t('panel.unconfirm')}
                         onClick={(event) => {
                           event.stopPropagation()
                           if (dismissed) restoreDefect(defect.id, defect.groupIds)
                           else
                             unconfirmDefect(
                               defect.id,
-                              `Снято подтверждение: ${defect.text}`,
+                              t('panel.unconfirmedToast', { text: defect.text }),
                               defect.groupIds
                             )
                         }}
@@ -446,7 +460,7 @@ export default function DefectPanel({
                         <textarea
                           className="note-input"
                           value={defect.note}
-                          placeholder="Заметка к дефекту…"
+                          placeholder={t('panel.notePlaceholder')}
                           onClick={(event) => event.stopPropagation()}
                           onChange={(event) => setNote(defect.id, event.target.value)}
                         />
@@ -471,7 +485,7 @@ export default function DefectPanel({
                               )
                             }}
                           >
-                            ▶ прослушать
+                            {t('panel.listen')}
                           </button>
                           <button
                             className="link-btn"
@@ -482,7 +496,7 @@ export default function DefectPanel({
                               )
                             }}
                           >
-                            {isLooping ? 'выключить цикл' : 'цикл'}
+                            {isLooping ? t('panel.loopOn') : t('panel.loop')}
                           </button>
                           {view.showSplit ? (
                             <button
@@ -492,7 +506,7 @@ export default function DefectPanel({
                                 splitManualGroup(defect.id)
                               }}
                             >
-                              разъединить
+                              {t('panel.split')}
                             </button>
                           ) : null}
                         </div>
@@ -508,13 +522,13 @@ export default function DefectPanel({
 
       <div className="panel-foot">
         <button className="btn ghost small" onClick={() => void exportAs('csv')}>
-          Экспорт CSV
+          {t('panel.exportCsv')}
         </button>
         <button className="btn ghost small" onClick={() => void exportAs('json')}>
           JSON
         </button>
         <button className="btn ghost small panel-foot-wide" onClick={onVideoExport}>
-          Экспорт видео…
+          {t('panel.exportVideo')}
         </button>
       </div>
     </aside>

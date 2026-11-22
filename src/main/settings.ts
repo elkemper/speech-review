@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { normalizeRules } from '@shared/defects'
@@ -11,9 +12,12 @@ import {
   normalizeMiniTimelinePad,
   normalizeModelVersions,
   normalizePlaybackSettings,
+  normalizeUiLanguageSetting,
   normalizeVideoExportSettings,
   normalizeWaveformContrast
 } from '@shared/settings'
+import { uiLanguageFromLocale, type UiLanguage } from '@shared/i18n'
+import { setCurrentUiLanguage } from './uiLanguage'
 import type {
   Backend,
   ExportField,
@@ -37,6 +41,15 @@ const DEFAULTS: Settings = {
 }
 
 const BACKENDS: Backend[] = ['metal', 'cpu']
+
+/** The language a brand-new install starts with. */
+export function systemUiLanguage(): UiLanguage {
+  try {
+    return uiLanguageFromLocale(app.getLocale())
+  } catch {
+    return 'ru'
+  }
+}
 
 function settingsFile(): string {
   return join(userDataDir(), 'settings.json')
@@ -74,15 +87,20 @@ function normalizeExport(value: unknown): ExportSettings {
 }
 
 export async function loadSettings(): Promise<Settings> {
+  let uiLanguage: UiLanguage
   try {
     const raw = JSON.parse(await readFile(settingsFile(), 'utf8')) as RawSettings
     const migrated = migrateSettings(raw)
     const parsed = migrated.settings as Partial<Settings>
+    // An existing file without `uiLanguage` migrates to the default `ru`.
+    uiLanguage = normalizeUiLanguageSetting(parsed.uiLanguage)
+    const language = typeof parsed.language === 'string' ? parsed.language : DEFAULTS.language
     const settings: Settings = {
-      language: typeof parsed.language === 'string' ? parsed.language : DEFAULTS.language,
+      language,
+      uiLanguage,
       modelId: validModelId(parsed.modelId) ? parsed.modelId : DEFAULTS.modelId,
       backend: validBackend(parsed.backend) ? parsed.backend : DEFAULTS.backend,
-      rules: normalizeRules(parsed.rules),
+      rules: normalizeRules(parsed.rules, language),
       chunkTargetSec: normalizeChunkTarget(parsed.chunkTargetSec),
       export: normalizeExport(parsed.export),
       videoExport: normalizeVideoExportSettings(parsed.videoExport),
@@ -92,15 +110,20 @@ export async function loadSettings(): Promise<Settings> {
       showDismissed: parsed.showDismissed !== false,
       modelVersions: normalizeModelVersions(parsed.modelVersions)
     }
+    setCurrentUiLanguage(uiLanguage)
     // Write the upgraded shape once so a renamed field is not converted again.
     if (migrated.migrated) {
       await writeSettingsFile(settings).catch(() => undefined)
     }
     return settings
   } catch {
+    // No settings file yet: a fresh install follows the system locale.
+    uiLanguage = systemUiLanguage()
+    setCurrentUiLanguage(uiLanguage)
     return {
       ...DEFAULTS,
-      rules: normalizeRules(DEFAULT_SETTINGS.rules),
+      uiLanguage,
+      rules: normalizeRules(DEFAULT_SETTINGS.rules, DEFAULTS.language),
       export: { ...DEFAULT_EXPORT_SETTINGS, fields: [...DEFAULT_EXPORT_SETTINGS.fields] },
       videoExport: { ...DEFAULT_SETTINGS.videoExport },
       playback: normalizePlaybackSettings(DEFAULT_PLAYBACK_SETTINGS)
@@ -118,5 +141,6 @@ async function writeSettingsFile(settings: Settings): Promise<void> {
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
+  setCurrentUiLanguage(normalizeUiLanguageSetting(settings.uiLanguage))
   await writeSettingsFile(settings)
 }

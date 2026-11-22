@@ -7,6 +7,7 @@ import {
   rangeProgress
 } from '@shared/format'
 import type { SkipPadding } from '@shared/types'
+import { useT } from '../i18n'
 
 /**
  * Slider plus a numeric field. The numeric field keeps the user's raw text
@@ -37,6 +38,7 @@ export function RangeField({
   ariaLabel?: string
   onChange: (value: number) => void
 }) {
+  const t = useT()
   const [draft, setDraft] = useState<string | null>(null)
   const draftRef = useRef<string | null>(null)
   const committed = useRef(value)
@@ -112,7 +114,7 @@ export function RangeField({
           role="spinbutton"
           value={shown}
           disabled={disabled}
-          aria-label={ariaLabel ?? label ?? 'Значение'}
+          aria-label={ariaLabel ?? label ?? t('common.value')}
           aria-valuemin={min}
           aria-valuemax={max}
           aria-valuenow={sliderValue}
@@ -130,7 +132,7 @@ export function RangeField({
           value={sliderValue}
           disabled={disabled}
           style={{ '--fill': `${rangeProgress(sliderValue, min, max)}%` } as CSSProperties}
-          aria-label={ariaLabel ?? label ?? 'Ползунок'}
+          aria-label={ariaLabel ?? label ?? t('common.slider')}
           aria-valuemin={min}
           aria-valuemax={max}
           aria-valuenow={sliderValue}
@@ -155,27 +157,28 @@ export function PaddingField({
   disabled?: boolean
   onChange: (value: SkipPadding) => void
 }) {
+  const t = useT()
   return (
     <div className="padding-field">
       <div className="padding-title">{label}</div>
       <RangeField
-        label="до"
+        label={t('common.before')}
         value={value.before}
         min={0}
         max={5}
         step={0.05}
-        suffix="с"
+        suffix={t('common.secondsSuffix')}
         disabled={disabled}
         compact
         onChange={(before) => onChange({ ...value, before })}
       />
       <RangeField
-        label="после"
+        label={t('common.after')}
         value={value.after}
         min={0}
         max={5}
         step={0.05}
-        suffix="с"
+        suffix={t('common.secondsSuffix')}
         disabled={disabled}
         compact
         onChange={(after) => onChange({ ...value, after })}
@@ -194,26 +197,27 @@ export function InlinePadding({
   disabled?: boolean
   onChange: (value: SkipPadding) => void
 }) {
+  const t = useT()
   return (
     <div className="inline-padding">
       <RangeField
-        label="до"
+        label={t('common.before')}
         value={value.before}
         min={0}
         max={5}
         step={0.05}
-        suffix="с"
+        suffix={t('common.secondsSuffix')}
         disabled={disabled}
         compact
         onChange={(before) => onChange({ ...value, before })}
       />
       <RangeField
-        label="после"
+        label={t('common.after')}
         value={value.after}
         min={0}
         max={5}
         step={0.05}
-        suffix="с"
+        suffix={t('common.secondsSuffix')}
         disabled={disabled}
         compact
         onChange={(after) => onChange({ ...value, after })}

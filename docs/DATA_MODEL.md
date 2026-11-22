@@ -38,7 +38,8 @@ Speech Review/
 
 | Field | Default | Meaning |
 |---|---|---|
-| `language` | `ru` | transcription language |
+| `language` | `ru` | transcription (ASR) language |
+| `uiLanguage` | `ru`* | interface language; `ru` / `en`; a missing field in an existing file migrates to `ru`, a missing file takes `app.getLocale()` when it is `ru` or `en` |
 | `modelId` | `q8_0` | `q8_0` / `bf16` / `q4_k` |
 | `backend` | `metal` | `metal` / `cpu` |
 | `rules` | `DEFAULT_RULES` | defect rules |
@@ -50,10 +51,11 @@ Speech Review/
 | `waveformContrast` | `55` | display-only waveform contrast, 0 = linear |
 | `showDismissed` | `true` | show deleted defects as thin cards with restore |
 
-`DEFAULT_RULES` (`src/shared/defects.ts`):
+`DEFAULT_RULES` (`src/shared/defects.ts`) shows the Russian lexicon; the filler lists follow the recognition language:
 
 ```ts
 {
+  // RU lexicon shown; the EN lexicon lives in FILLER_LEXICONS.en
   fillerWords: ['э', 'ээ', 'эээ', 'эм', 'мм', 'м', 'ну', 'вот',
                 'типа', 'короче', 'значит', 'собственно', 'ага', 'угу'],
   multiWordFillers: [['как', 'бы'], ['в', 'общем'], ['это', 'самое'], ['так', 'сказать']],
@@ -70,6 +72,14 @@ Speech Review/
   autoGroupGapSec: 0
 }
 ```
+
+**Filler lexicons follow the recognition language.** `FILLER_LEXICONS` in `src/shared/defects.ts` holds the Russian and English word/phrase lists (`fillerLanguage()` maps `en*` → English, everything else → Russian). The lists are recognition data, not interface copy: they depend on `Settings.language` / `Project.language`, never on `Settings.uiLanguage`, and are never translated.
+
+- A new project copies `settings.rules`; a fresh settings file fills missing lists from `settings.language`.
+- `loadSettings` and `loadProject` pass the recognition language to `normalizeRules(value, language)`, so a rules object without filler lists gets the lexicon of its own language.
+- Changing the recognition language runs `adoptFillerLanguage`: an untouched default list is swapped for the new language's list; a list the user edited (`usesAnyDefaultFillers` is false) is preserved. The "reset rules" button uses `defaultRulesForLanguage(language)`.
+- Switching `uiLanguage` never touches the filler lists.
+
 
 `minDurationByType` sets the shortest reported defect for each type. For `pause` it is the silence length and the only pause threshold: shorter gaps are not defects and do not become candidates. For `repetition` it is the shorter of the two repeated words; `0` means no limit, except for `pause`, where `0`/missing normalizes to 1.2 s and the range is 0.3–10 s. `enabledTypes` turns a whole automatic type off for the project; missing entries mean on, and `manual` is never filtered. `autoGroupEnabled` is the grouping switch; `autoGroupGapSec` is the largest gap at which neighbouring automatic defects become one group. The gap value is kept while grouping is off, and `0` also disables grouping at the data level.
 
@@ -372,7 +382,7 @@ History is stored only in renderer memory and is reset when a project is opened 
 ## 10. Writes and defect-state reset
 
 - `store.scheduleSave()` uses a 500 ms debounce; `flushSave()` is called when switching or closing a project.
-- Settings without a model/language/backend change are saved with a 450 ms debounce; a model/language/backend change is saved immediately and refreshes engine status.
+- Settings without a model/language/backend/interface-language change are saved with a 450 ms debounce; a model/language/backend/interface-language change is saved immediately and refreshes engine status (an interface-language change also rebuilds the native menu).
 - `project.json`, `transcript.json`, `peaks.json` and `settings.json` are written atomically: `*.tmp` + `rename`.
 - `writeTranscript(id, transcript, complete, resetReview)`:
   - always writes `transcript.json`;
@@ -436,7 +446,8 @@ CSV (`buildCsv`):
 - fields in `ExportSettings.fields` order;
 - values containing `"`, `;`, `,` or a newline are quoted;
 - timecodes `HH:MM:SS.mmm`, seconds with three decimal places;
-- type and severity labels are Russian.
+- type and severity labels and the `cut`/`confirmed` values are English (`filler`, `yes`/`no`), independent of the interface language (story 54);
+- the `text` of a manual mark with no words and no note is the English fallback label; otherwise `text` is user data and is exported unchanged.
 
 JSON:
 

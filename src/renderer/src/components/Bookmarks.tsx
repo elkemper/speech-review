@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { formatTimecode } from '@shared/format'
 import { seekTo } from '../player'
 import { useApp } from '../store'
+import { useT } from '../i18n'
 
 /**
  * A bookmark is a lightweight "I stopped here" marker. Unlike a manual mark it
@@ -13,6 +14,7 @@ export default function Bookmarks({ onClose }: { onClose: () => void }) {
   const addBookmark = useApp((state) => state.addBookmark)
   const removeBookmark = useApp((state) => state.removeBookmark)
   const setBookmarkNote = useApp((state) => state.setBookmarkNote)
+  const t = useT()
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -29,26 +31,24 @@ export default function Bookmarks({ onClose }: { onClose: () => void }) {
     <div className="bookmarks-popover">
       <div className="bookmarks-head">
         <div>
-          <h3>Закладки</h3>
-          <div className="muted small">
-            Отметьте место и вернитесь к нему позже — прогресс сохраняется в проекте.
-          </div>
+          <h3>{t('bookmarks.title')}</h3>
+          <div className="muted small">{t('bookmarks.hint')}</div>
         </div>
-        <button className="icon-btn" onClick={onClose} title="Закрыть">
+        <button className="icon-btn" onClick={onClose} title={t('common.close')}>
           ×
         </button>
       </div>
 
       <div className="bookmarks-actions">
         <button className="btn small primary" onClick={() => addBookmark()}>
-          ＋ Закладка на {formatTimecode(currentTime, true)}
+          {t('bookmarks.add', { time: formatTimecode(currentTime, true) })}
         </button>
       </div>
 
       <div className="bookmarks-list">
         {bookmarks.length === 0 ? (
           <div className="panel-empty">
-            Пока нет закладок. Нажмите <kbd>B</kbd> в нужном месте записи.
+            {t('bookmarks.empty')} <kbd>B</kbd> {t('bookmarks.emptySuffix')}
           </div>
         ) : (
           bookmarks.map((bookmark) => (
@@ -59,22 +59,22 @@ export default function Bookmarks({ onClose }: { onClose: () => void }) {
                   seekTo(bookmark.time)
                   onClose()
                 }}
-                title="Перейти к закладке"
+                title={t('bookmarks.go')}
               >
                 {formatTimecode(bookmark.time, true)}
               </button>
               <input
                 className="bookmark-note"
                 value={bookmark.note}
-                placeholder="Заметка к месту…"
+                placeholder={t('bookmarks.notePlaceholder')}
                 onChange={(event) => setBookmarkNote(bookmark.id, event.target.value)}
               />
               <button
                 className="link-btn danger"
                 onClick={() => removeBookmark(bookmark.id)}
-                title="Удалить закладку"
+                title={t('bookmarks.delete')}
               >
-                удалить
+                {t('bookmarks.deleteShort')}
               </button>
             </div>
           ))
@@ -91,7 +91,7 @@ export default function Bookmarks({ onClose }: { onClose: () => void }) {
               onClose()
             }}
           >
-            Продолжить с последней
+            {t('bookmarks.resume')}
           </button>
         </div>
       ) : null}

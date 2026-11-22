@@ -1,6 +1,8 @@
 import { open } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
+import { translate } from '@shared/i18n'
 import type { Peaks } from '@shared/types'
+import { currentUiLanguage } from '../uiLanguage'
 
 export interface WavInfo {
   path: string
@@ -37,9 +39,9 @@ export async function readWavInfo(path: string): Promise<WavInfo> {
     const headerSize = Math.min(stat.size, 1024 * 1024)
     const buffer = await readAt(handle, headerSize, 0)
 
-    if (buffer.length < 44) throw new Error('WAV: файл слишком короткий')
+    if (buffer.length < 44) throw new Error(translate(currentUiLanguage(), 'error.wavTooShort'))
     if (readAscii(buffer, 0, 4) !== 'RIFF' || readAscii(buffer, 8, 4) !== 'WAVE') {
-      throw new Error('WAV: не найден RIFF/WAVE заголовок')
+      throw new Error(translate(currentUiLanguage(), 'error.wavNoHeader'))
     }
 
     let format = 0
@@ -79,11 +81,11 @@ export async function readWavInfo(path: string): Promise<WavInfo> {
     }
 
     if (!sampleRate || !channels || !bitsPerSample) {
-      throw new Error('WAV: не найден fmt-чанк')
+      throw new Error(translate(currentUiLanguage(), 'error.wavNoFmt'))
     }
-    if (dataOffset < 0) throw new Error('WAV: не найден data-чанк')
+    if (dataOffset < 0) throw new Error(translate(currentUiLanguage(), 'error.wavNoData'))
     if (format !== 1 && format !== 3) {
-      throw new Error(`WAV: неподдерживаемый формат ${format}`)
+      throw new Error(translate(currentUiLanguage(), 'error.wavFormat', { format }))
     }
 
     const bytesPerSample = Math.ceil(bitsPerSample / 8)
@@ -175,7 +177,7 @@ export interface PeaksOptions {
 
 export async function computePeaks(info: WavInfo, options: PeaksOptions = {}): Promise<Peaks> {
   if (info.bitsPerSample !== 16) {
-    throw new Error('Пики: поддерживается только 16-битный WAV')
+    throw new Error(translate(currentUiLanguage(), 'error.wavPeaks'))
   }
 
   const peaksPerSecond = options.peaksPerSecond ?? 50

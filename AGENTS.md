@@ -6,7 +6,7 @@ Instructions for coding agents working in this repository. Read this file before
 
 **Speech Review** is a local Electron app for reviewing webinar recordings. It extracts audio, transcribes it with **CrisperWhisper 2.0** through the native **audio.cpp** runtime on Metal, detects speech defects, and provides a review workflow: click a word to seek, confirm real defects or delete false positives, add manual marks, loop, skip, and export.
 
-The current MVP targets **macOS 13+ on Apple Silicon** and Russian speech. The UI is in Russian and the theme is dark-only.
+The current MVP targets **macOS 13+ on Apple Silicon** and Russian speech. The UI is available in Russian and English (`Settings.uiLanguage`) and the theme is dark-only.
 
 User-facing documentation is available in English (`README.md`) and Russian (`README.RU.md`); requested features and bugs are consolidated in `docs/SPEC.md`; deferred work is in `docs/BACKLOG.md`.
 
@@ -33,11 +33,12 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 - **No Python/torch at runtime.** `resources/engine/tools/*.py` may exist in the downloaded engine bundle, but the app must not invoke Python. The runtime path is `audiocpp_cli` + GGUF + ffmpeg.
 - **`node_modules` is the macOS arm64 install.** It is kept in the repository workspace for packaging. Do **not** run `npm install`, `npm ci`, or replace `node_modules` in the Linux development container. `node_modules_linux/` is a stale Linux tree; it is gitignored and excluded from Vitest. If a dependency must change, edit `package.json`/`package-lock.json` and ask the user to install on the Mac.
 - **Dark theme only.** Do not add a light theme or a theme switcher unless the task explicitly asks for it.
+- **Filler lexicons follow the recognition language.** `FILLER_LEXICONS` in `src/shared/defects.ts` holds the RU and EN lists; `Settings.language` selects one, never `Settings.uiLanguage`. Keep both lists in sync with any new filler; see `docs/DATA_MODEL.md` §6.
 - **Word confidence / `unclear` is backlog.** `audiocpp_cli` currently writes `confidence: 0`. The parser stores `null` when no positive confidence exists and the `unclear` rule is disabled. Do not enable it by default or treat `0` as a low-confidence signal.
 - **Skip mode cuts every defect and manual mark except dismissed ones.** Confirmation does not decide whether an item is cut; it freezes the cut range at confirmation time. See `src/shared/cuts.ts`.
 - **Video export uses the same cut list.** `buildCutList` plus `complementRanges` are the only source of exported ranges; do not introduce a second cut model. Export always re-encodes, so cuts are frame-accurate. Audio-only export is deferred.
 - **Do not silently change defect-lifecycle semantics.** Automatic defect IDs are derived from the type and the covered words; manual marks have explicit group IDs; confirmed state is reconciled when marks merge/split; deleted manual marks live in `dismissedMarks`, deleted automatic IDs in `dismissedDefectIds`. See `docs/DATA_MODEL.md`.
-- **History is for editable project state only:** marks, confirmed IDs, dismissed IDs, dismissed marks, notes, cut overrides, the project defect rules and the skip padding that drives recalculation. Do not put skip mode, playback position, filters, selection, transcript, model/language/export or UI-only settings into undo/redo snapshots. While the settings dialog is open, undo is limited to settings changes made since it was opened.
+- **History is for editable project state only:** marks, confirmed IDs, dismissed IDs, dismissed marks, notes, cut overrides, the project defect rules and the skip padding that drives recalculation. Do not put skip mode, playback position, filters, selection, transcript, model/recognition language/interface language (`uiLanguage`)/export or UI-only settings into undo/redo snapshots. While the settings dialog is open, undo is limited to settings changes made since it was opened.
 - **Schema changes go through numbered migrations.** A renamed or removed field, or a one-time conversion, gets a step in `src/shared/projectMigrations.ts` or `src/shared/settingsMigrations.ts`, a bumped version constant and a test. Filling a new field with a default is not a migration: keep that in `normalizeRules` / `normalizePlaybackSettings`. See `docs/DATA_MODEL.md` §11.
 - **Do not commit generated or binary artifacts:** `out/`, `dist/`, `resources/engine/`, `resources/ffmpeg/`, `node_modules/`, `node_modules_linux/` are ignored.
 
@@ -47,6 +48,7 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 src/
 ├── main/                 Electron main process
 │   ├── index.ts          app lifecycle, window, menu, app-media protocol
+│   ├── uiLanguage.ts     cached UI language for main-process text
 │   ├── ipc.ts            IPC handlers, engine status, dialogs, projects, export
 │   ├── jobs.ts           transcription manager and chunk pipeline
 │   ├── projects.ts       project persistence (project/transcript/peaks)
@@ -75,7 +77,10 @@ src/
 │   ├── cuts.ts           final cut ranges, merging, complement for video export
 │   ├── exportCsv.ts      CSV formatting
 │   ├── videoExport.ts    pure ffmpeg args and filter graph
-│   └── format.ts         timecodes, bytes, clamp
+│   ├── i18n.ts           translate, plurals, locale helpers
+│   ├── locales/          ru.ts (source) and en.ts message catalogues
+│   ├── labels.ts         language-aware enum labels shared by UI and CSV
+│   └── format.ts         timecodes, bytes, ETA, clamp
 └── renderer/src/         React renderer
     ├── store.ts          zustand app state, persistence orchestration, history
     ├── history.ts        undo/redo snapshots and action log
@@ -98,7 +103,7 @@ test/                     Vitest suites and fixtures
 | Command | What it does | Works in this Linux container? |
 |---|---|---|
 | `npm run typecheck` | `tsc --noEmit` for node and web configs | Yes |
-| `npm test` | Vitest run (202 tests / 14 files) | Yes |
+| `npm test` | Vitest run (288 tests / 23 files) | Yes |
 | `npm run test:watch` | Vitest watch mode | Yes |
 | `npm run build` | electron-vite production build into `out/` | Yes |
 | `npm run dev` | electron-vite dev + Electron | **No** (needs macOS + macOS Electron) |
@@ -129,7 +134,7 @@ If you changed UI behavior or runtime code, also state clearly that Electron, `a
 - Use the existing aliases: `@shared` in main/preload/renderer, `@renderer` in the renderer.
 - IPC changes require all of: `src/shared/ipc.ts`, `src/shared/api.ts`, `src/preload/index.ts`, `src/main/ipc.ts`, and the renderer caller. Keep the preload surface minimal; never expose `ipcRenderer` directly.
 - File writes that can be interrupted should stay atomic: write `*.tmp`, then `rename`.
-- Russian strings for UI and user-facing errors; follow the existing English style for code comments. Do not introduce a UI framework or icon library without a concrete need.
+- Put user-facing strings in the typed catalogue (`src/shared/locales/ru.ts` + `en.ts`) and read them through `translate`/`useT` or the `lang`-aware helpers in `src/shared/labels.ts`. Do not add UI literals in components; follow the existing English style for code comments and never translate the filler lexicons in `src/shared/defects.ts` (they are recognition data chosen by `Settings.language`, not interface copy). Do not introduce a UI framework or icon library without a concrete need.
 - Avoid new dependencies. The macOS `node_modules` constraint makes dependency changes expensive.
 - Preserve user work: do not delete or rewrite unrelated files, tests or docs.
 

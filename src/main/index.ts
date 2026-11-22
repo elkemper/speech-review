@@ -1,10 +1,13 @@
 import { app, BrowserWindow, dialog, Menu, protocol, shell } from 'electron'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { translate, type UiLanguage } from '@shared/i18n'
 import { cacheDir, isDev, modelsDir, projectsDir, tempDir } from './paths'
 import { registerMediaProtocol } from './mediaServer'
 import { registerIpc } from './ipc'
 import { cancelVideoExport } from './videoExport'
+import { loadSettings } from './settings'
+import { currentUiLanguage } from './uiLanguage'
 import type { TranscriptionManager } from './jobs'
 
 protocol.registerSchemesAsPrivileged([
@@ -31,7 +34,8 @@ function sendMenu(action: string): void {
   }
 }
 
-function buildMenu(): void {
+function buildMenu(lang: UiLanguage = currentUiLanguage()): void {
+  const t = (key: Parameters<typeof translate>[1]): string => translate(lang, key)
   const isMac = process.platform === 'darwin'
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac
@@ -42,7 +46,7 @@ function buildMenu(): void {
               { role: 'about' as const },
               { type: 'separator' as const },
               {
-                label: 'Настройки…',
+                label: t('menu.settings'),
                 accelerator: 'Cmd+,',
                 click: () => sendMenu('settings')
               },
@@ -57,15 +61,15 @@ function buildMenu(): void {
         ]
       : []),
     {
-      label: 'Файл',
+      label: t('menu.file'),
       submenu: [
         {
-          label: 'Открыть запись…',
+          label: t('menu.openRecording'),
           accelerator: 'CmdOrCtrl+O',
           click: () => sendMenu('open-video')
         },
         {
-          label: 'Настройки…',
+          label: t('menu.settings'),
           accelerator: isMac ? undefined : 'Ctrl+,',
           visible: !isMac,
           click: () => sendMenu('settings')
@@ -75,7 +79,7 @@ function buildMenu(): void {
       ]
     },
     {
-      label: 'Правка',
+      label: t('menu.edit'),
       submenu: [
         { role: 'undo' },
         { role: 'redo' },
@@ -87,7 +91,7 @@ function buildMenu(): void {
       ]
     },
     {
-      label: 'Вид',
+      label: t('menu.view'),
       submenu: [
         { role: 'reload' },
         { role: 'toggleDevTools' },
@@ -100,10 +104,10 @@ function buildMenu(): void {
       ]
     },
     {
-      label: 'Помощь',
+      label: t('menu.help'),
       submenu: [
         {
-          label: 'Лицензия модели CrisperWhisper',
+          label: t('menu.modelLicense'),
           click: () => {
             void shell.openExternal(
               'https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/main/CrisperWhisper2.0-GGUF/LICENSE.md'
@@ -111,7 +115,7 @@ function buildMenu(): void {
           }
         },
         {
-          label: 'audio.cpp на GitHub',
+          label: t('menu.audioCppGithub'),
           click: () => {
             void shell.openExternal('https://github.com/0xShug0/audio.cpp')
           }
@@ -188,11 +192,14 @@ if (!gotLock) {
       app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
     }
 
+    // Load settings before building the menu so the first render already has
+    // the persisted UI language.
+    const settings = await loadSettings()
+    const lang = settings.uiLanguage
     app.setAboutPanelOptions({
       applicationName: 'Speech Review',
       applicationVersion: app.getVersion(),
-      credits:
-        'Локальное распознавание CrisperWhisper 2.0 через audio.cpp. Модель — Nyra Health Non-Commercial Research License.'
+      credits: translate(lang, 'menu.aboutCredits')
     })
 
     await Promise.all([
@@ -203,8 +210,18 @@ if (!gotLock) {
     ])
 
     registerMediaProtocol()
-    manager = registerIpc({ getWindow: () => mainWindow })
-    buildMenu()
+    manager = registerIpc({
+      getWindow: () => mainWindow,
+      onUiLanguageChange: (next) => {
+        buildMenu(next)
+        app.setAboutPanelOptions({
+          applicationName: 'Speech Review',
+          applicationVersion: app.getVersion(),
+          credits: translate(next, 'menu.aboutCredits')
+        })
+      }
+    })
+    buildMenu(lang)
     createWindow()
 
     app.on('activate', () => {
@@ -212,7 +229,10 @@ if (!gotLock) {
     })
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)
-    dialog.showErrorBox('Не удалось запустить Speech Review', message)
+    dialog.showErrorBox(
+      translate(currentUiLanguage(), 'menu.startupError'),
+      message
+    )
     app.quit()
   })
 

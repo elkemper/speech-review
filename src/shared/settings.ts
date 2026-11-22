@@ -1,4 +1,5 @@
 import { DEFAULT_RULES } from './defects'
+import { DEFAULT_UI_LANGUAGE, normalizeUiLanguage } from './i18n'
 import { MODEL_ORDER } from './models'
 import type {
   DefectType,
@@ -8,6 +9,7 @@ import type {
   PlaybackSettings,
   Settings,
   SkipPadding,
+  UiLanguage,
   VideoExportEncoder,
   VideoExportQuality,
   VideoExportResolution,
@@ -38,26 +40,6 @@ export const EXPORT_FIELDS: ExportField[] = [
   'defect_duration_sec'
 ]
 
-export const EXPORT_FIELD_LABELS: Record<ExportField, string> = {
-  start_tc: 'Начало выреза (таймкод)',
-  end_tc: 'Конец выреза (таймкод)',
-  start_sec: 'Начало выреза (секунды)',
-  end_sec: 'Конец выреза (секунды)',
-  duration_sec: 'Длительность выреза',
-  type: 'Тип',
-  severity: 'Важность',
-  source: 'Источник',
-  confirmed: 'Подтверждено',
-  text: 'Текст',
-  note: 'Заметка',
-  cut: 'Режется',
-  defect_start_tc: 'Начало дефекта (таймкод)',
-  defect_end_tc: 'Конец дефекта (таймкод)',
-  defect_start_sec: 'Начало дефекта (секунды)',
-  defect_end_sec: 'Конец дефекта (секунды)',
-  defect_duration_sec: 'Длительность дефекта'
-}
-
 export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   fields: [...DEFAULT_EXPORT_FIELDS],
   delimiter: ';',
@@ -83,26 +65,6 @@ export const VIDEO_EXPORT_ENCODERS: VideoExportEncoder[] = [
   'h264_videotoolbox',
   'hevc_videotoolbox'
 ]
-
-export const VIDEO_EXPORT_RESOLUTION_LABELS: Record<VideoExportResolution, string> = {
-  source: 'Как в источнике',
-  '1080': '1080p',
-  '720': '720p',
-  '480': '480p'
-}
-
-export const VIDEO_EXPORT_QUALITY_LABELS: Record<VideoExportQuality, string> = {
-  high: 'Высокое',
-  balanced: 'Сбалансированное',
-  compact: 'Компактное'
-}
-
-export const VIDEO_EXPORT_ENCODER_LABELS: Record<VideoExportEncoder, string> = {
-  h264: 'H.264 · программный',
-  hevc: 'HEVC · программный',
-  h264_videotoolbox: 'H.264 · аппаратный',
-  hevc_videotoolbox: 'HEVC · аппаратный'
-}
 
 export const DEFAULT_VIDEO_EXPORT_SETTINGS: VideoExportSettings = {
   resolution: 'source',
@@ -179,6 +141,7 @@ export const MAX_CHUNK_TARGET_SEC = 900
 
 export const DEFAULT_SETTINGS: Settings = {
   language: 'ru',
+  uiLanguage: DEFAULT_UI_LANGUAGE,
   modelId: 'q8_0',
   backend: 'metal',
   rules: DEFAULT_RULES,
@@ -214,6 +177,17 @@ export function normalizeWaveformContrast(value: unknown): number {
 export function normalizeChunkTarget(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_CHUNK_TARGET_SEC
   return Math.round(Math.min(MAX_CHUNK_TARGET_SEC, Math.max(MIN_CHUNK_TARGET_SEC, value)))
+}
+
+/**
+ * Normalizes the persisted interface language. The main process passes a
+ * system-locale fallback when the settings file does not exist yet.
+ */
+export function normalizeUiLanguageSetting(
+  value: unknown,
+  fallback: UiLanguage = DEFAULT_UI_LANGUAGE
+): UiLanguage {
+  return normalizeUiLanguage(value, fallback)
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {

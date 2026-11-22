@@ -113,7 +113,7 @@ configure one type without scanning several sections.
       `0,5` parse.
 - [ ] The stored value is snapped to the step grid, so the field and the thumb
       cannot disagree because of float noise.
-- [ ] Sliders use the existing Russian labels and do not add a new dependency.
+- [ ] Sliders use the message catalogue labels and do not add a new dependency.
 - [ ] Values survive a settings reload.
 
 ### Story 3

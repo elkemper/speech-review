@@ -1,6 +1,7 @@
 import { MODEL_SPECS } from '@shared/models'
-import { formatBytes, formatDuration } from '@shared/format'
+import { formatBytes, formatDuration, formatProjectDate } from '@shared/format'
 import { useApp } from '../store'
+import { useT, useUiLanguage } from '../i18n'
 import BrandMark from './BrandMark'
 
 function StatusPill({ ok, label }: { ok: boolean; label: string }) {
@@ -10,17 +11,6 @@ function StatusPill({ ok, label }: { ok: boolean; label: string }) {
       {label}
     </span>
   )
-}
-
-function projectDate(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
 }
 
 export default function Welcome() {
@@ -34,6 +24,8 @@ export default function Welcome() {
   const deleteProject = useApp((state) => state.deleteProject)
   const setShowSettings = useApp((state) => state.setShowSettings)
   const downloadModel = useApp((state) => state.downloadModel)
+  const t = useT()
+  const lang = useUiLanguage()
 
   const spec = status ? MODEL_SPECS[status.modelId] : MODEL_SPECS.q8_0
   const downloadingThis = downloadingModel && modelDownload?.modelId === status?.modelId
@@ -48,46 +40,44 @@ export default function Welcome() {
           <span className="brand-name">Speech Review</span>
         </div>
         <div className="titlebar-right">
-          <StatusPill ok={Boolean(status?.engineReady)} label="движок" />
+          <StatusPill ok={Boolean(status?.engineReady)} label={t('welcome.engineLabel')} />
           <StatusPill ok={Boolean(status?.ffmpegReady)} label="ffmpeg" />
-          <StatusPill ok={Boolean(status?.modelReady)} label="модель" />
+          <StatusPill ok={Boolean(status?.modelReady)} label={t('welcome.modelLabel')} />
           <button className="btn ghost small" onClick={() => setShowSettings(true)}>
-            Настройки
+            {t('welcome.settings')}
           </button>
         </div>
       </header>
 
       <div className="welcome-scroll">
         <section className="hero">
-          <div className="eyebrow">Локальный разбор речи</div>
+          <div className="eyebrow">{t('welcome.eyebrow')}</div>
           <h1>
-            Найдите оговорки в вебинаре,
+            {t('welcome.heroLine1')},
             <br />
-            не переслушивая его целиком
+            {t('welcome.heroLine2')}
           </h1>
-          <p className="hero-sub">
-            CrisperWhisper 2.0 на Apple Silicon распознаёт запись, отмечает филлеры, паузы,
-            обрывы и повторы. Клик по слову — переход к нужному месту. Всё считается на этом
-            компьютере.
-          </p>
+          <p className="hero-sub">{t('welcome.intro')}</p>
           <div className="hero-actions">
             <button className="btn primary big" disabled={opening} onClick={() => void openVideo()}>
-              {opening ? 'Открываю…' : 'Открыть запись'}
+              {opening ? t('welcome.opening') : t('welcome.open')}
             </button>
             <button className="btn ghost big" onClick={() => setShowSettings(true)}>
-              Настройки движка
+              {t('welcome.engineSettings')}
             </button>
           </div>
-          <div className="drop-hint">или перетащите MP4, MOV, MKV, MP3 или WAV в окно</div>
+          <div className="drop-hint">{t('welcome.dropHint')}</div>
         </section>
 
         <section className="engine-grid">
           <article className={`engine-card ${status?.engineReady ? 'ready' : 'missing'}`}>
             <div className="engine-card-top">
               <span className="engine-name">audio.cpp</span>
-              <StatusPill ok={Boolean(status?.engineReady)} label={status?.engineReady ? 'готов' : 'нет'} />
+              <StatusPill ok={Boolean(status?.engineReady)} label={status?.engineReady ? t('welcome.statusReady') : t(
+                  'welcome.statusMissing'
+                )} />
             </div>
-            <p>Нативный рантайм CrisperWhisper с Metal-ускорением.</p>
+            <p>{t('welcome.engineDescription')}</p>
             {!status?.engineReady ? (
               <code className="inline-code">npm run fetch:engine</code>
             ) : (
@@ -100,9 +90,11 @@ export default function Welcome() {
           <article className={`engine-card ${status?.ffmpegReady ? 'ready' : 'missing'}`}>
             <div className="engine-card-top">
               <span className="engine-name">ffmpeg</span>
-              <StatusPill ok={Boolean(status?.ffmpegReady)} label={status?.ffmpegReady ? 'готов' : 'нет'} />
+              <StatusPill ok={Boolean(status?.ffmpegReady)} label={status?.ffmpegReady ? t('welcome.statusReady') : t(
+                  'welcome.statusMissing'
+                )} />
             </div>
-            <p>Извлекает аудио 16 кГц и находит тишину для нарезки.</p>
+            <p>{t('welcome.ffmpegDescription')}</p>
             {!status?.ffmpegReady ? (
               <code className="inline-code">npm run fetch:engine</code>
             ) : (
@@ -115,18 +107,24 @@ export default function Welcome() {
           <article className={`engine-card ${status?.modelReady ? 'ready' : 'missing'}`}>
             <div className="engine-card-top">
               <span className="engine-name">{spec.shortLabel}</span>
-              <StatusPill ok={Boolean(status?.modelReady)} label={status?.modelReady ? 'готова' : 'нет'} />
+              <StatusPill ok={Boolean(status?.modelReady)} label={status?.modelReady ? t('welcome.statusReadyFem') : t(
+                  'welcome.statusMissing'
+                )} />
             </div>
             <p>{spec.label}</p>
             {status?.modelReady ? (
-              <div className="engine-path">{formatBytes(status.modelBytes)} · SHA-256 проверен</div>
+              <div className="engine-path">
+                {t('welcome.shaChecked', { size: formatBytes(status.modelBytes, lang) })}
+              </div>
             ) : (
               <button
                 className="btn small"
                 disabled={downloadingThis}
                 onClick={() => void downloadModel(spec.id)}
               >
-                {downloadingThis ? 'Скачиваю…' : `Скачать ${formatBytes(spec.size)}`}
+                {downloadingThis
+                  ? t('welcome.downloading')
+                  : t('welcome.downloadSize', { size: formatBytes(spec.size, lang) })}
               </button>
             )}
             {downloadingThis && modelDownload ? (
@@ -139,28 +137,28 @@ export default function Welcome() {
 
         {!engineReady ? (
           <div className="notice">
-            Для первого запуска выполните <code>npm run fetch:engine</code> в папке проекта — скрипт
-            скачает audio.cpp и ffmpeg под вашу платформу. Модель скачивается отдельно из приложения.
+            {t('welcome.fetchEnginePrefix')} <code>npm run fetch:engine</code>{' '}
+            {t('welcome.fetchEngineSuffix')}
           </div>
         ) : null}
 
         {allReady ? (
           <div className="ready-line">
             <span className="dot ok" />
-            Всё готово к работе. Обработка идёт локально, интернет нужен только для модели.
+            {t('welcome.allReady')}
           </div>
         ) : null}
 
         <section className="projects-section">
           <div className="section-head">
-            <h2>Проекты</h2>
+            <h2>{t('welcome.projects')}</h2>
             <span className="muted">{projects.length}</span>
           </div>
 
           {projects.length === 0 ? (
             <div className="empty-projects">
               <div className="empty-icon">▶</div>
-              <div>Пока пусто. Откройте запись вебинара, и здесь появится проект.</div>
+              <div>{t('welcome.projectsEmpty')}</div>
             </div>
           ) : (
             <div className="project-list">
@@ -179,22 +177,23 @@ export default function Welcome() {
                   <div className="project-info">
                     <div className="project-name">{project.name}</div>
                     <div className="project-meta">
-                      {formatDuration(project.duration)} · {projectDate(project.updatedAt)}
+                      {formatDuration(project.duration)} ·{' '}
+                      {formatProjectDate(project.updatedAt, lang)}
                       <span className={`badge ${project.transcriptComplete ? 'ok' : ''}`}>
                         {project.transcriptComplete
-                          ? 'транскрипт готов'
+                          ? t('welcome.projectReady')
                           : project.hasTranscript
-                            ? 'транскрипт частичный'
-                            : 'без транскрипта'}
+                            ? t('welcome.projectPartial')
+                            : t('welcome.projectNoTranscript')}
                       </span>
                     </div>
                   </div>
                   <button
                     className="icon-btn danger-hover"
-                    title="Удалить проект"
+                    title={t('welcome.deleteProject')}
                     onClick={(event) => {
                       event.stopPropagation()
-                      if (window.confirm(`Удалить проект «${project.name}»?`)) {
+                      if (window.confirm(t('welcome.deleteConfirm', { name: project.name }))) {
                         void deleteProject(project.id)
                       }
                     }}
@@ -208,10 +207,9 @@ export default function Welcome() {
         </section>
 
         <footer className="welcome-footer">
-          <span>Локальная обработка · Electron + audio.cpp</span>
+          <span>{t('welcome.footer')}</span>
           <span>
-            Модель CrisperWhisper 2.0 — Nyra Health Non-Commercial Research License. audio.cpp —
-            Apache-2.0.
+            {t('welcome.license')} Apache-2.0.
           </span>
         </footer>
       </div>

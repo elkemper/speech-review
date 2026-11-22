@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { access, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { basename, extname, resolve } from 'node:path'
+import { translate, type UiLanguage } from '@shared/i18n'
 import { IPC } from '@shared/ipc'
 import type {
   EngineStatus,
@@ -33,6 +34,7 @@ import {
 import { exportProject } from './export'
 import { cancelVideoExport, exportVideo } from './videoExport'
 import { loadSettings, saveSettings } from './settings'
+import { currentUiLanguage } from './uiLanguage'
 
 const MEDIA_EXTENSIONS = new Set([
   '.mp4',
@@ -58,9 +60,9 @@ async function executable(path: string): Promise<boolean> {
 async function mediaInfo(path: string): Promise<MediaInfo> {
   const absolute = resolve(path)
   const info = await stat(absolute)
-  if (!info.isFile()) throw new Error('Это не файл')
+  if (!info.isFile()) throw new Error(translate(currentUiLanguage(), 'error.notAFile'))
   if (!MEDIA_EXTENSIONS.has(extname(absolute).toLowerCase())) {
-    throw new Error('Поддерживаются видео и аудио: MP4, MOV, WebM, MKV, MP3, WAV, M4A, OGG')
+    throw new Error(translate(currentUiLanguage(), 'error.unsupportedMedia'))
   }
   return {
     path: absolute,
@@ -72,10 +74,14 @@ async function mediaInfo(path: string): Promise<MediaInfo> {
 
 export interface IpcDependencies {
   getWindow: () => BrowserWindow | null
+  /** Rebuilds the native menu and other main-process chrome after a switch. */
+  onUiLanguageChange?: (lang: UiLanguage) => void
 }
 
 export function registerIpc(dependencies: IpcDependencies): TranscriptionManager {
-  const { getWindow } = dependencies
+  const { getWindow, onUiLanguageChange } = dependencies
+  const t = (key: Parameters<typeof translate>[1]): string =>
+    translate(currentUiLanguage(), key)
 
   const send = (channel: string, payload: unknown): void => {
     const window = getWindow()
@@ -111,17 +117,19 @@ export function registerIpc(dependencies: IpcDependencies): TranscriptionManager
 
   ipcMain.handle(IPC.settingsGet, async (): Promise<Settings> => loadSettings())
   ipcMain.handle(IPC.settingsSave, async (_event, settings: Settings): Promise<void> => {
+    const previous = currentUiLanguage()
     await saveSettings(settings)
+    if (settings.uiLanguage !== previous) onUiLanguageChange?.(settings.uiLanguage)
   })
 
   ipcMain.handle(IPC.mediaOpen, async (): Promise<MediaInfo | null> => {
     const window = getWindow()
     const options = {
-      title: 'Открыть запись вебинара',
+      title: t('dialog.openRecording'),
       properties: ['openFile' as const],
       filters: [
-        { name: 'Видео и аудио', extensions: [...MEDIA_EXTENSIONS].map((ext) => ext.slice(1)) },
-        { name: 'Все файлы', extensions: ['*'] }
+        { name: t('dialog.mediaFilter'), extensions: [...MEDIA_EXTENSIONS].map((ext) => ext.slice(1)) },
+        { name: t('dialog.allFiles'), extensions: ['*'] }
       ]
     }
     const result = window
@@ -138,7 +146,7 @@ export function registerIpc(dependencies: IpcDependencies): TranscriptionManager
 
   ipcMain.handle(IPC.mediaRegister, async (_event, path: string) => {
     const info = await stat(path).catch(() => null)
-    if (!info || !info.isFile()) throw new Error('Файл не найден')
+    if (!info || !info.isFile()) throw new Error(t('error.fileNotFound'))
     return registerMedia(path)
   })
 
@@ -148,10 +156,10 @@ export function registerIpc(dependencies: IpcDependencies): TranscriptionManager
     const settings = await loadSettings()
     const ffmpeg = ffmpegBinary()
     if (!(await executable(ffmpeg))) {
-      throw new Error('ffmpeg не найден. Запустите npm run fetch:engine и перезапустите приложение.')
+      throw new Error(t('error.ffmpegMissing'))
     }
     const probe = await probeMedia(ffmpeg, media.path)
-    if (!probe.hasAudio) throw new Error('В выбранном файле нет аудиодорожки')
+    if (!probe.hasAudio) throw new Error(t('error.noAudioTrack'))
     return createProject(media, probe.duration, settings)
   })
 
