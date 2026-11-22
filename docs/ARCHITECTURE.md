@@ -197,6 +197,6 @@ Status triage and cross-cutting product invariants are in [`SPEC.md`](SPEC.md).
 - No diarization, transcript search, SRT/VTT or light theme.
 - Video export always re-encodes; there is no fast stream-copy mode, and
   audio-only export is not implemented.
-- No e2e tests; Electron, real media playback, the engine and packaging are not verified in the Linux development container.
+- No e2e tests; Electron, real media playback, the engine and packaging require a macOS run.
 
 Full deferred list — `docs/BACKLOG.md`; platform and test limits — `docs/TESTING.md` and `docs/DEVELOPMENT.md`.

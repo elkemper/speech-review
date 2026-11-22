@@ -29,14 +29,6 @@ npm run dev
 
 Then in the app: **Settings → General → Download model**. The Q8_0 model (~1.6 GB) is downloaded from Hugging Face, verified by SHA-256 and stored in `userData/models/CrisperWhisper2.0-GGUF/`.
 
-### Important: `node_modules`
-
-In this repository workspace, `node_modules` is the **macOS arm64** install prepared for packaging. Do not run `npm install`, `npm ci` or replace the directory in the Linux container: that would break the macOS dependencies.
-
-- `node_modules_linux/` is a stale Linux tree. It is not used by the app and is excluded from Vitest.
-- If a dependency must be added/updated, edit `package.json` and `package-lock.json`, then ask the user to install on the Mac.
-- The container supports `npm run typecheck`, `npm test` and `npm run build`; launching Electron and the engine is not possible.
-
 ## 3. Scripts
 
 | Script | What it does |
@@ -175,10 +167,6 @@ Chromium does not support some codecs (certain MKV/HEVC/AV1 files). Transcriptio
 ffmpeg -i input.mkv -c:v libx264 -c:a aac -movflags +faststart output.mp4
 ```
 
-### `check:platform` fails in the Linux container
-
-This is expected: `node_modules` was built for macOS, and Electron/native modules do not match Linux. Do not "fix" this by replacing `node_modules` with `node_modules_linux`. To check logic, use `npm test`, `npm run typecheck` and `npm run build`.
-
 ### Transcription is slow
 
 Reference for M4 Pro: 10 minutes of audio ≈ 1.5 minutes of transcription (RTF ≈ 0.15). M5 Air may be slower. The Q4_K model is faster and lighter, but quality is lower. The model is reloaded for each chunk — a known MVP limitation.
@@ -190,7 +178,7 @@ If the app crashes, the job starts over. Completed projects and partial transcri
 ## 8. Development rules
 
 - Do not add e2e/Electron tests; extract pure logic and cover it in Vitest.
-- Do not modify `node_modules` in the container.
+- Avoid new dependencies unless the task requires one.
 - Do not enable `unclear` by default until audio.cpp provides real confidence values.
 - Do not add a light theme without a separate task.
 - Keep user-facing strings in the message catalogue (`src/shared/locales/`) and the existing code style. Russian is the source language; English must keep the same keys. CSV values stay English (see `docs/spec/12-i18n.md`).
@@ -208,11 +196,11 @@ npm run build
 If UI, playback, ffmpeg, model or packaging changed:
 
 - [ ] changes verified on macOS arm64;
-- [ ] `npm run fetch:engine` run on the Mac;
+- [ ] `npm run fetch:engine` has downloaded the engine and ffmpeg;
 - [ ] model downloads and passes SHA-256;
 - [ ] a real file is transcribed; partial and final transcripts appear;
 - [ ] word click, cut handles, skip, undo/redo and export work;
 - [ ] `npm run package:mac` builds a DMG;
 - [ ] first launch of the DMG verified (ad-hoc signing).
 
-These items cannot be verified in the Linux container; do not mark them done without a real run.
+These items require a Mac with a real media file; do not mark them done without a real run.

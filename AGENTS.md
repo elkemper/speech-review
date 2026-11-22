@@ -31,7 +31,7 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 - **Target platform:** macOS on Apple Silicon. Do not assume Windows/Linux runtime support; the code has partial cross-platform paths, but only macOS arm64 is verified.
 - **Fully local:** recording, transcript, project data and model inference stay on the machine. The only network access is the one-time model download from Hugging Face and the engine/ffmpeg download at setup.
 - **No Python/torch at runtime.** `resources/engine/tools/*.py` may exist in the downloaded engine bundle, but the app must not invoke Python. The runtime path is `audiocpp_cli` + GGUF + ffmpeg.
-- **`node_modules` is the macOS arm64 install.** It is kept in the repository workspace for packaging. Do **not** run `npm install`, `npm ci`, or replace `node_modules` in the Linux development container. `node_modules_linux/` is a stale Linux tree; it is gitignored and excluded from Vitest. If a dependency must change, edit `package.json`/`package-lock.json` and ask the user to install on the Mac.
+- **Dependencies stay minimal.** Run `npm install` on macOS after pulling changes to `package.json`. Avoid new dependencies unless the task requires one: the macOS packaging setup makes dependency changes expensive.
 - **Dark theme only.** Do not add a light theme or a theme switcher unless the task explicitly asks for it.
 - **Filler lexicons follow the recognition language.** `FILLER_LEXICONS` in `src/shared/defects.ts` holds the RU and EN lists; `Settings.language` selects one, never `Settings.uiLanguage`. Keep both lists in sync with any new filler; see `docs/DATA_MODEL.md` §6.
 - **Word confidence / `unclear` is backlog.** `audiocpp_cli` currently writes `confidence: 0`. The parser stores `null` when no positive confidence exists and the `unclear` rule is disabled. Do not enable it by default or treat `0` as a low-confidence signal.
@@ -40,7 +40,7 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 - **Do not silently change defect-lifecycle semantics.** Automatic defect IDs are derived from the type and the covered words; manual marks have explicit group IDs; confirmed state is reconciled when marks merge/split; deleted manual marks live in `dismissedMarks`, deleted automatic IDs in `dismissedDefectIds`. See `docs/DATA_MODEL.md`.
 - **History is for editable project state only:** marks, confirmed IDs, dismissed IDs, dismissed marks, notes, cut overrides, the project defect rules and the skip padding that drives recalculation. Do not put skip mode, playback position, filters, selection, transcript, model/recognition language/interface language (`uiLanguage`)/export or UI-only settings into undo/redo snapshots. While the settings dialog is open, undo is limited to settings changes made since it was opened.
 - **Schema changes go through numbered migrations.** A renamed or removed field, or a one-time conversion, gets a step in `src/shared/projectMigrations.ts` or `src/shared/settingsMigrations.ts`, a bumped version constant and a test. Filling a new field with a default is not a migration: keep that in `normalizeRules` / `normalizePlaybackSettings`. See `docs/DATA_MODEL.md` §11.
-- **Do not commit generated or binary artifacts:** `out/`, `dist/`, `resources/engine/`, `resources/ffmpeg/`, `node_modules/`, `node_modules_linux/` are ignored.
+- **Do not commit generated or binary artifacts:** `out/`, `dist/`, `resources/engine/`, `resources/ffmpeg/`, `node_modules/` are ignored.
 
 ## Repository map
 
@@ -100,18 +100,18 @@ test/                     Vitest suites and fixtures
 
 ## Commands
 
-| Command | What it does | Works in this Linux container? |
-|---|---|---|
-| `npm run typecheck` | `tsc --noEmit` for node and web configs | Yes |
-| `npm test` | Vitest run (288 tests / 23 files) | Yes |
-| `npm run test:watch` | Vitest watch mode | Yes |
-| `npm run build` | electron-vite production build into `out/` | Yes |
-| `npm run dev` | electron-vite dev + Electron | **No** (needs macOS + macOS Electron) |
-| `npm start` | electron-vite preview | **No** |
-| `npm run fetch:engine` | downloads audio.cpp and ffmpeg into `resources/` | **No** — it would replace the macOS binaries with Linux ones; run it on the Mac |
-| `npm run check:resources` | verifies engine and ffmpeg exist | Yes if resources are present |
-| `npm run check:platform` | verifies Electron/native modules match the host | Fails on Linux with macOS `node_modules` |
-| `npm run package:mac` | platform check + resources check + build + electron-builder DMG | **No** (macOS only) |
+| Command | What it does |
+|---|---|
+| `npm run typecheck` | `tsc --noEmit` for node and web configs |
+| `npm test` | Vitest run (296 tests / 25 files) |
+| `npm run test:watch` | Vitest watch mode |
+| `npm run build` | electron-vite production build into `out/` |
+| `npm run dev` | electron-vite dev + Electron |
+| `npm start` | electron-vite preview |
+| `npm run fetch:engine` | downloads audio.cpp and ffmpeg into `resources/` |
+| `npm run check:resources` | verifies engine and ffmpeg exist |
+| `npm run check:platform` | verifies Electron/native modules match the host |
+| `npm run package:mac` | platform check + resources check + build + electron-builder DMG |
 
 ## Verification before finishing
 
@@ -123,7 +123,7 @@ npm test
 npm run build
 ```
 
-If you changed UI behavior or runtime code, also state clearly that Electron, `audiocpp_cli`, ffmpeg and real media playback were **not** verified in this container and ask the user to test on the Mac. Never claim a runtime check that did not happen.
+If you changed UI behavior or runtime code, verify it by running the app with `npm run dev` on macOS, including real media playback, transcription and export. If you could not run a check, say explicitly which runtime checks were not performed. Never claim a runtime check that did not happen.
 
 ## Coding conventions
 
@@ -159,7 +159,7 @@ If you changed UI behavior or runtime code, also state clearly that Electron, `a
 
 ## Testing rules
 
-- Tests live in `test/**/*.test.ts`; Vitest includes only that pattern and excludes `node_modules_linux`.
+- Tests live in `test/**/*.test.ts`; Vitest includes only that pattern.
 - Add regression tests for every pure rule change: defect detection, automatic grouping, per-type minimum duration, chunk planning, marks/groups, confirmation reconciliation, cut ranges and overrides, selection, timeline math, skip intervals and padding, settings normalization, CSV.
 - Tests may import renderer helpers by relative path (for example `../src/renderer/src/skip`); the only configured alias is `@shared`.
 - Do not add e2e or Electron launch tests. If behavior depends on Electron, extract the pure part and test that.
@@ -167,7 +167,7 @@ If you changed UI behavior or runtime code, also state clearly that Electron, `a
 
 ## Runtime and platform caveats
 
-- This development container is Linux. Electron cannot launch here, and `audiocpp_cli` is a macOS arm64 binary. Real playback, transcription, model download and packaging must be verified on the user's Mac.
+- Electron, `audiocpp_cli`, ffmpeg, real playback, transcription, model download and packaging can only be verified in the macOS app; unit tests do not cover them.
 - `npm run package:mac` produces an ad-hoc signed but **not notarized** DMG. First launch may require `xattr -cr "/Applications/Speech Review.app"` or right-click → Open.
 - Models are stored under Electron `userData/models/CrisperWhisper2.0-GGUF/`; projects under `userData/projects/<uuid>/`; temporary jobs under `userData/tmp/jobs/`.
 - The model is licensed under the Nyra Health Non-Commercial Research License. Do not imply commercial usage rights.

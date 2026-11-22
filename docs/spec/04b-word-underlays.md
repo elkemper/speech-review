@@ -43,5 +43,5 @@ words are marked without reading the defect list.
 
 ## Verification
 
-- Pure mapping is unit-testable in the Linux container.
+- Pure mapping is unit-tested.
 - Color contrast must be checked on macOS with a real transcript.

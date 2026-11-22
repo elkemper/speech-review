@@ -54,7 +54,7 @@ speech, so I can navigate and adjust marks by eye.
 
 ## Verification
 
-- Pure math is unit-tested in the Linux container.
+- Pure math is unit-tested.
 - Visual contrast must be checked on macOS with a real recording; peaks are
   stored at 20 buckets/s, so at 4× zoom the envelope may still look blocky.
   Raising the peak resolution is a separate change and would require

@@ -133,5 +133,4 @@ the defect list and skip intervals they recalculated.
 
 - `test/history.test.ts` covers undo/redo, merge keys, rules and padding
   snapshots; `test/settingsHistory.test.ts` covers labels and merge keys.
-- Panel resize, settings locking and visual changes need a macOS run.
-- Electron, real media and recognition are not verified in the Linux container.
+- Panel resize, settings locking, visual changes, Electron, real media and recognition need a macOS run.

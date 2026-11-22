@@ -101,6 +101,6 @@ for it on the main timeline.
 
 ## Verification
 
-- Unit tests pass in the Linux container.
+- Unit tests cover the pure parts.
 - Real drag/playhead behaviour must be checked on macOS, including a narrow
   defect panel and a trackpad.

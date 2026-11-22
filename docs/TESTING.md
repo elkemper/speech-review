@@ -11,7 +11,7 @@ npm run typecheck     # checks main/preload/shared and renderer types separately
 npm run build         # checks that the production build succeeds
 ```
 
-Current state: **288 tests in 23 files**. A run takes less than a second in the Linux container.
+Current state: **296 tests in 25 files**. A run takes about a second.
 
 ## 2. Configuration
 
@@ -114,4 +114,4 @@ These are deliberate MVP limitations. When improving these areas, extract a pure
 
 ## 8. Environment limitations
 
-Tests can run in the Linux container. They do not launch Electron, read `resources/engine`, download the model or work with real video. Therefore a green `npm test` does not mean the app works on macOS: a real run with `npm run dev` and a webinar file is still required from the user.
+The suite does not launch Electron, read `resources/engine`, download the model or work with real video. A green `npm test` therefore does not prove that the app works on macOS: a manual run with `npm run dev` and a real webinar file is still required.

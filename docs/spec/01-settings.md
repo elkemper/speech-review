@@ -148,5 +148,4 @@ configure one type without scanning several sections.
 
 - Unit tests: settings normalization in `test/grouping.test.ts`; number
   parsing and step snapping in `test/format.test.ts`.
-- Manual: settings reload, slow scrolling and slider dragging on macOS (not
-  possible in this container).
+- Manual: settings reload, slow scrolling and slider dragging on macOS.

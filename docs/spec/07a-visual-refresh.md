@@ -46,5 +46,5 @@ editor.
 
 ## Verification
 
-- Visual review on macOS; not verifiable in this Linux container.
+- Visual review on macOS.
 - Keep `test` green; this story should not change pure logic.

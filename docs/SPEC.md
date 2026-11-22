@@ -90,7 +90,8 @@ Applies to every story.
     bookmarks survive.
 12. **Atomic writes** (`*.tmp` + `rename`) for project, transcript, peaks and
     settings.
-13. **Do not replace `node_modules`** in the Linux container.
+13. **Dependencies stay minimal.** Run `npm install` on macOS after changing
+    `package.json`; do not hand-edit the installed tree.
 14. **Video export uses the same cut model.** `buildCutList` plus
     `complementRanges` produce the exported ranges; do not add a second cut
     model. Export always re-encodes, so cuts are frame-accurate. Audio-only
