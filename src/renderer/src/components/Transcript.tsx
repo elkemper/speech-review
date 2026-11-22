@@ -367,7 +367,7 @@ export default function Transcript({
                     className="link-btn"
                     onClick={() =>
                       confirmMany(
-                        selectedDefectIds,
+                        defects.filter((defect) => selectedDefectIds.includes(defect.id)),
                         `Подтверждено выделение: ${selectedDefectIds.length}`
                       )
                     }

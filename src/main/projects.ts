@@ -2,8 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import { normalizeRules } from '@shared/defects'
+import {
+  CURRENT_PROJECT_VERSION,
+  migrateProject,
+  type RawProject
+} from '@shared/projectMigrations'
 import type {
-  ManualMark,
   MediaInfo,
   Peaks,
   Project,
@@ -42,12 +46,12 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 
 type ProjectMeta = Omit<Project, 'transcript'>
 
-/** Older project files stored a single `reviewedDefectIds` list. */
-type LegacyProjectMeta = Partial<ProjectMeta> & { reviewedDefectIds?: string[] }
-
-function metaOf(project: Project): ProjectMeta {
+function metaOf(project: Project): ProjectMeta & { schemaVersion: number } {
+  // Drop any stale version a caller may have carried in memory, then stamp the
+  // current one: everything written by this build is already migrated.
   const { transcript: _transcript, ...meta } = project
-  return meta
+  delete (meta as { schemaVersion?: number }).schemaVersion
+  return { ...meta, schemaVersion: CURRENT_PROJECT_VERSION }
 }
 
 export async function createProject(
@@ -86,77 +90,44 @@ export async function createProject(
 }
 
 export async function loadProject(id: string): Promise<LoadedProject> {
-  const raw = JSON.parse(await readFile(projectFile(id), 'utf8')) as ProjectMeta & {
-    reviewedDefectIds?: string[]
-    confirmedDefectIds?: string[]
-    dismissedDefectIds?: string[]
-    dismissedMarks?: ManualMark[]
-  }
-  const { reviewedDefectIds: legacyReviewed, ...meta } = raw
-  // Old builds had one "reviewed" flag whose meaning was closer to the new
-  // "deleted": a checked item was considered not a defect and played normally.
-  // Translate it once instead of inverting the user's decision.
-  const hasNewState =
-    Array.isArray(meta.confirmedDefectIds) ||
-    Array.isArray(meta.dismissedDefectIds) ||
-    Array.isArray(meta.dismissedMarks)
-  const confirmedDefectIds = hasNewState ? meta.confirmedDefectIds ?? [] : []
-  let dismissedDefectIds = hasNewState
-    ? [...(meta.dismissedDefectIds ?? [])]
-    : [...(legacyReviewed ?? [])].filter((defectId) => !defectId.startsWith('manual-'))
+  const raw = JSON.parse(await readFile(projectFile(id), 'utf8')) as RawProject
 
-  // Manual deletions live in an archive with the full mark. Older builds stored
-  // their defect IDs in dismissedDefectIds, so move those marks once.
-  const manualDismissedIds = new Set<string>()
-  for (const defectId of legacyReviewed ?? []) {
-    if (defectId.startsWith('manual-')) manualDismissedIds.add(defectId)
-  }
-  for (const defectId of dismissedDefectIds) {
-    if (defectId.startsWith('manual-')) manualDismissedIds.add(defectId)
-  }
-  dismissedDefectIds = dismissedDefectIds.filter((defectId) => !defectId.startsWith('manual-'))
-
-  const sourceMarks = meta.marks ?? []
-  const dismissedMarks: ManualMark[] = hasNewState ? [...(meta.dismissedMarks ?? [])] : []
-  const archivedIds = new Set(dismissedMarks.map((mark) => mark.id))
-  const marks: ManualMark[] = []
-  for (const mark of sourceMarks) {
-    if (archivedIds.has(mark.id)) continue
-    const singleId = `manual-${mark.id}`
-    const groupId = mark.groupId ? `manual-group-${mark.groupId}` : null
-    if (manualDismissedIds.has(singleId) || (groupId && manualDismissedIds.has(groupId))) {
-      dismissedMarks.push(mark)
-      archivedIds.add(mark.id)
-    } else {
-      marks.push(mark)
-    }
+  // Read the transcript first: automatic defect ids in the metadata can only be
+  // migrated against the words they were detected on.
+  let transcript: Transcript | undefined
+  try {
+    transcript = JSON.parse(await readFile(transcriptFile(id), 'utf8')) as Transcript
+  } catch {
+    transcript = undefined
   }
 
-  const legacyMeta = meta as ProjectMeta & {
-    defectOverrides?: Record<string, { start: number; end: number }>
-  }
-  const legacyOverrides = legacyMeta.defectOverrides
-  delete legacyMeta.defectOverrides
+  const migrated = migrateProject(raw, transcript)
+  const meta = migrated.project
 
-  const project: Project = {
+  const project = {
     ...meta,
-    marks,
+    marks: meta.marks ?? [],
     // Projects created by older builds may not contain every rule field.
     rules: normalizeRules(meta.rules),
-    // Older builds stored boundary edits under `defectOverrides`. Their spans
-    // become cut overrides so existing edits survive the rename.
-    cutOverrides: meta.cutOverrides ?? legacyOverrides ?? {},
-    confirmedDefectIds,
-    dismissedDefectIds,
-    dismissedMarks,
+    cutOverrides: meta.cutOverrides ?? {},
+    confirmedDefectIds: meta.confirmedDefectIds ?? [],
+    dismissedDefectIds: meta.dismissedDefectIds ?? [],
+    dismissedMarks: meta.dismissedMarks ?? [],
     defectNotes: meta.defectNotes ?? {},
     bookmarks: Array.isArray(meta.bookmarks) ? meta.bookmarks : [],
     transcriptComplete: meta.transcriptComplete ?? false
+  } as Project
+
+  // Upgrade the file once, so a migrated project is not re-processed on every
+  // open. A failure here must not lose the user's project: the in-memory
+  // result is still returned.
+  if (migrated.migrated) {
+    await writeJson(projectFile(id), metaOf(project)).catch(() => undefined)
   }
 
-  try {
-    project.transcript = JSON.parse(await readFile(transcriptFile(id), 'utf8')) as Transcript
-  } catch {
+  if (transcript) {
+    project.transcript = transcript
+  } else {
     project.transcript = undefined
     project.transcriptComplete = false
   }
@@ -185,21 +156,20 @@ export async function writeTranscript(
 ): Promise<void> {
   await mkdir(projectDir(id), { recursive: true })
   await writeJson(transcriptFile(id), transcript)
-  const meta = JSON.parse(await readFile(projectFile(id), 'utf8')) as LegacyProjectMeta & {
-    reviewedDefectIds?: string[]
+  const meta = JSON.parse(await readFile(projectFile(id), 'utf8')) as ProjectMeta & {
+    schemaVersion?: number
   }
   meta.transcriptComplete = complete
   meta.updatedAt = new Date().toISOString()
-  // Defect ids are derived from the transcript order, so old confirmation,
-  // deletion and note state would silently point at different defects after
-  // re-recognition. Partial writes keep the state of the already visible prefix.
+  // Automatic defect ids are stable now, so a fresh transcript no longer
+  // renumbers the user's review state. It is still cleared when the whole
+  // transcript is replaced: the old matches may be gone or split differently,
+  // and a stale id would point at a different defect.
   if (resetReview) {
     meta.confirmedDefectIds = []
     meta.dismissedDefectIds = []
     meta.defectNotes = {}
     meta.cutOverrides = {}
-    delete (meta as Record<string, unknown>).defectOverrides
-    delete meta.reviewedDefectIds
   }
   await writeJson(projectFile(id), meta)
 }

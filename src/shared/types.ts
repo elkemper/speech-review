@@ -92,6 +92,12 @@ export interface ManualMark {
 export interface DefectBoundsOverride {
   start: number
   end: number
+  /**
+   * Written when the defect was confirmed: the cut is frozen at the padding in
+   * effect at that moment. Removing the confirmation drops pinned ranges only;
+   * a range dragged by hand is never pinned and survives.
+   */
+  pinned?: boolean
 }
 
 export interface CutRange {

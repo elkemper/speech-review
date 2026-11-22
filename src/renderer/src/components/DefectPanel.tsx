@@ -161,7 +161,7 @@ export default function DefectPanel({
   const confirmSelection = (): void => {
     if (selectedDefectIds.length === 0) return
     confirmMany(
-      selectedDefectIds,
+      defects.filter((defect) => selectedDefectIds.includes(defect.id)),
       `Подтверждено выделение: ${selectedDefectIds.length}`
     )
   }
@@ -339,7 +339,7 @@ export default function DefectPanel({
                       className="rail-btn confirm"
                       title="Подтвердить дефект (Enter)"
                       aria-label="Подтвердить дефект"
-                      onClick={() => confirmDefect(defect.id, `Подтверждён: ${defect.text}`)}
+                      onClick={() => confirmDefect(defect, `Подтверждён: ${defect.text}`)}
                     >
                       <CheckIcon />
                     </button>

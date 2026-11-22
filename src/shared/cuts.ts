@@ -57,9 +57,9 @@ function normalizeRange(start: number, end: number, duration: number): CutRange 
  * Final cut range for one defect.
  *
  * An explicit `cutOverrides[id]` wins over every padding setting: the user
- * dragged the cut handle and expects that exact range. A derived cut applies
- * type padding and the pause keep; a derived pause cut shorter than
- * `MIN_PAUSE_CUT_SEC` is not performed at all.
+ * dragged the cut handle, or the defect was confirmed and its cut pinned at
+ * that moment. A derived cut applies type padding and the pause keep; a derived
+ * pause cut shorter than `MIN_PAUSE_CUT_SEC` is not performed at all.
  */
 export function cutRangeFor(
   defect: Defect,
@@ -80,6 +80,50 @@ export function cutRangeFor(
     return null
   }
   return range
+}
+
+/**
+ * Freeze the current cut of a confirmed defect.
+ *
+ * Confirmation means "this is a real defect and I reviewed it": later padding
+ * changes must not silently move its cut. The derived range is stored as a
+ * `pinned` override, so `cutRangeFor` keeps returning exactly this range.
+ *
+ * A defect that is not cut at all (for example a pause shorter than the kept
+ * room tone) is pinned as an empty range: widening the padding later must not
+ * start cutting it. An empty range normalises to `null`, so the item stays
+ * un-cut.
+ *
+ * Returns `null` for an unconfirmed defect, so callers can skip it.
+ */
+export function pinCutFor(
+  defect: Defect,
+  settings: PlaybackSettings,
+  duration: number
+): DefectBoundsOverride | null {
+  if (!defect.confirmed) return null
+  const cut = cutRangeFor(defect, settings, duration)
+  return cut
+    ? { start: cut.start, end: cut.end, pinned: true }
+    : { start: defect.start, end: defect.start, pinned: true }
+}
+
+/**
+ * Drop the pinned overrides of the given defects and keep every explicit cut
+ * the user dragged by hand. Used when a confirmation is removed: the frozen
+ * range goes away, the manual edit stays.
+ */
+export function withoutPinnedCuts(
+  overrides: Record<string, DefectBoundsOverride>,
+  defectIds: Iterable<string>
+): Record<string, DefectBoundsOverride> {
+  const drop = new Set(defectIds)
+  const next: Record<string, DefectBoundsOverride> = {}
+  for (const [id, bounds] of Object.entries(overrides)) {
+    if (drop.has(id) && bounds.pinned) continue
+    next[id] = bounds
+  }
+  return next
 }
 
 export function mergeRanges(ranges: CutRange[]): CutRange[] {

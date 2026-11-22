@@ -242,7 +242,7 @@ Fields:
 
 | Field | Description |
 |---|---|
-| `id` | `auto-${type}-${sequence}` or `manual-${markId}` / `manual-group-${groupId}` |
+| `id` | `auto-${type}-w${wordIds.join('_')}` or `manual-${markId}` / `manual-group-${groupId}` |
 | `type` | `filler`, `pause`, `repetition`, `elongation`, `false_start`, `vocal_sound`, `unclear`, `manual` |
 | `start`, `end` | original detected/marked span in seconds; the final cut is derived separately |
 | `wordIds` | words the defect refers to |
@@ -257,17 +257,24 @@ Fields:
 | `candidate` | computed only: a suppressed minimum-duration detection is revealed for preview; never persisted |
 | `note` | filled in by the renderer |
 
-Automatic IDs are **not stable**: `sequence` is the global insertion order. Changing rules or re-transcribing can shift the numbering. This is a known limitation; see `docs/BACKLOG.md`.
+Automatic IDs are **stable**: they depend on the defect type and the words it
+covers, not on detection order. Changing rules or re-transcribing keeps an
+existing id as long as the same words still produce a defect of the same type.
+When one word produces two defects of the same type, the second gets a `-2`
+suffix in detection order. Files written before this scheme are migrated on
+load (see §11).
 
 `dismissedDefectIds` and `dismissedMarks` are applied inside `detectDefects`. Active automatic defects are grouped without dismissed members; deleted automatic and manual items are returned separately with `dismissed: true` so their thin cards can be restored and focused from the transcript. A deleted automatic group stores both the group ID and member IDs.
 
-A minimum-duration candidate is a rule match that did not pass the per-type filter. It keeps the same `auto-${type}-${sequence}` ID as it would have at a lower threshold. The renderer reveals one candidate at a time when `activeDefectId` matches it and computes `candidate: true`; the candidate is not persisted. Any explicit edit or review action (cut edit, confirmation, deletion, note) puts the ID into `promotedIds`, so the next detection pass returns it as a normal defect and it survives a switch or reload.
+A minimum-duration candidate is a rule match that did not pass the per-type filter. It keeps the same `auto-${type}-w…` ID as it would have at a lower threshold. The renderer reveals one candidate at a time when `activeDefectId` matches it and computes `candidate: true`; the candidate is not persisted. Any explicit edit or review action (cut edit, confirmation, deletion, note) puts the ID into `promotedIds`, so the next detection pass returns it as a normal defect and it survives a switch or reload.
 
 `cutRangeFor`:
 
 - returns an explicit `cutOverrides[defectId]` when present, normalized and clamped to the recording;
 - otherwise applies per-type padding and the pause keep;
 - returns `null` when the derived pause cut is shorter than 0.2 s; an explicit override is honoured even when shorter.
+
+An override carries `pinned: true` when it was written by confirmation. A pinned range is frozen: padding changes do not move it. Removing the confirmation deletes pinned overrides only, so a range dragged by hand stays. Double-clicking a handle on a confirmed defect re-pins the derived range instead of deleting the override.
 
 `buildCutList` merges every non-dismissed cut and does **not** depend on `skipEnabled`; `buildSkipIntervals` is `skipEnabled ? buildCutList : []`. `buildCutMap` returns the per-defect cut for drawing. `cutView` splits a defect into the original fill, the final cut, `outer` padding and `inner` kept room tone. The shared module is `src/shared/cuts.ts`; the renderer re-exports it from `src/renderer/src/skip.ts`.
 
@@ -302,7 +309,7 @@ Rules:
 
 | Entity | ID |
 |---|---|
-| Automatic defect | `auto-${type}-${sequence}` |
+| Automatic defect | `auto-${type}-w${wordIds.join('_')}` |
 | Automatically grouped defect | `auto-group-${firstDefectId}` |
 | Single manual mark | `manual-${mark.id}` |
 | Logical manual mark | `manual-group-${groupId}` |
@@ -319,7 +326,8 @@ Details:
   - adds a group confirmation ID only if **every** mark in it was confirmed before the change;
   - a new mark never becomes confirmed automatically.
 - When a confirmed logical mark is split, all parts remain confirmed. When a confirmed and an unconfirmed mark are merged, the new group is considered unconfirmed.
-- Skip mode produces intervals for every non-dismissed item; confirmation does not affect playback.
+- Skip mode produces intervals for every non-dismissed item; confirmation does not decide whether an item is cut, but it freezes the cut range (story 50).
+- Deleting an automatic defect stays effective across rule changes because automatic ids are stable (story 51).
 - Restoring removes the id from the appropriate dismissed store; restoring a manual mark moves it from `dismissedMarks` back to `marks`.
 
 ## 9. Action history
@@ -370,27 +378,55 @@ History is stored only in renderer memory and is reset when a project is opened 
   - always writes `transcript.json`;
   - updates `transcriptComplete` and `updatedAt` in `project.json`;
   - when `resetReview = true`, clears `confirmedDefectIds`, `dismissedDefectIds`, `defectNotes` and `cutOverrides`; `marks` and `dismissedMarks` survive.
-- During transcription, the first partial result is written with `resetReview = true` because automatic IDs may have changed. Later partial results use `resetReview = false` so the user's edits in the already visible prefix are not lost. Manual marks are never reset.
+- During transcription, the first partial result is written with `resetReview = true` because the transcript was rebuilt. Later partial results use `resetReview = false` so the user's edits in the already visible prefix are not lost. Manual marks are never reset. Automatic ids are stable, but a rebuilt transcript can split or drop the words a decision referred to, so review state is still cleared on a full rebuild.
 - On the first partial, the renderer replaces automatic confirmation state with the on-disk state and resets history; on later partials and `done`, it keeps local `marks`, `dismissedMarks`, `confirmedDefectIds`, `dismissedDefectIds`, `defectNotes`, `cutOverrides`.
 
-## 11. Backward compatibility
+## 11. Schema versions and migrations
 
-There is no explicit project schema version. Compatibility is provided by defaults at load time:
+`project.json` and `settings.json` carry `schemaVersion`. A file without one is
+treated as version 0. `runMigrations` (`src/shared/migrations.ts`) applies named,
+pure, idempotent steps in ascending order up to the target version and stamps
+the new version. Each format keeps its own step list next to it.
 
-- missing `marks`, `cutOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `bookmarks` → empty objects/arrays; an old `defectOverrides` map is read as `cutOverrides`;
-- a legacy project with `reviewedDefectIds` and no new fields migrates automatic IDs to `dismissedDefectIds` and manual marks to `dismissedMarks`; `confirmedDefectIds` starts empty;
+**Project** (`src/shared/projectMigrations.ts`, current version 2):
+
+- v1 folds the legacy fields: `reviewedDefectIds` → `dismissedDefectIds` /
+  `dismissedMarks`, `defectOverrides` → `cutOverrides`, and archives deleted
+  manual marks.
+- v2 rewrites order-based automatic ids (`auto-${type}-${sequence}`,
+  `auto-group-…`) to stable ids in `confirmedDefectIds`, `dismissedDefectIds`,
+  `defectNotes` and `cutOverrides`. The old counter included disabled types and
+  below-threshold candidates, so detection is re-run with those filters
+  neutralised; `detectDefectsWithCandidates().matches` supplies the order.
+  Ids that cannot be resolved are kept unchanged, never dropped.
+- `loadProject` runs the migration once, then writes the upgraded file back. A
+  project whose rules were edited after detection may not reproduce its old
+  numbering; unresolved ids stay as they are.
+
+**Settings** (`src/shared/settingsMigrations.ts`, current version 1):
+
+- v1 renames the legacy `reviewed` CSV column to `confirmed`.
+- Filling missing fields with defaults and clamping values is **not** a
+  migration: it stays in `normalizeRules` / `normalizePlaybackSettings` and runs
+  on every load.
+
+Compatibility by defaults still covers the rest:
+
+- missing `marks`, `cutOverrides`, `confirmedDefectIds`, `dismissedDefectIds`, `dismissedMarks`, `defectNotes`, `bookmarks` → empty objects/arrays;
 - missing `rules` fields, including `minDurationByType`, `enabledTypes`, `autoGroupEnabled` and `autoGroupGapSec` → values from `normalizeRules`/`DEFAULT_RULES`;
 - old marks without `wordIds` → strict time overlap;
 - old marks without `groupId` → single marks;
 - missing/broken `transcript.json` → project without a transcript, `transcriptComplete = false`;
 - missing/broken `peaks.json` → `peaks = null`;
-- old settings are normalized in `loadSettings`, including every per-type skip padding entry;
+- old settings are normalized in `loadSettings`, including every per-type skip padding entry.
 
 When adding new fields to `Project` or `Settings`:
 
-1. add a default at load time;
-2. keep reading old files working;
-3. add a normalization test if the logic is non-trivial.
+1. a new field that can be defaulted → add the default at load time;
+2. a renamed or removed field, or a one-time conversion → add a numbered
+   migration step, bump the version constant and add a test;
+3. keep reading old files working;
+4. add a normalization test if the logic is non-trivial.
 
 ## 12. Export
 

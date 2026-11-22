@@ -21,6 +21,11 @@ import type {
   ModelId,
   Settings
 } from '@shared/types'
+import {
+  CURRENT_SETTINGS_VERSION,
+  migrateSettings,
+  type RawSettings
+} from '@shared/settingsMigrations'
 import { userDataDir } from './paths'
 
 const DEFAULTS: Settings = {
@@ -50,13 +55,12 @@ function validBackend(value: unknown): value is Backend {
 
 function normalizeExport(value: unknown): ExportSettings {
   const raw = (value ?? {}) as Partial<ExportSettings>
-  // Older settings stored the confirmation column as `reviewed`.
-  const rawFields = Array.isArray(raw.fields) ? (raw.fields as string[]) : []
-  const migrated = rawFields.map((field) => (field === 'reviewed' ? 'confirmed' : field))
+  // Field renames (for example the old `reviewed` column) are handled once by
+  // `settingsMigrations`; this only filters and fills defaults.
   const fields = Array.isArray(raw.fields)
     ? [
         ...new Set(
-          migrated.filter((field): field is ExportField =>
+          (raw.fields as unknown[]).filter((field): field is ExportField =>
             EXPORT_FIELDS.includes(field as ExportField)
           )
         )
@@ -71,8 +75,10 @@ function normalizeExport(value: unknown): ExportSettings {
 
 export async function loadSettings(): Promise<Settings> {
   try {
-    const parsed = JSON.parse(await readFile(settingsFile(), 'utf8')) as Partial<Settings>
-    return {
+    const raw = JSON.parse(await readFile(settingsFile(), 'utf8')) as RawSettings
+    const migrated = migrateSettings(raw)
+    const parsed = migrated.settings as Partial<Settings>
+    const settings: Settings = {
       language: typeof parsed.language === 'string' ? parsed.language : DEFAULTS.language,
       modelId: validModelId(parsed.modelId) ? parsed.modelId : DEFAULTS.modelId,
       backend: validBackend(parsed.backend) ? parsed.backend : DEFAULTS.backend,
@@ -86,6 +92,11 @@ export async function loadSettings(): Promise<Settings> {
       showDismissed: parsed.showDismissed !== false,
       modelVersions: normalizeModelVersions(parsed.modelVersions)
     }
+    // Write the upgraded shape once so a renamed field is not converted again.
+    if (migrated.migrated) {
+      await writeSettingsFile(settings).catch(() => undefined)
+    }
+    return settings
   } catch {
     return {
       ...DEFAULTS,
@@ -97,10 +108,15 @@ export async function loadSettings(): Promise<Settings> {
   }
 }
 
-export async function saveSettings(settings: Settings): Promise<void> {
+async function writeSettingsFile(settings: Settings): Promise<void> {
   await mkdir(userDataDir(), { recursive: true })
   const path = settingsFile()
   const temporary = `${path}.tmp`
-  await writeFile(temporary, JSON.stringify(settings, null, 2), 'utf8')
+  const payload = { ...settings, schemaVersion: CURRENT_SETTINGS_VERSION }
+  await writeFile(temporary, JSON.stringify(payload, null, 2), 'utf8')
   await rename(temporary, path)
+}
+
+export async function saveSettings(settings: Settings): Promise<void> {
+  await writeSettingsFile(settings)
 }

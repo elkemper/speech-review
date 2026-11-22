@@ -27,7 +27,7 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - A word whose short defect is below the threshold opens a temporary «кандидат» card when clicked. Resize, confirm, delete or add a note to keep it as a real defect.
 - Skip padding is configured per defect type and per group; a pause keeps a configurable amount of room tone instead of being cut to zero. The handles on the timeline set the final cut; the fill stays the original defect. Double-click a handle to return to the derived cut.
 - Loop over a fragment, speed 0.5–2×, hotkeys.
-- Skip mode: during playback, automatically cut every defect and manual mark except deleted ones, with configurable padding. Confirmation does not affect playback.
+- Skip mode: during playback, automatically cut every defect and manual mark except deleted ones, with configurable padding. A confirmed defect keeps the cut it had at confirmation, so later padding changes do not move it.
 - Deleted defects stay as thin cards with an undo button when "Show deleted defects" is enabled. Confirmed cards collapse to a compact row with an undo button. Pending cards have delete/confirm buttons on the left.
 - Export defects to CSV (Excel) and JSON; CSV fields and delimiter are configurable. The base CSV columns are the final cut bounds; the original defect bounds are optional extra columns. JSON also contains the merged `cuts` list for a video editor.
 - Export a clean video from the current marks: resolution, three quality presets, and software H.264/HEVC or hardware VideoToolbox encoders. Progress can be cancelled; the source file is never modified.
@@ -155,8 +155,8 @@ Electron main
 - The engine runs as a separate process for each chunk. The model is reloaded between chunks — a deliberate trade-off for MVP simplicity.
 - `words.json` from audio.cpp contains `start_sample`/`end_sample` at 16 kHz. The parser tolerates trailing commas.
 - Defects are computed in the renderer from the transcript and rules. Confirmed and dismissed IDs, deleted manual marks and notes are stored in `project.json`.
-- The partial transcript is written with `transcriptComplete: false`; on the first partial result, old confirmation and dismissal state is reset because defect IDs may have changed. Manual marks are preserved.
-- Skip mode does not re-encode video: during playback the position jumps over the final cut ranges built from all defects and marks except deleted ones. "Before/after" padding is configured per defect type and per group, and pauses keep a configurable amount of silence so cuts do not sound clipped. Dragging a handle stores an explicit cut that wins over padding; double-clicking it restores the derived cut.
+- The partial transcript is written with `transcriptComplete: false`; on the first partial result, old confirmation and dismissal state is reset because the transcript was rebuilt and old matches may have changed. Manual marks are preserved.
+- Skip mode does not re-encode video: during playback the position jumps over the final cut ranges built from all defects and marks except deleted ones. "Before/after" padding is configured per defect type and per group, and pauses keep a configurable amount of silence so cuts do not sound clipped. Dragging a handle stores an explicit cut that wins over padding; double-clicking it restores the derived cut. Confirming a defect freezes its cut at the current padding, so later padding changes do not move it.
 
 ## Where data lives
 

@@ -182,10 +182,10 @@ describe('automatic defect grouping', () => {
     ).find((item) => item.type === 'pause')?.id
 
     const withDismissed = detectDefects(transcript, rules, [], {
-      dismissedIds: ['auto-filler-0']
+      dismissedIds: ['auto-filler-w0']
     })
     expect(
-      withDismissed.find((item) => item.id === 'auto-filler-0')?.dismissed
+      withDismissed.find((item) => item.id === 'auto-filler-w0')?.dismissed
     ).toBe(true)
     expect(
       withDismissed.some((item) => !item.dismissed && item.groupIds && item.groupIds.length > 1)

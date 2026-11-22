@@ -453,6 +453,7 @@ export default function Workspace() {
         <span><kbd>M</kbd> метка</span>
         <span><kbd>B</kbd> закладка</span>
         <span><kbd>L</kbd> цикл</span>
+        <span><kbd>K</kbd> пропускать дефекты</span>
         <span><kbd>1</kbd>–<kbd>6</kbd> скорость</span>
         <span className="hotkeys-spacer" />
         <span>{formatTimecode(project.duration)}</span>

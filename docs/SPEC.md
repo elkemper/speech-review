@@ -38,7 +38,7 @@ only the area it is working on.
 |---|---|---|
 | [`01-settings.md`](spec/01-settings.md) | 1–3, 43 | Tabs, sliders, rows, show-dismissed |
 | [`02-defects.md`](spec/02-defects.md) | 4–7, 44, 46 | Detection, minimum duration, candidates, auto-grouping, toggles, sentence pauses |
-| [`03-marks.md`](spec/03-marks.md) | 8–13, 45 | Manual marks, selection, logical marks, cut handles, confirmation state |
+| [`03-marks.md`](spec/03-marks.md) | 8–13, 45, 50, 51 | Manual marks, selection, logical marks, cut handles, confirmation state, pinned cuts, schema migrations |
 | [`04-timeline.md`](spec/04-timeline.md) | 14–17 | Zoom/pan, LOD, overlays, timeline selection |
 | [`04a-waveform-selection.md`](spec/04a-waveform-selection.md) | 17 detail | Exact time selection + manual marks; pause tokens deferred |
 | [`04b-word-underlays.md`](spec/04b-word-underlays.md) | 41 | Colored word underlays in both timelines |
@@ -68,7 +68,8 @@ Applies to every story.
    `confidence: 0`.
 6. **Skip mode cuts every defect and manual mark except dismissed ones.**
    The final range is `Project.cutOverrides[id]` or the derived padded range.
-   Confirmation is a review marker only. A different playback mode is allowed
+   Confirmation does not decide whether an item is cut; it freezes the cut range
+   at confirmation time (story 50). A different playback mode is allowed
    only as a separate, explicitly named mode (story 29 / `06a`).
 7. **The exact selected words define a manual mark.** Logical grouping may
    expand a *group's* span, but each underlying mark keeps its exact `wordIds`.

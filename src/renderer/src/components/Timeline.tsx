@@ -704,7 +704,7 @@ export default function Timeline({
         event.preventDefault()
         boundaryRef.current = null
         setHandleHover(null)
-        resetCutBounds(activeDefect.id)
+        resetCutBounds(activeDefect)
       }}
       onPointerLeave={() => {
         setHover(null)

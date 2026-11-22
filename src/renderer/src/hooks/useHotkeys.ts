@@ -303,14 +303,15 @@ export function useHotkeys(defects: Defect[]): void {
           event.preventDefault()
           if (event.shiftKey && hasSelection) {
             const ids = selectedIds()
-            if (ids.length > 0) {
-              state.confirmMany(ids, `Подтверждено выделение: ${ids.length}`)
+            const selected = defects.filter((defect) => ids.includes(defect.id))
+            if (selected.length > 0) {
+              state.confirmMany(selected, `Подтверждено выделение: ${selected.length}`)
             } else {
               state.notify('В выделении нет дефектов')
             }
           } else if (active) {
             if (!active.dismissed) {
-              state.confirmDefect(active.id, `Подтверждён: ${active.text}`)
+              state.confirmDefect(active, `Подтверждён: ${active.text}`)
             }
           }
           break

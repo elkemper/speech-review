@@ -178,7 +178,7 @@ export async function computePeaks(info: WavInfo, options: PeaksOptions = {}): P
     throw new Error('Пики: поддерживается только 16-битный WAV')
   }
 
-  const peaksPerSecond = options.peaksPerSecond ?? 20
+  const peaksPerSecond = options.peaksPerSecond ?? 50
   const bucketFrames = info.sampleRate / peaksPerSecond
   const bucketCount = Math.max(1, Math.ceil(info.frames / bucketFrames))
   const min = new Float32Array(bucketCount)
