@@ -25,9 +25,6 @@ import { RangeField } from './SettingsRangeField'
 
 type SettingsTab = 'general' | 'defects' | 'export'
 
-/** All export fields, grouped by the surface they are labelled for. */
-const ALL_EXPORT_FIELDS: ExportField[] = [...DEFAULT_EXPORT_FIELDS, ...EXPORT_FIELDS]
-
 const TAB_IDS: SettingsTab[] = ['general', 'defects', 'export']
 
 function PathRow({
@@ -138,7 +135,7 @@ export default function SettingsDialog() {
     else selected.add(field)
     if (selected.size === 0) return
     updateSettings({
-      export: { fields: ALL_EXPORT_FIELDS.filter((item) => selected.has(item)) }
+      export: { fields: EXPORT_FIELDS.filter((item) => selected.has(item)) }
     })
   }
 
@@ -585,7 +582,7 @@ export default function SettingsDialog() {
                       <button
                         className="link-btn"
                         onClick={() =>
-                          updateSettings({ export: { fields: [...ALL_EXPORT_FIELDS] } })
+                          updateSettings({ export: { fields: [...EXPORT_FIELDS] } })
                         }
                       >
                         {t('settings.export.fields.all')}
@@ -605,7 +602,7 @@ export default function SettingsDialog() {
                     </div>
                   </div>
                   <div className="export-fields">
-                    {ALL_EXPORT_FIELDS.map((field) => (
+                    {EXPORT_FIELDS.map((field) => (
                       <label key={field} className="check export-field">
                         <input
                           type="checkbox"

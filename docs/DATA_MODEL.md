@@ -437,7 +437,8 @@ CSV (`buildCsv`):
 - fields in `ExportSettings.fields` order;
 - values containing `"`, `;`, `,` or a newline are quoted;
 - timecodes `HH:MM:SS.mmm`, seconds with three decimal places;
-- type and severity labels and the `cut`/`confirmed` values are English (`filler`, `yes`/`no`), independent of the interface language (story 54).
+- type and severity labels and the `cut`/`confirmed` values are English (`filler`, `yes`/`no`), independent of the interface language (story 54);
+- the `text` of a manual mark with no words and no note is the English fallback label; otherwise `text` is user data and is exported unchanged.
 
 JSON:
 

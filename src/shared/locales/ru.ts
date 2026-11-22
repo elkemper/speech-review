@@ -12,6 +12,7 @@ export const ru = {
   'common.done': 'Готово',
   'common.retry': 'Повторить',
   'common.undo': 'Отменить',
+  'common.redo': 'Повторить',
   'common.delete': 'удалить',
   'common.show': 'показать',
   'common.check': 'проверить',
@@ -42,7 +43,7 @@ export const ru = {
 
   // Candidate tooltips
   'candidate.typeDisabled': 'тип выключен · не пропускается',
-  'candidate.belowThreshold': 'ниже порога {measured} c < {min} c · не пропускается',
+  'candidate.belowThreshold': 'ниже порога {measured} с < {min} с · не пропускается',
 
   // Export fields
   'export.field.start_tc': 'Начало выреза (таймкод)',
@@ -243,10 +244,12 @@ export const ru = {
   'workspace.hotkeyLoop': 'цикл',
   'workspace.hotkeySkip': 'пропускать дефекты',
   'workspace.hotkeySpeed': 'скорость',
+  'workspace.hotkeyNudge': '±2 с',
   'workspace.processing': 'Идёт обработка',
   'workspace.noPercent': 'этап без процента',
   'workspace.chunkOf': 'фрагмент {chunk} из {chunks}',
   'workspace.eta': 'осталось {eta}',
+  'workspace.progressSeconds': '{done} / {total} с',
   'workspace.processingHint':
     'Готовые фрагменты появляются в транскрипте сразу. Можно переключиться в другое окно: обработка идёт в фоне. Не закрывайте приложение до завершения.',
   'workspace.notReadyEyebrow': 'Транскрипт ещё не готов',
@@ -265,7 +268,7 @@ export const ru = {
   // Welcome
   'welcome.settings': 'Настройки',
   'welcome.eyebrow': 'Локальный разбор речи',
-  'welcome.heroLine1': 'Найдите оговорки в вебинаре,',
+  'welcome.heroLine1': 'Найдите оговорки в вебинаре',
   'welcome.heroLine2': 'не переслушивая его целиком',
   'welcome.intro':
     'CrisperWhisper 2.0 на Apple Silicon распознаёт запись, отмечает филлеры, паузы, обрывы и повторы. Клик по слову — переход к нужному месту. Всё считается на этом компьютере.',
@@ -351,20 +354,20 @@ export const ru = {
   'transcript.dismissedSuffix': ' · удалён',
   'transcript.confirmedSuffix': ' · подтверждено',
   'transcript.skippedHint': 'пропускается в режиме быстрого просмотра',
-  'transcript.cutSeconds': 'вырез {value} c',
+  'transcript.cutSeconds': 'вырез {value} с',
   'transcript.notCut': 'не вырезается',
   'transcript.skippedSuffix': ' · пропускается в режиме быстрого просмотра',
   'transcript.title': 'Транскрипт',
   'transcript.words': 'слов: {count}',
   'transcript.selected': 'выделено {count} · метка ·',
-  'transcript.unconfirmSelection': 'снять',
+  'transcript.clearSelection': 'снять выделение',
   'transcript.onlyDefects': 'только с дефектами',
   'transcript.follow': 'Следовать',
   'transcript.free': 'Свободно',
   'transcript.copy': 'Копировать',
   'transcript.emptyNoDefects': 'В этой записи не найдено дефектов по текущим правилам.',
   'transcript.emptyNoSpeech': 'Речь не распознана. Проверьте, что в файле есть аудиодорожка.',
-  'transcript.sentencePause': '⏸ {value} c · пауза после фразы',
+  'transcript.sentencePause': '⏸ {value} с · пауза после фразы',
 
   // Player
   'player.codecError':

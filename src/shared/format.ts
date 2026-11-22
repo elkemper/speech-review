@@ -47,8 +47,10 @@ export function formatEta(seconds: number | undefined, lang: UiLanguage = 'ru'):
   if (seconds < 60) {
     return translate(lang, 'unit.etaSeconds', { seconds: Math.max(1, Math.round(seconds)) })
   }
-  const minutes = Math.floor(seconds / 60)
-  const rest = Math.round(seconds % 60)
+  // Round once, then split, so 119.7 never renders as `1 min 60 s`.
+  const total = Math.round(seconds)
+  const minutes = Math.floor(total / 60)
+  const rest = total % 60
   return rest > 0
     ? translate(lang, 'unit.etaMinutesSeconds', { minutes, seconds: rest })
     : translate(lang, 'unit.etaMinutes', { minutes })

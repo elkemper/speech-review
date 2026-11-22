@@ -72,6 +72,18 @@ describe('CSV export', () => {
     expect(exportValue(item, 'defect_start_tc')).toBe('00:00:01.000')
   })
 
+  it('exports the synthetic manual label in English, independent of the UI language', () => {
+    const base = { type: 'manual' as const, source: 'manual' as const, wordIds: [], note: '' }
+    expect(exportValue(defect({ ...base, text: 'ручная метка' }), 'text')).toBe('manual mark')
+    expect(exportValue(defect({ ...base, text: 'manual mark' }), 'text')).toBe('manual mark')
+    // A note or real user text stays as-is.
+    expect(exportValue(defect({ ...base, text: 'x', note: 'проверить' }), 'text')).toBe('x')
+    expect(exportValue(defect({ ...base, text: 'своя подпись' }), 'text')).toBe('своя подпись')
+    expect(exportValue(defect({ type: 'filler', text: 'ручная метка' }), 'text')).toBe(
+      'ручная метка'
+    )
+  })
+
   it('maps every field without throwing', () => {
     const fields = [
       'start_tc',

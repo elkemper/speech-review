@@ -154,7 +154,7 @@ describe('below-threshold candidate hint', () => {
     expect(candidate).toBeDefined()
 
     expect(candidateHint(candidate!, 0.5, 'ru')).toBe(
-      'филлер · ниже порога 0.30 c < 0.50 c · не пропускается'
+      'филлер · ниже порога 0.30 с < 0.50 с · не пропускается'
     )
   })
 

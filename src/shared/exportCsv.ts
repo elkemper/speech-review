@@ -36,6 +36,21 @@ function cutDuration(defect: ExportDefect): string {
   return cut ? (cut.end - cut.start).toFixed(3) : ''
 }
 
+/**
+ * Export values are language-independent (story 54). A manual mark with no
+ * words and no note carries a synthetic UI label as its `text`, so export the
+ * English one instead of whatever language the interface happens to use.
+ * Comparing against both catalogues keeps this correct when stored `wordIds`
+ * point at words that a partial transcript rebuild has dropped.
+ */
+function exportText(defect: ExportDefect): string {
+  if (defect.source !== 'manual' || defect.note) return defect.text
+  const fallback = defectTypeLabel('en', 'manual')
+  return defect.text === fallback || defect.text === defectTypeLabel('ru', 'manual')
+    ? fallback
+    : defect.text
+}
+
 export function exportValue(defect: ExportDefect, field: ExportField): string | number | boolean {
   switch (field) {
     case 'start_tc':
@@ -73,7 +88,7 @@ export function exportValue(defect: ExportDefect, field: ExportField): string | 
     case 'confirmed':
       return yesNo('en', defect.confirmed)
     case 'text':
-      return defect.text
+      return exportText(defect)
     case 'note':
       return defect.note
     default:

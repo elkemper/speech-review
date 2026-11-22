@@ -71,7 +71,7 @@ export default function HistoryDialog() {
             disabled={!canRedo(history)}
             title={t('history.redoTitle')}
           >
-            ↷ {t('common.retry')}
+            ↷ {t('common.redo')}
           </button>
           <span className="muted small">{t('history.clickHint')}</span>
         </div>

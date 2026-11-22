@@ -176,6 +176,10 @@ describe('language-aware formatting', () => {
     expect(formatEta(125, 'ru')).toBe('~2 мин 5 с')
     expect(formatEta(125, 'en')).toBe('~2 min 5 s')
     expect(formatEta(120, 'en')).toBe('~2 min')
+    // Round the total once, so the remainder never becomes 60.
+    expect(formatEta(119.7, 'en')).toBe('~2 min')
+    expect(formatEta(119.7, 'ru')).toBe('~2 мин')
+    expect(formatEta(179.8, 'en')).toBe('~3 min')
     expect(formatEta(undefined, 'en')).toBe('')
   })
 })

@@ -443,7 +443,7 @@ export default function Workspace() {
 
       <footer className="hotkeys-bar">
         <span><kbd>Space</kbd> {t('workspace.hotkeyPlay')}</span>
-        <span><kbd>←</kbd><kbd>→</kbd> ±2 c</span>
+        <span><kbd>←</kbd><kbd>→</kbd> {t('workspace.hotkeyNudge')}</span>
         <span><kbd>[</kbd><kbd>]</kbd> {t('workspace.hotkeyDefect')}</span>
         <span><kbd>Enter</kbd> {t('workspace.hotkeyConfirm')}</span>
         <span><kbd>R</kbd> {t('workspace.hotkeyDelete')}</span>
@@ -519,7 +519,10 @@ function ProgressCard({
           ) : null}
           {isTranscribe && progress.totalSec ? (
             <span>
-              {Math.round(progress.processedSec ?? 0)} / {Math.round(progress.totalSec)} c
+              {t('workspace.progressSeconds', {
+                done: Math.round(progress.processedSec ?? 0),
+                total: Math.round(progress.totalSec)
+              })}
             </span>
           ) : null}
         </div>

@@ -323,9 +323,9 @@ export default function Transcript({
             className={`pause-chip ${pause.severity} ${pause.confirmed ? 'confirmed' : ''} ${
               isSkippedRange(pause.start, pause.end) ? 'skipped' : ''
             }`}
-            title={`${defectTypeLabel(lang, 'pause')} · ${(pause.end - pause.start).toFixed(
-              2
-            )} c · ${
+            title={`${defectTypeLabel(lang, 'pause')} · ${t('unit.shortSecondsPlain', {
+              value: (pause.end - pause.start).toFixed(2)
+            })} · ${
               pauseCutDuration !== null
                 ? t('transcript.cutSeconds', { value: pauseCutDuration.toFixed(2) })
                 : t('transcript.notCut')
@@ -346,7 +346,10 @@ export default function Transcript({
               setFollow(true)
             }}
           >
-            ⏸ {pauseCutDuration !== null ? `${pauseCutDuration.toFixed(1)} c` : '—'}
+            ⏸{' '}
+            {pauseCutDuration !== null
+              ? t('unit.shortSecondsPlain', { value: pauseCutDuration.toFixed(1) })
+              : '—'}
           </button>
         ) : null}{' '}
       </Fragment>
@@ -401,7 +404,7 @@ export default function Transcript({
                 </>
               ) : null}
               <button className="link-btn" onClick={clearSelection}>
-                {t('transcript.unconfirmSelection')}
+                {t('transcript.clearSelection')}
               </button>
             </span>
           ) : null}
