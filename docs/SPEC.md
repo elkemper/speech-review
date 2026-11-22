@@ -54,6 +54,7 @@ only the area it is working on.
 | [`10-mini-timeline.md`](spec/10-mini-timeline.md) | 40 | Selected defect snippet with editable cut handles |
 | [`11-model-updates.md`](spec/11-model-updates.md) | 49 | Model update discovery through a runtime manifest |
 | [`12-i18n.md`](spec/12-i18n.md) | 52–54 | Interface language (RU/EN), message catalogue, stable export values |
+| [`13-defect-panel.md`](spec/13-defect-panel.md) | 55 | Review panel map and the display-only type filter |
 
 ## Product invariants
 
@@ -153,7 +154,7 @@ Applies to every story.
 
 ### Done — do not regress
 
-Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48, 50–54.
+Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48, 50–55.
 Verification only (implemented, needs a pass): 9, 24.
 
 ## Related documents

@@ -5,7 +5,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent
 } from 'react'
-import { detectDefectsWithCandidates, sortDefects } from '@shared/defects'
+import { detectDefectsWithCandidates, matchesDefectFilter, sortDefects } from '@shared/defects'
 import { formatDuration, formatEta, formatTimecode } from '@shared/format'
 import { transcribePhaseLabel } from '@shared/labels'
 import { MODEL_SPECS } from '@shared/models'
@@ -58,6 +58,8 @@ export default function Workspace() {
   const cancelTranscription = useApp((state) => state.cancelTranscription)
   const setShowSettings = useApp((state) => state.setShowSettings)
   const setShowHistory = useApp((state) => state.setShowHistory)
+  const filter = useApp((state) => state.filter)
+  const setActiveDefect = useApp((state) => state.setActiveDefect)
   const settings = useApp((state) => state.settings)
   const history = useApp((state) => state.history)
   const undo = useApp((state) => state.undo)
@@ -248,6 +250,14 @@ export default function Workspace() {
   ])
 
   useHotkeys(defects)
+
+  // The type filter is display-only: when the active card stops matching, drop
+  // it so the panel, timeline handles and transcript stay consistent.
+  useEffect(() => {
+    if (!activeDefectId) return
+    const active = defects.find((defect) => defect.id === activeDefectId)
+    if (active && !matchesDefectFilter(active, filter)) setActiveDefect(null)
+  }, [activeDefectId, defects, filter, setActiveDefect])
 
   if (!project) return null
 

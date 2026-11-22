@@ -77,7 +77,8 @@ export interface Toast {
   text: string
 }
 
-export type DefectFilter = 'all' | 'filler' | 'pause' | 'repetition' | 'elongation' | 'false_start' | 'vocal_sound' | 'unclear' | 'manual'
+export type { DefectFilter } from '@shared/defects'
+import type { DefectFilter } from '@shared/defects'
 
 /** Nested settings objects accept partial patches; the store merges them. */
 export type SettingsPatch = Partial<
