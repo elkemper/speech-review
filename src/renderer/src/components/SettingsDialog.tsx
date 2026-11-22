@@ -535,6 +535,7 @@ export default function SettingsDialog() {
                 <DefectRulesSection
                   rules={rules}
                   playback={playback}
+                  language={settings.language}
                   setRules={setRules}
                   updateSettings={updateSettings}
                 />

@@ -11,7 +11,7 @@ npm run typecheck     # checks main/preload/shared and renderer types separately
 npm run build         # checks that the production build succeeds
 ```
 
-Current state: **276 tests in 22 files**. A run takes less than a second in the Linux container.
+Current state: **288 tests in 23 files**. A run takes less than a second in the Linux container.
 
 ## 2. Configuration
 
@@ -42,6 +42,7 @@ Current state: **276 tests in 22 files**. A run takes less than a second in the 
 | `test/defectCardView.test.ts` | 7 | pending/confirmed/deleted card layout, candidate card, collapsing in skip mode, automatic group marker, manual badges and split visibility |
 | `test/engine.test.ts` | 8 | chunk planner (short recording, silence, max size, short first chunk, target), WAV reading, slicing, waveform |
 | `test/export.test.ts` | 7 | CSV field order, escaping, delimiter/header, cut vs defect bounds, uncut rows, all fields; values are English (`filler`, `yes`/`no`), including the synthetic manual label |
+| `test/fillerLanguage.test.ts` | 12 | RU/EN filler lexicons, language mapping, default rules per language, `normalizeRules` language fill, adopting a default list vs keeping a custom one, English filler detection |
 | `test/format.test.ts` | 11 | number parsing (dot/comma/empty/partial), step snapping, float noise, display formatting (RU/EN), slider fill |
 | `test/grouping.test.ts` | 29 | per-type minimum duration, pause hard threshold and normalization, automatic grouping rules and limits, enabled types and id stability, grouping toggle and migration, per-type/group skip padding, settings normalization (padding, pause room tone, mini timeline, waveform contrast) |
 | `test/history.test.ts` | 10 | undo/redo by index, redo branch truncation, `mergeKey` coalescing, different keys, deleted-marks archive, rules and padding snapshots, `skipEnabled` preservation, rules equality, session guard and no cross-session coalescing |

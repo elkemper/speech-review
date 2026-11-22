@@ -33,6 +33,7 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 - **No Python/torch at runtime.** `resources/engine/tools/*.py` may exist in the downloaded engine bundle, but the app must not invoke Python. The runtime path is `audiocpp_cli` + GGUF + ffmpeg.
 - **`node_modules` is the macOS arm64 install.** It is kept in the repository workspace for packaging. Do **not** run `npm install`, `npm ci`, or replace `node_modules` in the Linux development container. `node_modules_linux/` is a stale Linux tree; it is gitignored and excluded from Vitest. If a dependency must change, edit `package.json`/`package-lock.json` and ask the user to install on the Mac.
 - **Dark theme only.** Do not add a light theme or a theme switcher unless the task explicitly asks for it.
+- **Filler lexicons follow the recognition language.** `FILLER_LEXICONS` in `src/shared/defects.ts` holds the RU and EN lists; `Settings.language` selects one, never `Settings.uiLanguage`. Keep both lists in sync with any new filler; see `docs/DATA_MODEL.md` §6.
 - **Word confidence / `unclear` is backlog.** `audiocpp_cli` currently writes `confidence: 0`. The parser stores `null` when no positive confidence exists and the `unclear` rule is disabled. Do not enable it by default or treat `0` as a low-confidence signal.
 - **Skip mode cuts every defect and manual mark except dismissed ones.** Confirmation does not decide whether an item is cut; it freezes the cut range at confirmation time. See `src/shared/cuts.ts`.
 - **Video export uses the same cut list.** `buildCutList` plus `complementRanges` are the only source of exported ranges; do not introduce a second cut model. Export always re-encodes, so cuts are frame-accurate. Audio-only export is deferred.
@@ -102,7 +103,7 @@ test/                     Vitest suites and fixtures
 | Command | What it does | Works in this Linux container? |
 |---|---|---|
 | `npm run typecheck` | `tsc --noEmit` for node and web configs | Yes |
-| `npm test` | Vitest run (276 tests / 22 files) | Yes |
+| `npm test` | Vitest run (288 tests / 23 files) | Yes |
 | `npm run test:watch` | Vitest watch mode | Yes |
 | `npm run build` | electron-vite production build into `out/` | Yes |
 | `npm run dev` | electron-vite dev + Electron | **No** (needs macOS + macOS Electron) |
@@ -133,7 +134,7 @@ If you changed UI behavior or runtime code, also state clearly that Electron, `a
 - Use the existing aliases: `@shared` in main/preload/renderer, `@renderer` in the renderer.
 - IPC changes require all of: `src/shared/ipc.ts`, `src/shared/api.ts`, `src/preload/index.ts`, `src/main/ipc.ts`, and the renderer caller. Keep the preload surface minimal; never expose `ipcRenderer` directly.
 - File writes that can be interrupted should stay atomic: write `*.tmp`, then `rename`.
-- Put user-facing strings in the typed catalogue (`src/shared/locales/ru.ts` + `en.ts`) and read them through `translate`/`useT` or the `lang`-aware helpers in `src/shared/labels.ts`. Do not add UI literals in components; follow the existing English style for code comments and never translate the filler lexicons in `src/shared/defects.ts`. Do not introduce a UI framework or icon library without a concrete need.
+- Put user-facing strings in the typed catalogue (`src/shared/locales/ru.ts` + `en.ts`) and read them through `translate`/`useT` or the `lang`-aware helpers in `src/shared/labels.ts`. Do not add UI literals in components; follow the existing English style for code comments and never translate the filler lexicons in `src/shared/defects.ts` (they are recognition data chosen by `Settings.language`, not interface copy). Do not introduce a UI framework or icon library without a concrete need.
 - Avoid new dependencies. The macOS `node_modules` constraint makes dependency changes expensive.
 - Preserve user work: do not delete or rewrite unrelated files, tests or docs.
 

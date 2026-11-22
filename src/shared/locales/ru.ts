@@ -192,6 +192,10 @@ export const ru = {
   'rules.column.specific': 'Особенности',
   'rules.minDurationAria': 'Минимальная длительность: {type}',
   'rules.lexicalFillers': 'искать слова-филлеры',
+  'rules.lexicon.ru': 'список филлеров: русский',
+  'rules.lexicon.en': 'список филлеров: английский',
+  'rules.lexiconHint':
+    'Набор филлеров берётся из языка распознавания. Смена языка в разделе «Распознавание» подставит стандартный список заново, если вы его не правили; свои слова сохраняются.',
   'rules.repetitionWindow': 'окно повторов',
   'rules.elongationRepeats': 'повторов буквы',
   'rules.inDevelopment': 'в разработке',

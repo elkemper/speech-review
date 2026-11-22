@@ -49,29 +49,98 @@ export const DEFAULT_ENABLED_TYPES: Record<DefectType, boolean> = {
   manual: true
 }
 
+/**
+ * Recognition language of the filler lexicons. `Settings.language` and
+ * `Project.language` carry this value; anything unknown falls back to Russian.
+ */
+export type FillerLanguage = 'ru' | 'en'
+
+/**
+ * Filler lexicons are recognition data, not interface copy: the ASR language
+ * decides which words are fillers, independent of `Settings.uiLanguage`.
+ * They are not part of the message catalogue and are never translated.
+ */
+export const FILLER_LEXICONS: Record<
+  FillerLanguage,
+  { fillerWords: string[]; multiWordFillers: string[][] }
+> = {
+  ru: {
+    fillerWords: [
+      'э',
+      'ээ',
+      'эээ',
+      'эм',
+      'мм',
+      'м',
+      'ну',
+      'вот',
+      'типа',
+      'короче',
+      'значит',
+      'собственно',
+      'ага',
+      'угу'
+    ],
+    multiWordFillers: [
+      ['как', 'бы'],
+      ['в', 'общем'],
+      ['это', 'самое'],
+      ['так', 'сказать']
+    ]
+  },
+  en: {
+    fillerWords: [
+      'uh',
+      'uhh',
+      'uhm',
+      'um',
+      'umm',
+      'er',
+      'erm',
+      'ah',
+      'eh',
+      'hm',
+      'hmm',
+      'mm',
+      'mhm',
+      'like',
+      'actually',
+      'basically',
+      'literally',
+      'right',
+      'okay',
+      'so',
+      'well',
+      'y\'know'
+    ],
+    multiWordFillers: [
+      ['you', 'know'],
+      ['i', 'mean'],
+      ['kind', 'of'],
+      ['sort', 'of'],
+      ['you', 'see']
+    ]
+  }
+}
+
+/** Normalizes a recognition language to one of the supported lexicons. */
+export function fillerLanguage(language: unknown): FillerLanguage {
+  return typeof language === 'string' && language.toLowerCase().startsWith('en') ? 'en' : 'ru'
+}
+
+/** Default filler words for a recognition language. */
+export function defaultFillerWords(language: unknown): string[] {
+  return [...FILLER_LEXICONS[fillerLanguage(language)].fillerWords]
+}
+
+/** Default multi-word fillers for a recognition language. */
+export function defaultMultiWordFillers(language: unknown): string[][] {
+  return FILLER_LEXICONS[fillerLanguage(language)].multiWordFillers.map((phrase) => [...phrase])
+}
+
 export const DEFAULT_RULES: DefectRules = {
-  fillerWords: [
-    'э',
-    'ээ',
-    'эээ',
-    'эм',
-    'мм',
-    'м',
-    'ну',
-    'вот',
-    'типа',
-    'короче',
-    'значит',
-    'собственно',
-    'ага',
-    'угу'
-  ],
-  multiWordFillers: [
-    ['как', 'бы'],
-    ['в', 'общем'],
-    ['это', 'самое'],
-    ['так', 'сказать']
-  ],
+  fillerWords: defaultFillerWords('ru'),
+  multiWordFillers: defaultMultiWordFillers('ru'),
   excludePauseAfterSentenceEnd: true,
   repetitionWindowSec: 2.0,
   elongationMinRepeats: 3,
@@ -83,6 +152,61 @@ export const DEFAULT_RULES: DefectRules = {
   autoGroupGapSec: 0
 }
 
+/** Default rules for a recognition language, with a fresh copy of every list. */
+export function defaultRulesForLanguage(language: unknown): DefectRules {
+  return {
+    ...DEFAULT_RULES,
+    fillerWords: defaultFillerWords(language),
+    multiWordFillers: defaultMultiWordFillers(language),
+    minDurationByType: { ...DEFAULT_MIN_DURATION_BY_TYPE },
+    enabledTypes: { ...DEFAULT_ENABLED_TYPES }
+  }
+}
+
+/**
+ * True when the stored filler lists are exactly the defaults of this language.
+ * Opening a project in a different recognition language can then swap the
+ * lexicon without discarding a customized word list.
+ */
+export function usesDefaultFillers(rules: DefectRules, language: unknown): boolean {
+  const words = rules.fillerWords.map(normalizeWord)
+  const expectedWords = defaultFillerWords(language).map(normalizeWord)
+  if (words.length !== expectedWords.length) return false
+  if (!words.every((word, index) => word === expectedWords[index])) return false
+  const phrases = rules.multiWordFillers.map((phrase) => phrase.map(normalizeWord).join(' '))
+  const expectedPhrases = defaultMultiWordFillers(language).map((phrase) =>
+    phrase.map(normalizeWord).join(' ')
+  )
+  return (
+    phrases.length === expectedPhrases.length &&
+    phrases.every((phrase, index) => phrase === expectedPhrases[index])
+  )
+}
+
+/** True when the filler lists are an untouched default of any known language. */
+export function usesAnyDefaultFillers(rules: DefectRules): boolean {
+  return (Object.keys(FILLER_LEXICONS) as FillerLanguage[]).some((language) =>
+    usesDefaultFillers(rules, language)
+  )
+}
+
+/**
+ * Adopts the filler lexicon of a language while keeping every other rule.
+ * A list the user has edited is preserved: only an untouched default list
+ * (of any language) is replaced, so switching RU→EN swaps the default words
+ * but never silently drops a custom list.
+ */
+export function adoptFillerLanguage(rules: DefectRules, language: unknown): DefectRules {
+  if (!usesAnyDefaultFillers(rules)) return rules
+  const target = fillerLanguage(language)
+  if (usesDefaultFillers(rules, target)) return rules
+  return {
+    ...rules,
+    fillerWords: defaultFillerWords(target),
+    multiWordFillers: defaultMultiWordFillers(target)
+  }
+}
+
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.min(max, Math.max(min, value))
@@ -91,9 +215,11 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 /**
  * Rules are stored inside both settings and projects. Projects written by older
  * builds miss the newer nested fields, so they are merged field by field
- * instead of a shallow spread that would drop defaults.
+ * instead of a shallow spread that would drop defaults. `language` is the
+ * recognition language; it only supplies the filler lexicon when the stored
+ * lists are absent.
  */
-export function normalizeRules(value: unknown): DefectRules {
+export function normalizeRules(value: unknown, language: unknown = 'ru'): DefectRules {
   // Obsolete keys from the old pause-threshold model are dropped, not migrated:
   // there are no released users yet. The pause minimum is the only threshold.
   const source = { ...((value ?? {}) as Record<string, unknown>) }
@@ -134,13 +260,13 @@ export function normalizeRules(value: unknown): DefectRules {
     ...raw,
     fillerWords: Array.isArray(raw.fillerWords)
       ? raw.fillerWords.filter((word): word is string => typeof word === 'string')
-      : [...DEFAULT_RULES.fillerWords],
+      : defaultFillerWords(language),
     multiWordFillers: Array.isArray(raw.multiWordFillers)
       ? raw.multiWordFillers.filter(
           (phrase): phrase is string[] =>
             Array.isArray(phrase) && phrase.every((word) => typeof word === 'string')
         )
-      : DEFAULT_RULES.multiWordFillers.map((phrase) => [...phrase]),
+      : defaultMultiWordFillers(language),
     minDurationByType: minDuration,
     enabledTypes,
     autoGroupEnabled,

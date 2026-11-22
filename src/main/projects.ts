@@ -2,7 +2,7 @@ import { translate } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
-import { normalizeRules } from '@shared/defects'
+import { adoptFillerLanguage, normalizeRules } from '@shared/defects'
 import {
   CURRENT_PROJECT_VERSION,
   migrateProject,
@@ -112,7 +112,7 @@ export async function loadProject(id: string): Promise<LoadedProject> {
     ...meta,
     marks: meta.marks ?? [],
     // Projects created by older builds may not contain every rule field.
-    rules: normalizeRules(meta.rules),
+    rules: adoptFillerLanguage(normalizeRules(meta.rules, meta.language), meta.language),
     cutOverrides: meta.cutOverrides ?? {},
     confirmedDefectIds: meta.confirmedDefectIds ?? [],
     dismissedDefectIds: meta.dismissedDefectIds ?? [],

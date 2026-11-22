@@ -7,7 +7,8 @@ import {
   MIN_PAUSE_KEEP_SEC
 } from '@shared/settings'
 import {
-  DEFAULT_RULES,
+  defaultRulesForLanguage,
+  fillerLanguage,
   MAX_PAUSE_MIN_DURATION,
   MIN_PAUSE_MIN_DURATION
 } from '@shared/defects'
@@ -46,11 +47,14 @@ const MAX_AUTO_GROUP_GAP = 5
 export default function DefectRulesSection({
   rules,
   playback,
+  language,
   setRules,
   updateSettings
 }: {
   rules: DefectRules
   playback: PlaybackSettings
+  /** Recognition language; decides the filler lexicon of the reset defaults. */
+  language: string
   setRules: (patch: Partial<DefectRules>, history?: SettingsHistoryMeta) => void
   updateSettings: (patch: {
     playback?: Partial<PlaybackSettings>
@@ -113,7 +117,10 @@ export default function DefectRulesSection({
     <section className="settings-section">
       <div className="section-title-row">
         <h3>{t('rules.title')}</h3>
-        <button className="link-btn" onClick={() => setRules(DEFAULT_RULES, RULES_HISTORY.reset)}>
+        <button
+          className="link-btn"
+          onClick={() => setRules(defaultRulesForLanguage(language), RULES_HISTORY.reset)}
+        >
           {t('rules.reset')}
         </button>
       </div>
@@ -190,6 +197,14 @@ export default function DefectRulesSection({
                       />
                       {t('rules.lexicalFillers')}
                     </label>
+                  ) : null}
+
+                  {type === 'filler' ? (
+                    <div className="hint">
+                      {fillerLanguage(language) === 'en'
+                        ? t('rules.lexicon.en')
+                        : t('rules.lexicon.ru')}
+                    </div>
                   ) : null}
 
                   {type === 'repetition' ? (
@@ -283,6 +298,7 @@ export default function DefectRulesSection({
       </div>
 
       <div className="hint">{t('rules.minDurationHint')}</div>
+      <div className="hint">{t('rules.lexiconHint')}</div>
 
       <div className="auto-group-row">
         <label className="check">

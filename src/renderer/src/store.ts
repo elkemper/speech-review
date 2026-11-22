@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { translate } from '@shared/i18n'
 import { DEFAULT_SETTINGS } from '@shared/settings'
+import { adoptFillerLanguage } from '@shared/defects'
 import { formatTimecode } from '@shared/format'
 import {
   markIdsForDefectId,
@@ -504,10 +505,22 @@ export const useApp = create<AppStore>((set, get) => ({
     const current = get().settings
     const project = get().project
     const before = project ? snapshotEditable(project, current) : null
+    const language = patch.language ?? current.language
+    const mergedRules: DefectRules = { ...current.rules, ...patch.rules }
+    // The filler lexicon follows the recognition language. An untouched default
+    // list is swapped for the new language; a customized list, or lists set
+    // explicitly in this same patch, are kept as is.
+    const explicitFillers =
+      patch.rules?.fillerWords !== undefined || patch.rules?.multiWordFillers !== undefined
+    const rules =
+      language !== current.language && !explicitFillers
+        ? adoptFillerLanguage(mergedRules, language)
+        : mergedRules
     const settings: Settings = {
       ...current,
       ...patch,
-      rules: { ...current.rules, ...patch.rules },
+      language,
+      rules,
       export: { ...current.export, ...patch.export },
       videoExport: { ...current.videoExport, ...patch.videoExport },
       playback: { ...current.playback, ...patch.playback }

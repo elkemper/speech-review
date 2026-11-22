@@ -94,12 +94,13 @@ export async function loadSettings(): Promise<Settings> {
     const parsed = migrated.settings as Partial<Settings>
     // An existing file without `uiLanguage` migrates to the default `ru`.
     uiLanguage = normalizeUiLanguageSetting(parsed.uiLanguage)
+    const language = typeof parsed.language === 'string' ? parsed.language : DEFAULTS.language
     const settings: Settings = {
-      language: typeof parsed.language === 'string' ? parsed.language : DEFAULTS.language,
+      language,
       uiLanguage,
       modelId: validModelId(parsed.modelId) ? parsed.modelId : DEFAULTS.modelId,
       backend: validBackend(parsed.backend) ? parsed.backend : DEFAULTS.backend,
-      rules: normalizeRules(parsed.rules),
+      rules: normalizeRules(parsed.rules, language),
       chunkTargetSec: normalizeChunkTarget(parsed.chunkTargetSec),
       export: normalizeExport(parsed.export),
       videoExport: normalizeVideoExportSettings(parsed.videoExport),
@@ -122,7 +123,7 @@ export async function loadSettings(): Promise<Settings> {
     return {
       ...DEFAULTS,
       uiLanguage,
-      rules: normalizeRules(DEFAULT_SETTINGS.rules),
+      rules: normalizeRules(DEFAULT_SETTINGS.rules, DEFAULTS.language),
       export: { ...DEFAULT_EXPORT_SETTINGS, fields: [...DEFAULT_EXPORT_SETTINGS.fields] },
       videoExport: { ...DEFAULT_SETTINGS.videoExport },
       playback: normalizePlaybackSettings(DEFAULT_PLAYBACK_SETTINGS)

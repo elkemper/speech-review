@@ -193,6 +193,10 @@ export const en: Record<MessageKey, string> = {
   'rules.column.specific': 'Specifics',
   'rules.minDurationAria': 'Minimum duration: {type}',
   'rules.lexicalFillers': 'find filler words',
+  'rules.lexicon.ru': 'filler list: Russian',
+  'rules.lexicon.en': 'filler list: English',
+  'rules.lexiconHint':
+    'The filler list comes from the recognition language. Changing the language in Recognition restores the default list unless you edited it; your own words are kept.',
   'rules.repetitionWindow': 'repetition window',
   'rules.elongationRepeats': 'letter repeats',
   'rules.inDevelopment': 'in development',

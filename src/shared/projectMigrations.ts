@@ -25,6 +25,8 @@ export interface RawProject {
   schemaVersion?: number
   id?: string
   name?: string
+  /** Recognition language the project was transcribed with. */
+  language?: string
   marks?: ManualMark[]
   rules?: DefectRules
   cutOverrides?: Record<string, DefectBoundsOverride>
