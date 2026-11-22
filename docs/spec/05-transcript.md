@@ -62,6 +62,8 @@ As a user, I want to show only segments that contain defects.
 
 - Keeps segments with a defect word or a pause chip.
 - Empty state explains whether there are no defects or no speech.
+- The display-only type filter narrows which defects count while this mode is
+  on ([story 55](13-defect-panel.md)).
 
 ### Story 22 — Sentence pause rows
 

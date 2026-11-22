@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { clamp, formatTimecode } from '@shared/format'
+import { matchesDefectFilter } from '@shared/defects'
 import type { Defect } from '@shared/types'
 import { DEFECT_COLORS, defectByWordId } from '../defectsUi'
 import { seekTo } from '../player'
@@ -72,6 +73,7 @@ export default function MiniTimeline({
   const padSec = useApp((state) => state.settings.miniTimelinePadSec)
   const waveContrast = useApp((state) => state.settings.waveformContrast)
   const playback = useApp((state) => state.settings.playback)
+  const filter = useApp((state) => state.filter)
   const setCutBounds = useApp((state) => state.setCutBounds)
   const resetCutBounds = useApp((state) => state.resetCutBounds)
   const t = useT()
@@ -117,21 +119,28 @@ export default function MiniTimeline({
     () => buildWaveLut(waveStats, waveContrast),
     [waveStats, waveContrast]
   )
+  // Neighbours follow the same display-only type filter as the main timeline.
+  const filteredNeighbours = useMemo(
+    () =>
+      defects.filter(
+        (item) => !item.dismissed && matchesDefectFilter(item, filter)
+      ),
+    [defects, filter]
+  )
   const wordDefectMap = useMemo(
-    () => defectByWordId(defects.filter((item) => !item.dismissed)),
-    [defects]
+    () => defectByWordId(filteredNeighbours),
+    [filteredNeighbours]
   )
   const activeWordIds = useMemo(() => new Set(defect.wordIds), [defect.wordIds])
   const nearbyDefects = useMemo(
     () =>
-      defects.filter(
+      filteredNeighbours.filter(
         (item) =>
-          !item.dismissed &&
           item.id !== defect.id &&
           item.end >= view.start &&
           item.start <= view.end
       ),
-    [defects, defect.id, view.start, view.end]
+    [filteredNeighbours, defect.id, view.start, view.end]
   )
   const base = baseRef.current
   const zoomed = zoom > 1 + 1e-6

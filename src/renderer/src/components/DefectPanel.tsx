@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { formatShortSeconds, formatTimecode } from '@shared/format'
 import { defectTypeLabel } from '@shared/labels'
+import { matchesDefectFilter } from '@shared/defects'
 import type { Defect, DefectType, ExportDefect } from '@shared/types'
 import { DEFECT_COLORS, TYPE_ORDER } from '../defectsUi'
 import { defectCardView } from '../defectCardView'
@@ -132,9 +133,7 @@ export default function DefectPanel({
     () =>
       defects.filter(
         (defect) =>
-          (filter === 'all' ||
-            defect.type === filter ||
-            defect.groupTypes?.includes(filter as DefectType)) &&
+          matchesDefectFilter(defect, filter) &&
           (!defect.dismissed || showDismissed)
       ),
     [defects, filter, showDismissed]

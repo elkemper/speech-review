@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatTimecode } from '@shared/format'
 import { endsSentence, findActiveWord, findSegmentIndexForWord } from '@shared/transcript'
+import { matchesDefectFilter } from '@shared/defects'
 import type { DefectCandidate } from '@shared/defects'
 import type { Defect, Segment } from '@shared/types'
 import { defectTypeLabel, severityLabel } from '@shared/labels'
@@ -39,6 +40,7 @@ export default function Transcript({
   const removeDefects = useApp((state) => state.removeDefects)
   const notify = useApp((state) => state.notify)
   const playback = useApp((state) => state.settings.playback)
+  const filter = useApp((state) => state.filter)
   const t = useT()
   const lang = useUiLanguage()
 
@@ -93,9 +95,17 @@ export default function Transcript({
       (interval) => interval.start < end && interval.end > start
     )
 
+  // In «только с дефектами» mode the display-only type filter narrows which
+  // defects count, so a segment survives only because of a matching defect.
+  const filteredDefects = useMemo(
+    () =>
+      onlyDefects ? defects.filter((defect) => matchesDefectFilter(defect, filter)) : defects,
+    [defects, onlyDefects, filter]
+  )
+
   const wordDefects = useMemo(() => {
     const map = new Map<number, Defect[]>()
-    for (const defect of defects) {
+    for (const defect of filteredDefects) {
       if (defect.type === 'pause') continue
       for (const wordId of defect.wordIds) {
         const list = map.get(wordId)
@@ -104,18 +114,18 @@ export default function Transcript({
       }
     }
     return map
-  }, [defects])
+  }, [filteredDefects])
 
   const candidateByWordId = useMemo(() => defectByWordId(candidates), [candidates])
 
   const pauseAfter = useMemo(() => {
     const map = new Map<number, Defect>()
-    for (const defect of defects) {
+    for (const defect of filteredDefects) {
       if (defect.type !== 'pause' || defect.wordIds.length === 0) continue
       map.set(defect.wordIds[0], defect)
     }
     return map
-  }, [defects])
+  }, [filteredDefects])
 
   const visibleSegments = useMemo(() => {
     if (!onlyDefects) return segments
@@ -167,9 +177,23 @@ export default function Transcript({
     [rows, activeSegmentId]
   )
 
+  // Key measurements by row identity, not array index. Filtering removes
+  // segments and gap rows, which shifts indexes and changes row kinds; a
+  // stale index-keyed height would make the absolute translateY positions
+  // overlap neighbouring rows.
+  const rowKey = useCallback(
+    (index: number): string | number => {
+      const row = rows[index]
+      if (!row) return index
+      return row.kind === 'segment' ? `s-${row.segment.id}` : row.id
+    },
+    [rows]
+  )
+
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
+    getItemKey: rowKey,
     estimateSize: (index) => (rows[index]?.kind === 'gap' ? 46 : 92),
     overscan: 8,
     measureElement: (element) => element.getBoundingClientRect().height

@@ -134,6 +134,17 @@ export function labelHasRoom(
 export type WordDetail = 'none' | 'mark' | 'label'
 
 /**
+ * Alpha for defects hidden by the panel's type filter. They are drawn as a
+ * barely-there boundary hint so the user still knows something sits nearby.
+ * The hint fades in only at close zoom: at an overview it is gone completely.
+ */
+export function filteredDefectAlpha(pps: number): number {
+  if (pps < 40) return 0
+  if (pps >= 160) return 0.22
+  return 0.06 + ((pps - 40) / 120) * 0.16
+}
+
+/**
  * Single source of truth for the word strip. A label can only be reached
  * through the mark stage, so the timeline can never show full words before
  * the small marks that represent them.

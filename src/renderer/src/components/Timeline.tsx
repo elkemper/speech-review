@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { clamp, formatTimecode } from '@shared/format'
+import { matchesDefectFilter } from '@shared/defects'
 import type { Defect } from '@shared/types'
 import { DEFECT_COLORS, defectByWordId } from '../defectsUi'
 import { seekTo } from '../player'
@@ -20,6 +21,7 @@ import {
   clampDefectEdge,
   firstVisibleWord,
   fitView,
+  filteredDefectAlpha,
   labelHasRoom,
   panView,
   pixelsPerSecond,
@@ -48,6 +50,7 @@ export default function Timeline({
   const selection = useApp((state) => state.selection)
   const timeSelection = useApp((state) => state.timeSelection)
   const playback = useApp((state) => state.settings.playback)
+  const filter = useApp((state) => state.filter)
   const waveContrast = useApp((state) => state.settings.waveformContrast)
   const setActiveDefect = useApp((state) => state.setActiveDefect)
   const setCutBounds = useApp((state) => state.setCutBounds)
@@ -76,9 +79,16 @@ export default function Timeline({
     () => defects.filter((defect) => !defect.dismissed),
     [defects]
   )
+  // The type filter is display-only: cuts, skip intervals and hatching always
+  // use every visible defect. Matching defects are drawn normally; the rest are
+  // a faint boundary hint that only appears at close zoom.
+  const displayDefects = useMemo(
+    () => visibleDefects.filter((defect) => matchesDefectFilter(defect, filter)),
+    [visibleDefects, filter]
+  )
   const activeDefect = useMemo(
-    () => visibleDefects.find((defect) => defect.id === activeDefectId) ?? null,
-    [visibleDefects, activeDefectId]
+    () => displayDefects.find((defect) => defect.id === activeDefectId) ?? null,
+    [displayDefects, activeDefectId]
   )
   const cutMap = useMemo(
     () =>
@@ -91,7 +101,7 @@ export default function Timeline({
     [visibleDefects, playback, project?.duration, project?.cutOverrides]
   )
   const activeCut = activeDefect ? cutMap.get(activeDefect.id) ?? null : null
-  const wordDefectMap = useMemo(() => defectByWordId(visibleDefects), [visibleDefects])
+  const wordDefectMap = useMemo(() => defectByWordId(displayDefects), [displayDefects])
   const activeWordIds = useMemo(
     () => new Set(activeDefect?.wordIds ?? []),
     [activeDefect]
@@ -259,12 +269,30 @@ export default function Timeline({
     // the original defect; the cut is drawn separately so the handles can move
     // without changing what was detected. The kept room tone is left unfilled
     // so the waveform stays visible under its neutral hatch.
+    //
+    // Defects hidden by the display-only type filter are still drawn, but only
+    // as a faint boundary hint and only once the view is zoomed in enough.
     {
+      const ppsNow = pixelsPerSecond(view, width)
       for (const defect of visibleDefects) {
         if (defect.end < view.start || defect.start > view.end) continue
+        const matches = matchesDefectFilter(defect, filter)
+        const dimAlpha = matches ? 1 : filteredDefectAlpha(ppsNow)
+        if (dimAlpha <= 0) continue
         const startX = clamp(toX(defect.start), 0, width)
         const color = DEFECT_COLORS[defect.type]
         const active = defect.id === activeDefectId
+        if (!matches) {
+          ctx.globalAlpha = dimAlpha
+          ctx.strokeStyle = color
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.moveTo(Math.round(startX) + 0.5, 18)
+          ctx.lineTo(Math.round(startX) + 0.5, HEIGHT - 4)
+          ctx.stroke()
+          ctx.globalAlpha = 1
+          continue
+        }
         const fillAlpha = defect.confirmed ? 0.12 : active ? 0.28 : 0.2
         const cut = cutMap.get(defect.id) ?? null
         const layers = cutView(defect, cut)
@@ -328,16 +356,24 @@ export default function Timeline({
         (a, b) =>
           Number(a.id === activeDefectId) - Number(b.id === activeDefectId)
       )
+      // The type filter is display-only, so hatching still shows every cut.
+      // Hints for filtered-out types are muted so the matching type stands out.
+      const ppsNow = pixelsPerSecond(view, width)
+      const hintAlpha = filteredDefectAlpha(ppsNow)
       for (const defect of ordered) {
         const cut = cutMap.get(defect.id)
         if (!cut) continue
         if (cut.end < view.start || cut.start > view.end) continue
         const active = defect.id === activeDefectId
         const layers = cutView(defect, cut)
+        const muted = matchesDefectFilter(defect, filter)
+          ? active ? 1 : 0.85
+          : hintAlpha
+        if (muted <= 0) continue
         const outerPattern = hatchPattern(ctx, DEFECT_COLORS[defect.type], 0.62)
         const innerPattern = hatchPattern(ctx, TRACK_BG_LIGHT, 0.9)
-        drawHatch(layers.outer, outerPattern, active ? 1 : 0.85, defect.confirmed)
-        drawHatch(layers.inner, innerPattern, active ? 1 : 0.85, defect.confirmed)
+        drawHatch(layers.outer, outerPattern, muted, defect.confirmed)
+        drawHatch(layers.inner, innerPattern, muted, defect.confirmed)
       }
     }
 
@@ -407,7 +443,7 @@ export default function Timeline({
     // Cut boundary ticks for the non-active defects. The active defect gets
     // full draggable handles below.
     {
-      for (const defect of visibleDefects) {
+      for (const defect of displayDefects) {
         const cut = cutMap.get(defect.id)
         if (!cut || defect.id === activeDefectId) continue
         if (cut.end < view.start || cut.start > view.end) continue
@@ -513,6 +549,8 @@ export default function Timeline({
     width,
     peaks,
     visibleDefects,
+    displayDefects,
+    filter,
     currentTime,
     loop,
     activeDefectId,
@@ -548,7 +586,7 @@ export default function Timeline({
     const px = clientX - rect.left
     let nearest: Defect | null = null
     let best = 7
-    for (const defect of visibleDefects) {
+    for (const defect of displayDefects) {
       const cut = cutMap.get(defect.id)
       const start = cut ? Math.min(defect.start, cut.start) : defect.start
       const end = cut ? Math.max(defect.end, cut.end) : defect.end
@@ -630,7 +668,7 @@ export default function Timeline({
 
     if (boundaryRef.current) {
       const current =
-        visibleDefects.find((defect) => defect.id === boundaryRef.current?.defectId) ??
+        displayDefects.find((defect) => defect.id === boundaryRef.current?.defectId) ??
         activeDefect
       if (!current) {
         boundaryRef.current = null

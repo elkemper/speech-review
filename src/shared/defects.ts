@@ -11,6 +11,29 @@ import type {
 import { endsSentence, normalizeWord } from './transcript'
 import { groupManualMarks } from './marks'
 
+/**
+ * Display-only defect type filter used by the right panel, both timelines and
+ * the only-with-defects transcript. It never affects detection, cuts, skip
+ * intervals or export.
+ */
+export type DefectFilter = 'all' | DefectType
+
+/**
+ * Whether a defect is shown under the given type filter. Automatic groups match
+ * when any type inside the group matches, so a group stays visible under each
+ * of its members' chips.
+ */
+export function matchesDefectFilter(
+  defect: Pick<Defect, 'type' | 'groupTypes'>,
+  filter: DefectFilter
+): boolean {
+  return (
+    filter === 'all' ||
+    defect.type === filter ||
+    defect.groupTypes?.includes(filter) === true
+  )
+}
+
 export const AUTO_DEFECT_TYPES: DefectType[] = [
   'filler',
   'pause',
