@@ -100,11 +100,11 @@ describe('automatic defect candidates', () => {
       enabledTypes: { ...DEFAULT_RULES.enabledTypes, filler: false }
     })
     const result = detectDefectsWithCandidates(transcript, rules, [], {
-      promotedIds: ['auto-filler-0']
+      promotedIds: ['auto-filler-w0']
     })
 
     expect(result.defects.some((item) => item.type === 'filler')).toBe(false)
-    expect(result.candidates.find((item) => item.id === 'auto-filler-0')).toMatchObject({
+    expect(result.candidates.find((item) => item.id === 'auto-filler-w0')).toMatchObject({
       reason: 'type-disabled'
     })
   })
@@ -150,7 +150,7 @@ describe('below-threshold candidate hint', () => {
 
   it('explains that a below-threshold filler is not skipped', () => {
     const result = detectDefectsWithCandidates(transcript, rulesWithFillerMin(0.5))
-    const candidate = result.candidates.find((item) => item.id === 'auto-filler-0')
+    const candidate = result.candidates.find((item) => item.id === 'auto-filler-w0')
     expect(candidate).toBeDefined()
 
     expect(candidateHint(candidate!, 0.5, 'ru')).toBe(
@@ -164,7 +164,7 @@ describe('below-threshold candidate hint', () => {
       enabledTypes: { ...DEFAULT_RULES.enabledTypes, filler: false }
     })
     const result = detectDefectsWithCandidates(transcript, rules)
-    const candidate = result.candidates.find((item) => item.id === 'auto-filler-0')
+    const candidate = result.candidates.find((item) => item.id === 'auto-filler-w0')
     expect(candidate).toBeDefined()
 
     expect(candidateHint(candidate!, 0.5, 'ru')).toBe('филлер · тип выключен · не пропускается')

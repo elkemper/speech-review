@@ -215,6 +215,37 @@ function mergedSeverity(group: Defect[]): Severity {
   return 'low'
 }
 
+/**
+ * Stable automatic defect id.
+ *
+ * The id is derived from the defect type and the words it covers, not from the
+ * detection order: changing a threshold, a filler word or a type toggle must
+ * not move an existing confirmation, deletion, note or cut edit onto a
+ * different defect. A word may produce more than one defect (for example a
+ * repetition and a false start), so a collision gets a `-2`, `-3` suffix in
+ * detection order. Order-based suffixes are only used inside one detection
+ * pass; the base id stays stable.
+ */
+export function autoDefectId(type: DefectType, wordIds: number[]): string {
+  const words = wordIds.length > 0 ? wordIds.join('_') : 'x'
+  return `auto-${type}-w${words}`
+}
+
+function uniqueAutoDefectId(
+  type: DefectType,
+  wordIds: number[],
+  used: Set<string>
+): string {
+  const base = autoDefectId(type, wordIds)
+  let id = base
+  let suffix = 2
+  while (used.has(id)) {
+    id = `${base}-${suffix++}`
+  }
+  used.add(id)
+  return id
+}
+
 function mergeAutoGroup(group: Defect[]): Defect {
   const first = group.reduce((a, b) => (a.start <= b.start ? a : b))
   return {
@@ -301,6 +332,12 @@ export interface DefectCandidate extends Defect {
 export interface DetectDefectsResult {
   defects: Defect[]
   candidates: DefectCandidate[]
+  /**
+   * Every rule match in detection order, before type toggles, minimum
+   * durations and grouping. Used to translate order-based ids written by older
+   * builds into stable ids.
+   */
+  matches: Array<{ type: DefectType; wordIds: number[]; id: string }>
 }
 
 /** Manual defects built from marks, shared by active and dismissed lists. */
@@ -366,7 +403,9 @@ export function detectDefectsWithCandidates(
   const dismissed = new Set(options.dismissedIds ?? [])
   const promoted = new Set([...dismissed, ...(options.promotedIds ?? [])])
   const promotedCandidates = new Set<string>()
-  let sequence = 0
+  const usedIds = new Set<string>()
+  /** Every rule match in detection order, filtered out or not. */
+  const matches: Array<{ type: DefectType; wordIds: number[]; id: string }> = []
 
   const add = (
     type: DefectType,
@@ -377,9 +416,8 @@ export function detectDefectsWithCandidates(
     severity: Severity,
     measuredSec = Math.max(start, end) - start
   ): void => {
-    // The sequence advances even for disabled types so that turning one type
-    // off does not renumber every later automatic defect.
-    const id = `auto-${type}-${sequence++}`
+    const id = uniqueAutoDefectId(type, wordIds, usedIds)
+    matches.push({ type, wordIds: [...wordIds], id })
     const defect: Defect = {
       id,
       type,
@@ -570,7 +608,8 @@ export function detectDefectsWithCandidates(
 
   return {
     defects,
-    candidates: candidates.sort(compareDefects)
+    candidates: candidates.sort(compareDefects),
+    matches
   }
 }
 

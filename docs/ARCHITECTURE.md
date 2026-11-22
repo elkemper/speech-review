@@ -137,6 +137,7 @@ transcript + rules + marks
 ```
 
 - `src/shared/defects.ts` owns detection and grouping. `src/shared/marks.ts` owns logical marks and confirmation reconciliation. `src/shared/cuts.ts` owns the final cut range, the cut list and the complement used by video export. All three are pure and tested without Electron.
+- `src/shared/migrations.ts` is the schema-migration runner; `projectMigrations.ts` and `settingsMigrations.ts` hold the numbered steps for the two state files. See `DATA_MODEL.md` §11.
 - `Project` is the source of truth for editable state: marks, cut overrides, confirmed IDs, dismissed IDs/marks, notes, rules and skip padding.
 - History (`history.ts`) snapshots only that editable state; `skipEnabled` is player state. See `docs/SPEC.md` (story 32/47) and `DATA_MODEL.md` §9.
 - `src/renderer/src/skip.ts` re-exports `shared/cuts.ts`. `buildCutList` derives every non-dismissed cut, applies per-type or group padding plus the pause room tone, clamps to the duration and merges overlaps; it does not depend on skip mode. `buildSkipIntervals` is the same list only while skip mode is on. Video export uses the same list through `complementRanges`.

@@ -9,8 +9,11 @@ import {
   mergeMarksAtSpan,
   reconcileConfirmedIds
 } from '@shared/marks'
+import { pinCutFor, withoutPinnedCuts } from '@shared/cuts'
+import { reconcileManualPins } from '@shared/pinnedCuts'
 import type {
   Bookmark,
+  Defect,
   DefectRules,
   EngineStatus,
   ExportSettings,
@@ -139,8 +142,8 @@ interface AppStore {
   updateSettings: (patch: SettingsPatch, history?: SettingsHistoryMeta) => void
   setRules: (patch: Partial<DefectRules>, history?: SettingsHistoryMeta) => void
   toggleSkip: () => void
-  confirmDefect: (defectId: string, label?: string) => void
-  confirmMany: (defectIds: string[], label?: string) => void
+  confirmDefect: (defect: Defect, label?: string) => void
+  confirmMany: (defects: Defect[], label?: string) => void
   unconfirmDefect: (defectId: string, label?: string, relatedIds?: string[]) => void
   restoreDefect: (defectId: string, relatedIds?: string[]) => void
   setNote: (defectId: string, note: string) => void
@@ -157,7 +160,7 @@ interface AppStore {
     end: number,
     edge?: 'start' | 'end'
   ) => void
-  resetCutBounds: (defectId: string) => void
+  resetCutBounds: (defect: Defect) => void
   undo: () => void
   redo: () => void
   jumpHistory: (index: number) => void
@@ -565,48 +568,50 @@ export const useApp = create<AppStore>((set, get) => ({
     })
   },
 
-  confirmDefect: (defectId, label) => {
-    const project = get().project
-    if (!project) return
-    if (project.confirmedDefectIds.includes(defectId)) return
-    const before = snapshotEditable(project, get().settings)
-    const confirmed = new Set(project.confirmedDefectIds)
-    confirmed.add(defectId)
-    const dismissed = new Set(project.dismissedDefectIds)
-    dismissed.delete(defectId)
-    set({
-      project: {
-        ...project,
-        confirmedDefectIds: [...confirmed],
-        dismissedDefectIds: [...dismissed]
-      }
-    })
-    recordProjectChange(set, get, before, label ?? tr(get, 'history.label.defectConfirmed'))
-    get().scheduleSave()
+  confirmDefect: (defect, label) => {
+    get().confirmMany([defect], label)
   },
 
-  confirmMany: (defectIds, label) => {
+  confirmMany: (items, label) => {
     const project = get().project
-    if (!project || defectIds.length === 0) return
+    if (!project || items.length === 0) return
     const before = snapshotEditable(project, get().settings)
     const confirmed = new Set(project.confirmedDefectIds)
     const dismissed = new Set(project.dismissedDefectIds)
-    for (const defectId of defectIds) {
-      confirmed.add(defectId)
-      dismissed.delete(defectId)
+    // Confirming freezes the cut: the review decision must not move when the
+    // padding settings change later. An existing hand-dragged cut is kept as is.
+    // Re-confirming an already confirmed defect changes nothing, so a bulk
+    // confirmation cannot pin old decisions retroactively.
+    const overrides = { ...(project.cutOverrides ?? {}) }
+    for (const defect of items) {
+      if (confirmed.has(defect.id)) continue
+      confirmed.add(defect.id)
+      dismissed.delete(defect.id)
+      if (!overrides[defect.id]) {
+        const pinned = pinCutFor(
+          { ...defect, confirmed: true },
+          get().settings.playback,
+          project.duration
+        )
+        if (pinned) overrides[defect.id] = pinned
+      }
     }
     set({
       project: {
         ...project,
         confirmedDefectIds: [...confirmed],
-        dismissedDefectIds: [...dismissed]
+        dismissedDefectIds: [...dismissed],
+        cutOverrides: overrides
       }
     })
     recordProjectChange(
       set,
       get,
       before,
-      label ?? tr(get, 'history.label.confirmedMany', { count: defectIds.length })
+      label ??
+        (items.length === 1
+          ? tr(get, 'history.label.defectConfirmed')
+          : tr(get, 'history.label.confirmedMany', { count: items.length }))
     )
     get().scheduleSave()
   },
@@ -618,7 +623,15 @@ export const useApp = create<AppStore>((set, get) => ({
     if (!project.confirmedDefectIds.some((id) => stale.has(id))) return
     const before = snapshotEditable(project, get().settings)
     const confirmed = project.confirmedDefectIds.filter((id) => !stale.has(id))
-    set({ project: { ...project, confirmedDefectIds: confirmed } })
+    // Removing the confirmation unfreezes the cut. A range the user dragged by
+    // hand is not pinned and stays.
+    set({
+      project: {
+        ...project,
+        confirmedDefectIds: confirmed,
+        cutOverrides: withoutPinnedCuts(project.cutOverrides ?? {}, stale)
+      }
+    })
     recordProjectChange(set, get, before, label ?? tr(get, 'history.label.unconfirmed'))
     get().scheduleSave()
   },
@@ -645,7 +658,9 @@ export const useApp = create<AppStore>((set, get) => ({
           confirmedDefectIds: confirmed.filter(
             (id) => !markIds.some((markId) => id === `manual-${markId}`)
           ),
-          dismissedDefectIds: dismissedIds
+          dismissedDefectIds: dismissedIds,
+          // A restored mark is unconfirmed again, so its cut follows padding.
+          cutOverrides: withoutPinnedCuts(project.cutOverrides ?? {}, stale)
         },
         activeDefectId: defectId
       })
@@ -655,7 +670,8 @@ export const useApp = create<AppStore>((set, get) => ({
         project: {
           ...project,
           confirmedDefectIds: confirmed,
-          dismissedDefectIds: dismissedIds
+          dismissedDefectIds: dismissedIds,
+          cutOverrides: withoutPinnedCuts(project.cutOverrides ?? {}, stale)
         },
         activeDefectId: defectId
       })
@@ -756,7 +772,8 @@ export const useApp = create<AppStore>((set, get) => ({
     const marks = mergeMarkNeighbours([...project.marks, mark], [mark.id])
     const activeDefectId = manualDefectIdForMark(marks, mark.id) ?? `manual-${mark.id}`
     // Adding a mark can rebuild a logical group. The group's fill changed, so
-    // every nested cut override is dropped and the cut is derived again.
+    // every nested cut override is dropped and the cut is derived again. A
+    // frozen (confirmed) cut is re-pinned by `reconcileManualPins` below.
     const cutOverrides = { ...(project.cutOverrides ?? {}) }
     const affectedMarkIds = markIdsForDefectId(activeDefectId, marks)
     for (const markId of affectedMarkIds) delete cutOverrides[`manual-${markId}`]
@@ -767,16 +784,24 @@ export const useApp = create<AppStore>((set, get) => ({
         delete cutOverrides[`manual-group-${previous.groupId}`]
       }
     }
+    const confirmed = reconcileConfirmedIds(
+      project.marks,
+      marks,
+      project.confirmedDefectIds
+    )
     set({
       project: {
         ...project,
         marks,
-        cutOverrides,
-        confirmedDefectIds: reconcileConfirmedIds(
-          project.marks,
+        cutOverrides: reconcileManualPins(
           marks,
-          project.confirmedDefectIds
-        )
+          confirmed,
+          cutOverrides,
+          get().settings.playback,
+          project.duration,
+          markIdsForDefectId(activeDefectId, marks).map((markId) => `manual-${markId}`).concat(activeDefectId)
+        ),
+        confirmedDefectIds: confirmed
       },
       activeDefectId,
       filter: 'all',
@@ -897,6 +922,12 @@ export const useApp = create<AppStore>((set, get) => ({
       if (groupNote) notes[singleId] = groupNote
     }
     const cutOverrides = { ...(project.cutOverrides ?? {}) }
+    // A split confirmed group keeps its frozen cuts: each part is still the
+    // same reviewed defect, now with its own id. `reconcileManualPins` re-pins
+    // the parts after the group override is dropped. Only a pinned group is
+    // re-pinned; a group confirmed before pinning existed keeps following the
+    // padding.
+    const wasPinned = cutOverrides[defectId]?.pinned === true
     delete cutOverrides[defectId]
     set({
       project: {
@@ -904,7 +935,16 @@ export const useApp = create<AppStore>((set, get) => ({
         marks,
         confirmedDefectIds: confirmed,
         defectNotes: notes,
-        cutOverrides
+        cutOverrides: wasPinned
+          ? reconcileManualPins(
+              marks,
+              confirmed,
+              cutOverrides,
+              get().settings.playback,
+              project.duration,
+              groupMarks.map((mark) => `manual-${mark.id}`)
+            )
+          : cutOverrides
       },
       activeDefectId: `manual-${groupMarks[0].id}`
     })
@@ -969,20 +1009,32 @@ export const useApp = create<AppStore>((set, get) => ({
     get().scheduleSave()
   },
 
-  resetCutBounds: (defectId) => {
+  resetCutBounds: (defect) => {
     const project = get().project
     if (!project) return
-    if (!project.cutOverrides?.[defectId]) return
+    if (!project.cutOverrides?.[defect.id]) return
     const before = snapshotEditable(project, get().settings)
     const overrides = { ...(project.cutOverrides ?? {}) }
-    delete overrides[defectId]
+    // A confirmed defect stays frozen: resetting the handle pins the freshly
+    // derived cut instead of unfreezing it.
+    if (project.confirmedDefectIds.includes(defect.id)) {
+      const pinned = pinCutFor(
+        { ...defect, confirmed: true },
+        get().settings.playback,
+        project.duration
+      )
+      if (pinned) overrides[defect.id] = pinned
+      else delete overrides[defect.id]
+    } else {
+      delete overrides[defect.id]
+    }
     set({ project: { ...project, cutOverrides: overrides } })
     recordProjectChange(
       set,
       get,
       before,
       tr(get, 'history.label.cutReset'),
-      `cut:${defectId}`
+      `cut:${defect.id}`
     )
     get().scheduleSave()
   },

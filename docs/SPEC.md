@@ -38,7 +38,7 @@ only the area it is working on.
 |---|---|---|
 | [`01-settings.md`](spec/01-settings.md) | 1–3, 43 | Tabs, sliders, rows, show-dismissed |
 | [`02-defects.md`](spec/02-defects.md) | 4–7, 44, 46 | Detection, minimum duration, candidates, auto-grouping, toggles, sentence pauses |
-| [`03-marks.md`](spec/03-marks.md) | 8–13, 45 | Manual marks, selection, logical marks, cut handles, confirmation state |
+| [`03-marks.md`](spec/03-marks.md) | 8–13, 45, 50, 51 | Manual marks, selection, logical marks, cut handles, confirmation state, pinned cuts, schema migrations |
 | [`04-timeline.md`](spec/04-timeline.md) | 14–17 | Zoom/pan, LOD, overlays, timeline selection |
 | [`04a-waveform-selection.md`](spec/04a-waveform-selection.md) | 17 detail | Exact time selection + manual marks; pause tokens deferred |
 | [`04b-word-underlays.md`](spec/04b-word-underlays.md) | 41 | Colored word underlays in both timelines |
@@ -53,7 +53,7 @@ only the area it is working on.
 | [`09-export.md`](spec/09-export.md) | 38–39, 48 | CSV, JSON and video export |
 | [`10-mini-timeline.md`](spec/10-mini-timeline.md) | 40 | Selected defect snippet with editable cut handles |
 | [`11-model-updates.md`](spec/11-model-updates.md) | 49 | Model update discovery through a runtime manifest |
-| [`12-i18n.md`](spec/12-i18n.md) | 50–52 | Interface language (RU/EN), message catalogue, stable export values |
+| [`12-i18n.md`](spec/12-i18n.md) | 52–54 | Interface language (RU/EN), message catalogue, stable export values |
 
 ## Product invariants
 
@@ -69,7 +69,8 @@ Applies to every story.
    `confidence: 0`.
 6. **Skip mode cuts every defect and manual mark except dismissed ones.**
    The final range is `Project.cutOverrides[id]` or the derived padded range.
-   Confirmation is a review marker only. A different playback mode is allowed
+   Confirmation does not decide whether an item is cut; it freezes the cut range
+   at confirmation time (story 50). A different playback mode is allowed
    only as a separate, explicitly named mode (story 29 / `06a`).
 7. **The exact selected words define a manual mark.** Logical grouping may
    expand a *group's* span, but each underlying mark keeps its exact `wordIds`.
@@ -152,7 +153,7 @@ Applies to every story.
 
 ### Done — do not regress
 
-Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48, 50–52.
+Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48, 50–54.
 Verification only (implemented, needs a pass): 9, 24.
 
 ## Related documents

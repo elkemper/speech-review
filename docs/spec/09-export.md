@@ -30,7 +30,7 @@ Excel-friendly file whose base time columns are the final cut bounds.
 - Escaping for quotes, delimiters and newlines.
 - Timecodes `HH:MM:SS.mmm`.
 - Type/severity names and `yes`/`no` values are English and do not depend on
-  the interface language ([story 52](12-i18n.md)).
+  the interface language ([story 54](12-i18n.md)).
 
 ### Story 39 — JSON export with full data
 

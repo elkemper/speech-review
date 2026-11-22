@@ -451,6 +451,7 @@ export default function Workspace() {
         <span><kbd>M</kbd> {t('workspace.hotkeyMark')}</span>
         <span><kbd>B</kbd> {t('workspace.hotkeyBookmark')}</span>
         <span><kbd>L</kbd> {t('workspace.hotkeyLoop')}</span>
+        <span><kbd>K</kbd> {t('workspace.hotkeySkip')}</span>
         <span><kbd>1</kbd>–<kbd>6</kbd> {t('workspace.hotkeySpeed')}</span>
         <span className="hotkeys-spacer" />
         <span>{formatTimecode(project.duration)}</span>

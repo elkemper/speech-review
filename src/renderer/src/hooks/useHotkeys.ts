@@ -308,14 +308,18 @@ export function useHotkeys(defects: Defect[]): void {
           event.preventDefault()
           if (event.shiftKey && hasSelection) {
             const ids = selectedIds()
-            if (ids.length > 0) {
-              state.confirmMany(ids, tr('toast.confirmedSelection', { count: ids.length }))
+            const selected = defects.filter((defect) => ids.includes(defect.id))
+            if (selected.length > 0) {
+              state.confirmMany(
+                selected,
+                tr('toast.confirmedSelection', { count: selected.length })
+              )
             } else {
               state.notify(tr('toast.noDefectsInSelection'))
             }
           } else if (active) {
             if (!active.dismissed) {
-              state.confirmDefect(active.id, tr('toast.confirmed', { text: active.text }))
+              state.confirmDefect(active, tr('toast.confirmed', { text: active.text }))
             }
           }
           break

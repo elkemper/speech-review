@@ -165,7 +165,7 @@ export default function DefectPanel({
   const confirmSelection = (): void => {
     if (selectedDefectIds.length === 0) return
     confirmMany(
-      selectedDefectIds,
+      defects.filter((defect) => selectedDefectIds.includes(defect.id)),
       t('panel.confirmedSelection', { count: selectedDefectIds.length })
     )
   }
@@ -345,7 +345,7 @@ export default function DefectPanel({
                       aria-label={t('panel.confirmAria')}
                       onClick={() =>
                         confirmDefect(
-                          defect.id,
+                          defect,
                           t('panel.confirmedToast', { text: defect.text })
                         )
                       }

@@ -620,7 +620,7 @@ export default function MiniTimeline({
         onDoubleClick={(event) => {
           event.stopPropagation()
           if (currentEdgeAt(xFromClientX(event.clientX))) {
-            resetCutBounds(defect.id)
+            resetCutBounds(defect)
             return
           }
           resetZoom()

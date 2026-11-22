@@ -183,7 +183,7 @@ export class TranscriptionManager {
       let peaks: Peaks | null = null
       try {
         peaks = await computePeaks(info, {
-          peaksPerSecond: 20,
+          peaksPerSecond: 150,
           signal,
           onProgress: (fraction) => {
             this.progress(job.id, 'peaks', 33 + fraction * 11, t('progress.buildPeaks'), undefined, undefined, {

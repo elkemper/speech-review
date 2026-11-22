@@ -241,6 +241,7 @@ export const ru = {
   'workspace.hotkeyMark': 'метка',
   'workspace.hotkeyBookmark': 'закладка',
   'workspace.hotkeyLoop': 'цикл',
+  'workspace.hotkeySkip': 'пропускать дефекты',
   'workspace.hotkeySpeed': 'скорость',
   'workspace.processing': 'Идёт обработка',
   'workspace.noPercent': 'этап без процента',

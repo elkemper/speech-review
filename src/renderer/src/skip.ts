@@ -13,6 +13,8 @@ export {
   mergeRanges,
   MIN_PAUSE_CUT_SEC,
   paddingFor,
-  subtractRanges
+  pinCutFor,
+  subtractRanges,
+  withoutPinnedCuts
 } from '@shared/cuts'
 export type { CutRange, CutView } from '@shared/cuts'

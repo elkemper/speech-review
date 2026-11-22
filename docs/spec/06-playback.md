@@ -20,7 +20,10 @@ deleted ones, and to treat a logical group as one item.
 - `buildSkipIntervals` uses every non-dismissed defect and manual mark.
 - A revealed minimum-duration candidate is a temporary defect, so it is cut
   while it is active and stops being cut after switching away.
-- Confirmation does not affect playback.
+- Confirmation does not decide whether an item is cut. It freezes the cut range
+  at confirmation time (story 50): later padding changes do not move a
+  confirmed defect, and a deleted defect keeps its status because automatic ids
+  are stable (story 51).
 - Deleted automatic defects and manual marks are absent from the cut list.
 - Disabled mode yields no intervals.
 - Logical manual/automatic groups are already one defect and one interval.
@@ -46,6 +49,8 @@ together.
 - A grouped pause uses `groupPadding`, not the keep.
 - `Project.cutOverrides[defectId]` is the final cut. It wins over every padding
   setting; double-clicking a handle deletes it and restores the derived cut.
+  A confirmed defect stores a `pinned` override instead (story 50): the range is
+  frozen at confirmation and a double-click re-pins the derived range.
 - `buildCutList` is independent of `skipEnabled` and feeds the timeline
   hatching, the mini timeline, JSON export and video export. `buildSkipIntervals`
   is `skipEnabled ? buildCutList : []`.

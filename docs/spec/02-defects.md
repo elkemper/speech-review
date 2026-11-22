@@ -18,7 +18,8 @@ vocal sounds detected by rules that apply immediately, without re-transcribing.
 - Rules live in `DefectRules` (`DEFAULT_RULES`).
 - `detectDefects(transcript, rules, marks)` is pure.
 - Types use the existing `DefectType` union.
-- Automatic ids are `auto-${type}-${sequence}` in global insertion order.
+- Automatic ids are `auto-${type}-w${wordIds.join('_')}`, derived from the type
+  and the covered words rather than from detection order (story 51).
 - Rule changes recompute the open project and save with a debounce.
 
 ### Story 5 — Minimum duration per type
@@ -80,8 +81,8 @@ values I already set.
   mean on, except `unclear`, which stays off while the engine writes
   `confidence: 0` (presentation is also marked "в разработке").
 - `manual` is never filtered: manual marks are explicit user work.
-- A disabled type produces no defects, but the detection sequence still
-  advances, so ids of the other types do not shift.
+- A disabled type produces no defects, but ids do not depend on which types are
+  on, so the other types keep their ids.
 - Field: `rules.autoGroupEnabled: boolean` plus the existing
   `rules.autoGroupGapSec`.
 - Old rules with `autoGroupGapSec > 0` migrate to enabled; storing an explicit
@@ -98,8 +99,8 @@ word, without changing the minimum-duration rule globally.
 
 - `detectDefectsWithCandidates` returns `{ defects, candidates }`; the existing
   `detectDefects` remains a wrapper.
-- A below-threshold match keeps its normal automatic id and order. Lowering the
-  threshold later produces the same id.
+- A below-threshold match keeps its normal automatic id. Lowering the threshold
+  later produces the same id.
 - A candidate is revealable only for `min-duration`; a disabled type stays off.
 - While `activeDefectId` matches a candidate, the renderer adds a computed
   `candidate: true` defect to the list. It has the normal pending controls,
@@ -122,7 +123,8 @@ word, without changing the minimum-duration rule globally.
 - [ ] Types: filler, pause, repetition, elongation, false start, vocal sound;
       `unclear` stays disabled while confidence is `0`.
 - [ ] Multi-word fillers ("как бы", "в общем") are one defect.
-- [ ] Automatic ids are order-based and unique within one detection pass.
+- [ ] Automatic ids are derived from the type and the covered words, and are
+      unique within one detection pass (story 51).
 - [ ] Rule changes update the open project and save.
 - [ ] The sample fixture still yields 6 fillers, 3 pauses, 1 false start = 10.
 

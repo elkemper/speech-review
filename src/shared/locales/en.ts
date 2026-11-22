@@ -242,6 +242,7 @@ export const en: Record<MessageKey, string> = {
   'workspace.hotkeyMark': 'mark',
   'workspace.hotkeyBookmark': 'bookmark',
   'workspace.hotkeyLoop': 'loop',
+  'workspace.hotkeySkip': 'skip defects',
   'workspace.hotkeySpeed': 'speed',
   'workspace.processing': 'Processing',
   'workspace.noPercent': 'step without a percentage',
