@@ -1,10 +1,15 @@
 import { useEffect } from 'react'
+import { translate } from '@shared/i18n'
 import type { Defect } from '@shared/types'
 import { nudge, playPause, seekTo, setPlaybackRate, toggleLoopForDefect } from '../player'
 import { defectIdsForSelection, defectIdsInRange } from '../selection'
 import { useApp } from '../store'
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
+
+function tr(key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]): string {
+  return translate(useApp.getState().settings.uiLanguage, key, params)
+}
 
 type Action =
   | 'play'
@@ -304,13 +309,13 @@ export function useHotkeys(defects: Defect[]): void {
           if (event.shiftKey && hasSelection) {
             const ids = selectedIds()
             if (ids.length > 0) {
-              state.confirmMany(ids, `Подтверждено выделение: ${ids.length}`)
+              state.confirmMany(ids, tr('toast.confirmedSelection', { count: ids.length }))
             } else {
-              state.notify('В выделении нет дефектов')
+              state.notify(tr('toast.noDefectsInSelection'))
             }
           } else if (active) {
             if (!active.dismissed) {
-              state.confirmDefect(active.id, `Подтверждён: ${active.text}`)
+              state.confirmDefect(active.id, tr('toast.confirmed', { text: active.text }))
             }
           }
           break
@@ -325,9 +330,9 @@ export function useHotkeys(defects: Defect[]): void {
                   relatedIds: defects.find((defect) => defect.id === id)?.groupIds
                 }))
               )
-              state.notify(`Удалено: ${ids.length}`)
+              state.notify(tr('toast.deleted', { count: ids.length }))
             } else {
-              state.notify('В выделении нет дефектов')
+              state.notify(tr('toast.noDefectsInSelection'))
             }
           } else if (active) {
             if (!active.dismissed) state.removeDefect(active.id, active.groupIds)

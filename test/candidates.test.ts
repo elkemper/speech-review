@@ -153,7 +153,7 @@ describe('below-threshold candidate hint', () => {
     const candidate = result.candidates.find((item) => item.id === 'auto-filler-0')
     expect(candidate).toBeDefined()
 
-    expect(candidateHint(candidate!, 0.5)).toBe(
+    expect(candidateHint(candidate!, 0.5, 'ru')).toBe(
       'филлер · ниже порога 0.30 c < 0.50 c · не пропускается'
     )
   })
@@ -167,6 +167,6 @@ describe('below-threshold candidate hint', () => {
     const candidate = result.candidates.find((item) => item.id === 'auto-filler-0')
     expect(candidate).toBeDefined()
 
-    expect(candidateHint(candidate!, 0.5)).toBe('филлер · тип выключен · не пропускается')
+    expect(candidateHint(candidate!, 0.5, 'ru')).toBe('филлер · тип выключен · не пропускается')
   })
 })

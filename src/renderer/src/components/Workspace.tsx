@@ -6,10 +6,12 @@ import {
   type PointerEvent as ReactPointerEvent
 } from 'react'
 import { detectDefectsWithCandidates, sortDefects } from '@shared/defects'
-import { formatDuration, formatTimecode } from '@shared/format'
+import { formatDuration, formatEta, formatTimecode } from '@shared/format'
+import { transcribePhaseLabel } from '@shared/labels'
 import { MODEL_SPECS } from '@shared/models'
 import type { Defect, TranscribeProgress } from '@shared/types'
 import { useApp } from '../store'
+import { useT, useUiLanguage } from '../i18n'
 import { canRedo, canUndo } from '../history'
 import { useHotkeys } from '../hooks/useHotkeys'
 import Player from './Player'
@@ -19,31 +21,19 @@ import DefectPanel from './DefectPanel'
 import Bookmarks from './Bookmarks'
 import VideoExportDialog from './VideoExportDialog'
 
-const STEPS: Array<{ phase: TranscribeProgress['phase']; label: string }> = [
-  { phase: 'prepare', label: 'Подготовка' },
-  { phase: 'audio', label: 'Аудио' },
-  { phase: 'silence', label: 'Паузы' },
-  { phase: 'peaks', label: 'Осциллограмма' },
-  { phase: 'transcribe', label: 'Распознавание' },
-  { phase: 'merge', label: 'Сборка' },
-  { phase: 'done', label: 'Готово' }
+const STEPS: Array<TranscribeProgress['phase']> = [
+  'prepare',
+  'audio',
+  'silence',
+  'peaks',
+  'transcribe',
+  'merge',
+  'done'
 ]
 
-const PHASE_LABELS = Object.fromEntries(
-  STEPS.map((step) => [step.phase, step.label])
-) as Record<TranscribeProgress['phase'], string>
-
 function phaseIndex(phase: TranscribeProgress['phase']): number {
-  const index = STEPS.findIndex((step) => step.phase === phase)
+  const index = STEPS.findIndex((step) => step === phase)
   return index < 0 ? STEPS.length : index
-}
-
-function formatEta(seconds: number | undefined): string {
-  if (seconds === undefined || !Number.isFinite(seconds)) return ''
-  if (seconds < 60) return `~${Math.max(1, Math.round(seconds))} c`
-  const minutes = Math.floor(seconds / 60)
-  const rest = Math.round(seconds % 60)
-  return `~${minutes} мин${rest > 0 ? ` ${rest} c` : ''}`
 }
 
 function readStoredNumber(key: string, fallback: number, min: number, max: number): number {
@@ -58,6 +48,8 @@ const TIMELINE_MIN = 80
 export default function Workspace() {
   const project = useApp((state) => state.project)
   const activeDefectId = useApp((state) => state.activeDefectId)
+  const t = useT()
+  const lang = useUiLanguage()
   const status = useApp((state) => state.status)
   const progress = useApp((state) => state.progress)
   const jobId = useApp((state) => state.jobId)
@@ -190,7 +182,8 @@ export default function Workspace() {
       {
         dismissedIds: project.dismissedDefectIds,
         dismissedMarks: project.dismissedMarks,
-        promotedIds
+        promotedIds,
+        uiLanguage: lang
       }
     )
   }, [
@@ -199,7 +192,8 @@ export default function Workspace() {
     project?.marks,
     project?.dismissedDefectIds,
     project?.dismissedMarks,
-    promotedIds
+    promotedIds,
+    lang
   ])
 
   // Disabled types stay off; only the minimum-duration candidates are revealed.
@@ -266,9 +260,7 @@ export default function Workspace() {
 
   const onTranscribe = (): void => {
     if (project.transcript) {
-      const confirmed = window.confirm(
-        'Перераспознать запись? Транскрипт, подтверждения, заметки и удалённые автоматические дефекты будут сброшены. Ручные метки, включая удалённые, сохранятся.'
-      )
+      const confirmed = window.confirm(t('workspace.reTranscribeConfirm'))
       if (!confirmed) return
     }
     void startTranscription()
@@ -278,26 +270,30 @@ export default function Workspace() {
     <div className="workspace">
       <header className="titlebar workspace-titlebar">
         <button className="btn ghost small" onClick={() => void closeProject()}>
-          ← Проекты
+          {t('workspace.back')}
         </button>
         <div className="workspace-title">
           <div className="workspace-name" title={project.video.path}>
             {project.name}
           </div>
           <div className="workspace-meta">
-            {formatDuration(project.duration)} · {project.transcript ? `${words} слов` : 'без транскрипта'}
-            {project.transcript ? ` · ${unconfirmed} неподтверждённых` : ''}
+            {project.transcript
+              ? t('workspace.durationWords', { duration: formatDuration(project.duration), count: words })
+              : `${formatDuration(project.duration)} · ${t('workspace.noTranscript')}`}
+            {project.transcript ? t('workspace.unconfirmed', { count: unconfirmed }) : ''}
             {project.transcript && !project.transcriptComplete ? (
-              <span className="badge live small-badge">частичный</span>
+              <span className="badge live small-badge">{t('workspace.partial')}</span>
             ) : null}
           </div>
         </div>
         <div className="workspace-actions">
           <span className="badge">{spec.shortLabel}</span>
-          <span className="badge">{settings.language.toUpperCase()}</span>
+          <span className="badge" title={t('workspace.recognitionLanguage')}>
+            {settings.language.toUpperCase()}
+          </span>
           {progress ? (
             <span className="badge live">
-              {PHASE_LABELS[progress.phase]}
+              {transcribePhaseLabel(lang, progress.phase)}
               {progress.phase === 'transcribe' ? ` · ${progress.percent}%` : '…'}
             </span>
           ) : null}
@@ -305,7 +301,7 @@ export default function Workspace() {
             className="btn ghost small"
             onClick={undo}
             disabled={!canUndo(history)}
-            title="Отменить (⌘Z / Ctrl+Z)"
+            title={t('workspace.undoTitle')}
           >
             ↶
           </button>
@@ -313,34 +309,34 @@ export default function Workspace() {
             className="btn ghost small"
             onClick={redo}
             disabled={!canRedo(history)}
-            title="Повторить (⇧⌘Z / Ctrl+Y)"
+            title={t('workspace.redoTitle')}
           >
             ↷
           </button>
           <button
             className="btn ghost small"
             onClick={() => setShowHistory(true)}
-            title="История действий"
+            title={t('workspace.historyTitle')}
           >
-            История
+            {t('workspace.history')}
           </button>
           <button
             className={`btn ghost small ${showBookmarks ? 'active' : ''}`}
             onClick={() => setShowBookmarks((value) => !value)}
-            title="Закладки — вернуться к месту, где остановились (B)"
+            title={t('workspace.bookmarksTitle')}
           >
             🔖 {(project.bookmarks ?? []).length}
           </button>
           {!panelVisible ? (
             <button className="btn ghost small" onClick={() => setPanelVisible(true)}>
-              Дефекты
+              {t('workspace.defects')}
             </button>
           ) : null}
           <button className="btn ghost small" onClick={() => setShowSettings(true)}>
-            Настройки
+            {t('workspace.settings')}
           </button>
           <button className="btn small" disabled={Boolean(jobId)} onClick={onTranscribe}>
-            {project.transcript ? 'Распознать заново' : 'Распознать'}
+            {project.transcript ? t('workspace.reTranscribe') : t('workspace.transcribe')}
           </button>
         </div>
       </header>
@@ -369,7 +365,7 @@ export default function Workspace() {
             onPointerMove={moveRowResize}
             onPointerUp={endRowResize}
             onPointerCancel={endRowResize}
-            title="Потяните, чтобы изменить высоту окна просмотра"
+            title={t('workspace.resizeVideo')}
           />
           <Timeline defects={defects} height={timelineHeight} />
           <div
@@ -378,7 +374,7 @@ export default function Workspace() {
             onPointerMove={moveRowResize}
             onPointerUp={endRowResize}
             onPointerCancel={endRowResize}
-            title="Потяните, чтобы изменить высоту таймлайна"
+            title={t('workspace.resizeTimeline')}
           />
 
           {progress && project.transcript ? (
@@ -389,10 +385,12 @@ export default function Workspace() {
                   {progress.phase === 'transcribe'
                     ? `${progress.percent}%${
                         progress.etaSec !== undefined
-                          ? ` · осталось ${formatEta(progress.etaSec)}`
+                          ? t('workspace.etaRemaining', {
+                              eta: formatEta(progress.etaSec, lang)
+                            })
                           : ''
                       }`
-                    : PHASE_LABELS[progress.phase]}
+                    : transcribePhaseLabel(lang, progress.phase)}
                 </span>
               </div>
               <div className={`progress-track ${progress.phase === 'transcribe' ? '' : 'indeterminate'}`}>
@@ -404,7 +402,7 @@ export default function Workspace() {
                 />
               </div>
               <button className="btn ghost small" onClick={() => void cancelTranscription()}>
-                Отменить
+                {t('common.cancel')}
               </button>
             </div>
           ) : null}
@@ -432,7 +430,7 @@ export default function Workspace() {
               onPointerMove={moveResize}
               onPointerUp={endResize}
               onPointerCancel={endResize}
-              title="Перетащите, чтобы изменить ширину панели"
+              title={t('workspace.resizePanel')}
             />
             <DefectPanel
               defects={defects}
@@ -444,16 +442,16 @@ export default function Workspace() {
       </div>
 
       <footer className="hotkeys-bar">
-        <span><kbd>Space</kbd> играть</span>
+        <span><kbd>Space</kbd> {t('workspace.hotkeyPlay')}</span>
         <span><kbd>←</kbd><kbd>→</kbd> ±2 c</span>
-        <span><kbd>[</kbd><kbd>]</kbd> дефект</span>
-        <span><kbd>Enter</kbd> подтвердить</span>
-        <span><kbd>R</kbd> удалить</span>
-        <span><kbd>⇧Enter</kbd>/<kbd>⇧R</kbd> выделение</span>
-        <span><kbd>M</kbd> метка</span>
-        <span><kbd>B</kbd> закладка</span>
-        <span><kbd>L</kbd> цикл</span>
-        <span><kbd>1</kbd>–<kbd>6</kbd> скорость</span>
+        <span><kbd>[</kbd><kbd>]</kbd> {t('workspace.hotkeyDefect')}</span>
+        <span><kbd>Enter</kbd> {t('workspace.hotkeyConfirm')}</span>
+        <span><kbd>R</kbd> {t('workspace.hotkeyDelete')}</span>
+        <span><kbd>⇧Enter</kbd>/<kbd>⇧R</kbd> {t('workspace.hotkeySelection')}</span>
+        <span><kbd>M</kbd> {t('workspace.hotkeyMark')}</span>
+        <span><kbd>B</kbd> {t('workspace.hotkeyBookmark')}</span>
+        <span><kbd>L</kbd> {t('workspace.hotkeyLoop')}</span>
+        <span><kbd>1</kbd>–<kbd>6</kbd> {t('workspace.hotkeySpeed')}</span>
         <span className="hotkeys-spacer" />
         <span>{formatTimecode(project.duration)}</span>
       </footer>
@@ -468,23 +466,25 @@ function ProgressCard({
   progress: TranscribeProgress
   onCancel: () => void
 }) {
+  const t = useT()
+  const lang = useUiLanguage()
   const current = phaseIndex(progress.phase)
   const isTranscribe = progress.phase === 'transcribe'
   return (
     <div className="start-panel">
       <div className="start-card">
-        <div className="start-eyebrow">Идёт обработка</div>
-        <h2>{PHASE_LABELS[progress.phase]}</h2>
+        <div className="start-eyebrow">{t('workspace.processing')}</div>
+        <h2>{transcribePhaseLabel(lang, progress.phase)}</h2>
         <p className="muted">{progress.message}</p>
 
         <ol className="progress-steps">
-          {STEPS.map((step, index) => (
+          {STEPS.map((phase, index) => (
             <li
-              key={step.phase}
+              key={phase}
               className={index < current ? 'done' : index === current ? 'active' : ''}
             >
               <span className="step-dot" />
-              {step.label}
+              {transcribePhaseLabel(lang, phase)}
             </li>
           ))}
         </ol>
@@ -500,14 +500,21 @@ function ProgressCard({
         )}
 
         <div className="progress-meta">
-          {isTranscribe ? <span>{progress.percent}%</span> : <span>этап без процента</span>}
+          {isTranscribe ? (
+            <span>{progress.percent}%</span>
+          ) : (
+            <span>{t('workspace.noPercent')}</span>
+          )}
           {progress.chunks ? (
             <span>
-              фрагмент {progress.chunk ?? 0} из {progress.chunks}
+              {t('workspace.chunkOf', {
+                chunk: progress.chunk ?? 0,
+                chunks: progress.chunks
+              })}
             </span>
           ) : null}
           {isTranscribe && progress.etaSec !== undefined ? (
-            <span>осталось {formatEta(progress.etaSec)}</span>
+            <span>{t('workspace.eta', { eta: formatEta(progress.etaSec, lang) })}</span>
           ) : null}
           {isTranscribe && progress.totalSec ? (
             <span>
@@ -517,13 +524,10 @@ function ProgressCard({
         </div>
         <div className="start-actions">
           <button className="btn ghost" onClick={onCancel}>
-            Отменить
+            {t('common.cancel')}
           </button>
         </div>
-        <p className="hint">
-          Готовые фрагменты появляются в транскрипте сразу. Можно переключиться в другое окно:
-          обработка идёт в фоне. Не закрывайте приложение до завершения.
-        </p>
+        <p className="hint">{t('workspace.processingHint')}</p>
       </div>
     </div>
   )
@@ -542,36 +546,34 @@ function StartCard({
   onStart: () => void
   onSettings: () => void
 }) {
+  const t = useT()
   const estimate = Math.max(1, Math.round((duration / 60) * 0.2))
   return (
     <div className="start-panel">
       <div className="start-card">
-        <div className="start-eyebrow">Транскрипт ещё не готов</div>
-        <h2>Разобрать запись</h2>
+        <div className="start-eyebrow">{t('workspace.notReadyEyebrow')}</div>
+        <h2>{t('workspace.startTitle')}</h2>
         <p>
-          Приложение извлечёт аудио, нарежет его по паузам и распознает речь моделью{' '}
-          <strong>{modelLabel}</strong>. Затем отметит филлеры, паузы, обрывы и повторы.
+          {t('workspace.startHintPrefix')} <strong>{modelLabel}</strong>.{' '}
+          {t('workspace.startHintSuffix')}
         </p>
         <ul className="start-list">
-          <li>Обработка локальная, запись никуда не отправляется.</li>
-          <li>Ориентировочно {estimate} мин на Apple Silicon M4 Pro.</li>
-          <li>Клик по слову в транскрипте сразу перематывает видео.</li>
+          <li>{t('workspace.startLocal')}</li>
+          <li>{t('workspace.startEstimate', { minutes: estimate })}</li>
+          <li>{t('workspace.startSeek')}</li>
         </ul>
         <div className="start-actions">
           {modelReady ? (
             <button className="btn primary big" onClick={onStart}>
-              Распознать запись
+              {t('workspace.startButton')}
             </button>
           ) : (
             <button className="btn primary big" onClick={onSettings}>
-              Сначала скачать модель
+              {t('workspace.startDownloadModel')}
             </button>
           )}
         </div>
-        <p className="hint">
-          Если запись длинная, приложение обрабатывает её фрагментами по 5–15 минут и сохраняет
-          прогресс после каждого фрагмента.
-        </p>
+        <p className="hint">{t('workspace.startChunks')}</p>
       </div>
     </div>
   )

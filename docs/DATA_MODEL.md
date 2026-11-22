@@ -38,7 +38,8 @@ Speech Review/
 
 | Field | Default | Meaning |
 |---|---|---|
-| `language` | `ru` | transcription language |
+| `language` | `ru` | transcription (ASR) language |
+| `uiLanguage` | `ru`* | interface language; `ru` / `en`; a missing field in an existing file migrates to `ru`, a missing file takes `app.getLocale()` when it is `ru` or `en` |
 | `modelId` | `q8_0` | `q8_0` / `bf16` / `q4_k` |
 | `backend` | `metal` | `metal` / `cpu` |
 | `rules` | `DEFAULT_RULES` | defect rules |
@@ -364,7 +365,7 @@ History is stored only in renderer memory and is reset when a project is opened 
 ## 10. Writes and defect-state reset
 
 - `store.scheduleSave()` uses a 500 ms debounce; `flushSave()` is called when switching or closing a project.
-- Settings without a model/language/backend change are saved with a 450 ms debounce; a model/language/backend change is saved immediately and refreshes engine status.
+- Settings without a model/language/backend/interface-language change are saved with a 450 ms debounce; a model/language/backend/interface-language change is saved immediately and refreshes engine status (an interface-language change also rebuilds the native menu).
 - `project.json`, `transcript.json`, `peaks.json` and `settings.json` are written atomically: `*.tmp` + `rename`.
 - `writeTranscript(id, transcript, complete, resetReview)`:
   - always writes `transcript.json`;
@@ -400,7 +401,7 @@ CSV (`buildCsv`):
 - fields in `ExportSettings.fields` order;
 - values containing `"`, `;`, `,` or a newline are quoted;
 - timecodes `HH:MM:SS.mmm`, seconds with three decimal places;
-- type and severity labels are Russian.
+- type and severity labels and the `cut`/`confirmed` values are English (`filler`, `yes`/`no`), independent of the interface language (story 52).
 
 JSON:
 

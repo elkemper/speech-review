@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatTimecode } from '@shared/format'
 import type { Defect } from '@shared/types'
 import { useApp } from '../store'
+import { useT } from '../i18n'
 import { intervalAt, buildSkipIntervals } from '../skip'
 import {
   attachVideo,
@@ -35,6 +36,7 @@ export default function Player({
   const setError = useApp((state) => state.setError)
   const playback = useApp((state) => state.settings.playback)
   const toggleSkip = useApp((state) => state.toggleSkip)
+  const t = useT()
 
   const skipIntervals = useMemo(
     () =>
@@ -153,21 +155,17 @@ export default function Player({
             onPause={() => setPlaying(false)}
             onEnded={() => setPlaying(false)}
             onError={() => {
-              setVideoError(
-                'Не удалось воспроизвести файл. Проверьте кодек: лучше всего подходит MP4/H.264 или MOV.'
-              )
-              setError(
-                'Видео не воспроизводится. Перекодируйте в MP4/H.264 — распознавание при этом работает с любым файлом.'
-              )
+              setVideoError(t('player.codecError'))
+              setError(t('player.codecHint'))
             }}
             onLoadedMetadata={() => setVideoError(null)}
           />
         ) : (
-          <div className="video-placeholder">Видео не загружено</div>
+          <div className="video-placeholder">{t('player.noVideo')}</div>
         )}
 
         {!playing && mediaUrl && !videoError ? (
-          <button className="big-play" onClick={playPause} title="Играть (Space)">
+          <button className="big-play" onClick={playPause} title={t('player.playTitle')}>
             ▶
           </button>
         ) : null}
@@ -181,7 +179,7 @@ export default function Player({
         ) : null}
 
         {playback.skipEnabled ? (
-          <div className="skip-badge">⏭ пропуск дефектов</div>
+          <div className="skip-badge">{t('player.skipBadge')}</div>
         ) : null}
 
         <div className="video-badges">
@@ -190,13 +188,13 @@ export default function Player({
       </div>
 
       <div className="player-controls">
-        <button className="ctrl primary-ctrl" onClick={playPause} title="Играть / пауза (Space)">
+        <button className="ctrl primary-ctrl" onClick={playPause} title={t('player.playPauseTitle')}>
           {playing ? '❚❚' : '▶'}
         </button>
-        <button className="ctrl" onClick={() => nudge(-5)} title="Назад 5 секунд">
+        <button className="ctrl" onClick={() => nudge(-5)} title={t('player.back5')}>
           −5
         </button>
-        <button className="ctrl" onClick={() => nudge(5)} title="Вперёд 5 секунд">
+        <button className="ctrl" onClick={() => nudge(5)} title={t('player.forward5')}>
           +5
         </button>
         <div className="timecode">
@@ -209,7 +207,7 @@ export default function Player({
         <button
           className="ctrl"
           onClick={() => setMuted((value) => !value)}
-          title={muted ? 'Включить звук' : 'Выключить звук'}
+          title={muted ? t('player.unmute') : t('player.mute')}
         >
           {muted ? '🔇' : '🔊'}
         </button>
@@ -221,14 +219,14 @@ export default function Player({
           step={0.05}
           value={volume}
           onChange={(event) => setVolume(Number(event.target.value))}
-          title="Громкость"
+          title={t('player.volume')}
         />
 
         <select
           className="rate-select"
           value={rate}
           onChange={(event) => setPlaybackRate(Number(event.target.value))}
-          title="Скорость"
+          title={t('player.speed')}
         >
           {RATES.map((value) => (
             <option key={value} value={value}>
@@ -240,24 +238,24 @@ export default function Player({
         <button
           className={`ctrl ${loopActive ? 'active' : ''}`}
           onClick={() => toggleLoopForDefect(activeDefect)}
-          title="Цикл по активному дефекту (L)"
+          title={t('player.loopTitle')}
         >
-          ⟲ цикл
+          {t('player.loop')}
         </button>
         <button
           className={`ctrl ${playback.skipEnabled ? 'active' : ''}`}
           onClick={toggleSkip}
-          title="Пропускать дефекты и метки при проигрывании (K)"
+          title={t('player.skipToggleTitle')}
         >
           ⏭
         </button>
-        <button className="ctrl" onClick={addMark} title="Добавить ручную метку (M)">
-          ＋ метка
+        <button className="ctrl" onClick={addMark} title={t('player.addMarkTitle')}>
+          {t('player.addMark')}
         </button>
-        <button className="ctrl" onClick={() => addBookmark()} title="Поставить закладку (B)">
+        <button className="ctrl" onClick={() => addBookmark()} title={t('player.bookmarkTitle')}>
           🔖
         </button>
-        <button className="ctrl" onClick={toggleFullscreen} title="Полный экран">
+        <button className="ctrl" onClick={toggleFullscreen} title={t('player.fullscreen')}>
           ⛶
         </button>
       </div>

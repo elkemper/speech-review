@@ -1,3 +1,4 @@
+import { translate, type UiLanguage } from './i18n'
 import type {
   Defect,
   DefectRules,
@@ -279,6 +280,8 @@ export function groupAutoDefects(
 export interface DetectDefectsOptions {
   /** Automatic defect IDs deleted by the user. */
   dismissedIds?: Iterable<string>
+  /** Interface language for the fallback text of a mark without words. */
+  uiLanguage?: UiLanguage
   /** Manual marks deleted by the user, kept so their cards can be restored. */
   dismissedMarks?: ManualMark[]
   /**
@@ -301,7 +304,11 @@ export interface DetectDefectsResult {
 }
 
 /** Manual defects built from marks, shared by active and dismissed lists. */
-export function buildManualDefects(words: Word[], marks: ManualMark[]): Defect[] {
+export function buildManualDefects(
+  words: Word[],
+  marks: ManualMark[],
+  uiLanguage: UiLanguage = 'ru'
+): Defect[] {
   const wordById = new Map(words.map((word) => [word.id, word]))
   return groupManualMarks(marks).map((group) => {
     const wordIds = [
@@ -327,7 +334,7 @@ export function buildManualDefects(words: Word[], marks: ManualMark[]): Defect[]
       end: Math.max(group.start, group.end),
       wordIds,
       markIds: group.marks.map((mark) => mark.id),
-      text: group.note.trim() || selectedText || 'Ручная метка',
+      text: group.note.trim() || selectedText || translate(uiLanguage, 'defect.manual'),
       severity: 'medium',
       source: 'manual',
       confirmed: false,
@@ -516,8 +523,9 @@ export function detectDefectsWithCandidates(
     }
   }
 
-  const activeManual = buildManualDefects(words, marks)
-  const dismissedManual = buildManualDefects(words, options.dismissedMarks ?? []).map(
+  const uiLanguage = options.uiLanguage ?? 'ru'
+  const activeManual = buildManualDefects(words, marks, uiLanguage)
+  const dismissedManual = buildManualDefects(words, options.dismissedMarks ?? [], uiLanguage).map(
     (defect) => ({ ...defect, dismissed: true })
   )
 

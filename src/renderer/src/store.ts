@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { translate } from '@shared/i18n'
 import { DEFAULT_SETTINGS } from '@shared/settings'
 import { formatTimecode } from '@shared/format'
 import {
@@ -56,6 +57,15 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 let settingsTimer: ReturnType<typeof setTimeout> | null = null
 let listenersAttached = false
 let startingTranscription = false
+
+/** Translator for store actions, bound to the current UI language. */
+function tr(
+  get: () => AppStore,
+  key: Parameters<typeof translate>[1],
+  params?: Parameters<typeof translate>[2]
+): string {
+  return translate(get().settings.uiLanguage, key, params)
+}
 
 export interface Toast {
   id: number
@@ -303,6 +313,8 @@ export const useApp = create<AppStore>((set, get) => ({
       await flushSave(get)
       const loaded = await window.api.loadProject(id)
       const media = await window.api.registerMedia(loaded.project.video.path)
+      // Only recognition settings follow the project. `uiLanguage` is a global
+      // UI preference and must survive opening a project.
       const mergedSettings: Settings = {
         ...get().settings,
         language: loaded.project.language,
@@ -379,7 +391,7 @@ export const useApp = create<AppStore>((set, get) => ({
         })
       }
       await get().refreshProjects()
-      get().notify('Проект удалён')
+      get().notify(tr(get, 'toast.projectDeleted'))
     } catch (error) {
       set({ error: cleanError(error) })
     }
@@ -424,7 +436,7 @@ export const useApp = create<AppStore>((set, get) => ({
           projectId: project.id,
           phase: 'prepare',
           percent: 0,
-          message: 'Запускаю распознавание…'
+          message: tr(get, 'toast.recognitionStarting')
         }
       })
     } catch (error) {
@@ -440,7 +452,7 @@ export const useApp = create<AppStore>((set, get) => ({
     if (!jobId) return
     await window.api.cancelTranscription(jobId).catch(() => undefined)
     set({ jobId: null, progress: null })
-    get().notify('Распознавание отменено')
+    get().notify(tr(get, 'toast.recognitionCancelled'))
   },
 
   downloadModel: async (id) => {
@@ -448,7 +460,7 @@ export const useApp = create<AppStore>((set, get) => ({
     get().updateSettings({ modelId: id })
     set({
       downloadingModel: true,
-      modelDownload: { modelId: id, percent: 0, message: 'Начинаю загрузку…' }
+      modelDownload: { modelId: id, percent: 0, message: tr(get, 'toast.downloadStarting') }
     })
     try {
       await window.api.downloadModel(id)
@@ -461,7 +473,7 @@ export const useApp = create<AppStore>((set, get) => ({
       await get().refreshStatus()
       // The installed version changed; a stale check result would be wrong.
       set({ modelUpdateCheck: null })
-      get().notify('Модель скачана и проверена', 'success')
+      get().notify(tr(get, 'toast.modelDownloaded'), 'success')
     } catch (error) {
       set({ error: cleanError(error) })
     } finally {
@@ -516,7 +528,8 @@ export const useApp = create<AppStore>((set, get) => ({
     }
 
     if (project && before) {
-      const meta = historyMeta ?? settingsHistoryMetaForPatch(patch)
+      const meta =
+        historyMeta ?? settingsHistoryMetaForPatch(patch, get().settings.uiLanguage)
       if (meta) {
         recordProjectChange(
           set,
@@ -531,7 +544,7 @@ export const useApp = create<AppStore>((set, get) => ({
 
     if (project) get().scheduleSave()
 
-    if (patch.modelId || patch.language || patch.backend) {
+    if (patch.modelId || patch.language || patch.backend || patch.uiLanguage) {
       void window.api
         .saveSettings(settings)
         .then(() => get().refreshStatus())
@@ -568,7 +581,7 @@ export const useApp = create<AppStore>((set, get) => ({
         dismissedDefectIds: [...dismissed]
       }
     })
-    recordProjectChange(set, get, before, label ?? 'Дефект подтверждён')
+    recordProjectChange(set, get, before, label ?? tr(get, 'history.label.defectConfirmed'))
     get().scheduleSave()
   },
 
@@ -589,7 +602,12 @@ export const useApp = create<AppStore>((set, get) => ({
         dismissedDefectIds: [...dismissed]
       }
     })
-    recordProjectChange(set, get, before, label ?? `Подтверждено: ${defectIds.length}`)
+    recordProjectChange(
+      set,
+      get,
+      before,
+      label ?? tr(get, 'history.label.confirmedMany', { count: defectIds.length })
+    )
     get().scheduleSave()
   },
 
@@ -601,7 +619,7 @@ export const useApp = create<AppStore>((set, get) => ({
     const before = snapshotEditable(project, get().settings)
     const confirmed = project.confirmedDefectIds.filter((id) => !stale.has(id))
     set({ project: { ...project, confirmedDefectIds: confirmed } })
-    recordProjectChange(set, get, before, label ?? 'Подтверждение снято')
+    recordProjectChange(set, get, before, label ?? tr(get, 'history.label.unconfirmed'))
     get().scheduleSave()
   },
 
@@ -631,7 +649,7 @@ export const useApp = create<AppStore>((set, get) => ({
         },
         activeDefectId: defectId
       })
-      recordProjectChange(set, get, before, 'Метка восстановлена')
+      recordProjectChange(set, get, before, tr(get, 'history.label.markRestored'))
     } else {
       set({
         project: {
@@ -641,7 +659,7 @@ export const useApp = create<AppStore>((set, get) => ({
         },
         activeDefectId: defectId
       })
-      recordProjectChange(set, get, before, 'Дефект восстановлен')
+      recordProjectChange(set, get, before, tr(get, 'history.label.defectRestored'))
     }
     get().scheduleSave()
   },
@@ -662,7 +680,7 @@ export const useApp = create<AppStore>((set, get) => ({
     const bookmarks = [...(project.bookmarks ?? []), bookmark].sort((a, b) => a.time - b.time)
     set({ project: { ...project, bookmarks } })
     get().scheduleSave()
-    get().notify(`Закладка ${formatTimecode(at, true)}`, 'success')
+    get().notify(tr(get, 'toast.bookmarkAdded', { time: formatTimecode(at, true) }), 'success')
   },
 
   removeBookmark: (id) => {
@@ -711,7 +729,7 @@ export const useApp = create<AppStore>((set, get) => ({
         : project.marks
 
     set({ project: { ...project, defectNotes: notes, marks } })
-    recordProjectChange(set, get, before, 'Заметка', `note:${defectId}`)
+    recordProjectChange(set, get, before, tr(get, 'history.label.note'), `note:${defectId}`)
     get().scheduleSave()
   },
 
@@ -766,7 +784,7 @@ export const useApp = create<AppStore>((set, get) => ({
       selectedWordId: null,
       timeSelection: null
     })
-    recordProjectChange(set, get, before, 'Добавлена метка')
+    recordProjectChange(set, get, before, tr(get, 'history.label.markAdded'))
     get().scheduleSave()
 
     const changed = marks.find((item) => item.id === mark.id)
@@ -775,12 +793,12 @@ export const useApp = create<AppStore>((set, get) => ({
       : 1
     const count = range.wordIds.length
     if (groupSize > 1) {
-      get().notify(`Метки объединены в логическую (${groupSize}) — подтверждается за раз`)
+      get().notify(tr(get, 'toast.marksMerged', { count: groupSize }))
     } else {
       get().notify(
         count > 1
-          ? `Метка на ${count} слов — введите заметку в панели справа`
-          : 'Метка добавлена — введите заметку в панели справа'
+          ? tr(get, 'toast.markAddedWords', { count })
+          : tr(get, 'toast.markAdded')
       )
     }
   },
@@ -848,9 +866,9 @@ export const useApp = create<AppStore>((set, get) => ({
     const label =
       items.length === 1
         ? manualCount > 0
-          ? 'Удалена метка'
-          : 'Удалён дефект'
-        : `Удалено: ${items.length}`
+          ? tr(get, 'history.label.markDeleted')
+          : tr(get, 'history.label.defectDeleted')
+        : tr(get, 'history.label.deletedMany', { count: items.length })
     recordProjectChange(set, get, before, label)
     get().scheduleSave()
   },
@@ -890,9 +908,9 @@ export const useApp = create<AppStore>((set, get) => ({
       },
       activeDefectId: `manual-${groupMarks[0].id}`
     })
-    recordProjectChange(set, get, before, 'Логическая метка разделена')
+    recordProjectChange(set, get, before, tr(get, 'history.label.groupSplit'))
     get().scheduleSave()
-    get().notify(`Метка разделена на ${groupMarks.length} отдельных`)
+    get().notify(tr(get, 'toast.markSplit', { count: groupMarks.length }))
   },
 
   setCutBounds: (defectId, start, end, edge) => {
@@ -947,7 +965,7 @@ export const useApp = create<AppStore>((set, get) => ({
       set({ project: { ...project, cutOverrides: overrides } })
     }
 
-    recordProjectChange(set, get, before, 'Границы выреза', `cut:${defectId}`)
+    recordProjectChange(set, get, before, tr(get, 'history.label.cutBounds'), `cut:${defectId}`)
     get().scheduleSave()
   },
 
@@ -963,7 +981,7 @@ export const useApp = create<AppStore>((set, get) => ({
       set,
       get,
       before,
-      'Сброшены границы выреза',
+      tr(get, 'history.label.cutReset'),
       `cut:${defectId}`
     )
     get().scheduleSave()
@@ -987,7 +1005,7 @@ export const useApp = create<AppStore>((set, get) => ({
     })
     get().scheduleSave()
     scheduleSettingsSave(get)
-    get().notify(`Отменено: ${entry.label}`)
+    get().notify(tr(get, 'toast.undo', { label: entry.label }))
   },
 
   redo: () => {
@@ -1006,7 +1024,7 @@ export const useApp = create<AppStore>((set, get) => ({
     })
     get().scheduleSave()
     scheduleSettingsSave(get)
-    get().notify(`Повторено: ${entry.label}`)
+    get().notify(tr(get, 'toast.redo', { label: entry.label }))
   },
 
   jumpHistory: (index) => {
@@ -1155,7 +1173,7 @@ async function createFromMedia(
   await get().refreshProjects()
   if (!get().status?.modelReady) {
     get().setShowSettings(true)
-    get().notify('Скачайте модель CrisperWhisper, чтобы начать распознавание')
+    get().notify(tr(get, 'toast.downloadModelHint'))
   }
 }
 
@@ -1259,7 +1277,7 @@ function attachListeners(
         ...(isCurrentJob ? { progress: null, jobId: null } : {}),
         activeDefectId: null
       })
-      get().notify('Транскрипт готов', 'success')
+      get().notify(tr(get, 'toast.transcriptReady'), 'success')
     } else if (isCurrentJob) {
       // The project was closed while its job was still running.
       set({ progress: null, jobId: null })

@@ -4,13 +4,9 @@ import { formatTimecode } from '@shared/format'
 import { endsSentence, findActiveWord, findSegmentIndexForWord } from '@shared/transcript'
 import type { DefectCandidate } from '@shared/defects'
 import type { Defect, Segment } from '@shared/types'
-import {
-  DEFECT_COLORS,
-  DEFECT_LABELS,
-  SEVERITY_LABELS,
-  candidateHint,
-  defectByWordId
-} from '../defectsUi'
+import { defectTypeLabel, severityLabel } from '@shared/labels'
+import { DEFECT_COLORS, candidateHint, defectByWordId } from '../defectsUi'
+import { useT, useUiLanguage } from '../i18n'
 import { seekTo } from '../player'
 import { rangeForSelection, defectIdsForSelection } from '../selection'
 import { buildSkipIntervals, cutRangeFor } from '../skip'
@@ -43,6 +39,8 @@ export default function Transcript({
   const removeDefects = useApp((state) => state.removeDefects)
   const notify = useApp((state) => state.notify)
   const playback = useApp((state) => state.settings.playback)
+  const t = useT()
+  const lang = useUiLanguage()
 
   const [onlyDefects, setOnlyDefects] = useState(false)
   const parentRef = useRef<HTMLDivElement>(null)
@@ -186,8 +184,8 @@ export default function Transcript({
     if (!transcript) return
     void navigator.clipboard
       .writeText(transcript.text)
-      .then(() => notify('Транскрипт скопирован', 'success'))
-      .catch(() => notify('Не удалось скопировать текст', 'error'))
+      .then(() => notify(t('transcript.copied'), 'success'))
+      .catch(() => notify(t('transcript.copyFailed'), 'error'))
   }
 
   const renderWord = (wordId: number) => {
@@ -228,11 +226,14 @@ export default function Transcript({
       list.length > 0
         ? list.map(
             (defect) =>
-              `${DEFECT_LABELS[defect.type]} · ${SEVERITY_LABELS[defect.severity]}${
+              `${defectTypeLabel(lang, defect.type)} · ${severityLabel(
+                lang,
+                defect.severity
+              )}${
                 defect.dismissed
-                  ? ' · удалён'
+                  ? t('transcript.dismissedSuffix')
                   : defect.confirmed
-                    ? ' · подтверждено'
+                    ? t('transcript.confirmedSuffix')
                     : ''
               }`
           )
@@ -240,11 +241,12 @@ export default function Transcript({
           ? [
               candidateHint(
                 wordCandidate,
-                project?.rules.minDurationByType[wordCandidate.type] ?? 0
+                project?.rules.minDurationByType[wordCandidate.type] ?? 0,
+                lang
               )
             ]
           : []
-    if (skipped && !candidateOnly) titleLines.push('пропускается в режиме быстрого просмотра')
+    if (skipped && !candidateOnly) titleLines.push(t('transcript.skippedHint'))
     const title = titleLines.length > 0 ? titleLines.join('\n') : undefined
 
     return (
@@ -321,20 +323,20 @@ export default function Transcript({
             className={`pause-chip ${pause.severity} ${pause.confirmed ? 'confirmed' : ''} ${
               isSkippedRange(pause.start, pause.end) ? 'skipped' : ''
             }`}
-            title={`${DEFECT_LABELS.pause} · ${(pause.end - pause.start).toFixed(2)} c · ${
+            title={`${defectTypeLabel(lang, 'pause')} · ${(pause.end - pause.start).toFixed(
+              2
+            )} c · ${
               pauseCutDuration !== null
-                ? `вырез ${pauseCutDuration.toFixed(2)} c`
-                : 'не вырезается'
+                ? t('transcript.cutSeconds', { value: pauseCutDuration.toFixed(2) })
+                : t('transcript.notCut')
             }${
               pause.dismissed
-                ? ' · удалён'
+                ? t('transcript.dismissedSuffix')
                 : pause.confirmed
-                  ? ' · подтверждено'
+                  ? t('transcript.confirmedSuffix')
                   : ''
             }${
-              isSkippedRange(pause.start, pause.end)
-                ? ' · пропускается в режиме быстрого просмотра'
-                : ''
+              isSkippedRange(pause.start, pause.end) ? t('transcript.skippedSuffix') : ''
             }`}
             onClick={(event) => {
               event.stopPropagation()
@@ -357,10 +359,12 @@ export default function Transcript({
     <section className="transcript">
       <div className="transcript-toolbar">
         <div className="transcript-title">
-          Транскрипт <span className="muted">{words.length} слов</span>
+          {t('transcript.title')}{' '}
+          <span className="muted">{t('transcript.words', { count: words.length })}</span>
           {selection && selection.anchorId !== selection.focusId ? (
             <span className="selection-badge">
-              выделено {selectedRange?.wordIds.length ?? 0} · <kbd>M</kbd> метка ·{' '}
+              {t('transcript.selected', { count: selectedRange?.wordIds.length ?? 0 })}{' '}
+              <kbd>M</kbd> ·{' '}
               {selectedDefectIds.length > 0 ? (
                 <>
                   <button
@@ -368,12 +372,13 @@ export default function Transcript({
                     onClick={() =>
                       confirmMany(
                         selectedDefectIds,
-                        `Подтверждено выделение: ${selectedDefectIds.length}`
+                        t('panel.confirmedSelection', { count: selectedDefectIds.length })
                       )
                     }
-                    title="Подтвердить все дефекты в выделении (Shift+Enter)"
+                    title={t('panel.confirmSelectionTitle')}
                   >
-                    <kbd>Shift+Enter</kbd> подтвердить ({selectedDefectIds.length})
+                    <kbd>Shift+Enter</kbd>{' '}
+                    {t('panel.confirmSelection', { count: selectedDefectIds.length })}
                   </button>{' '}
                   ·{' '}
                   <button
@@ -385,17 +390,18 @@ export default function Transcript({
                           relatedIds: defects.find((defect) => defect.id === id)?.groupIds
                         }))
                       )
-                      notify(`Удалено: ${selectedDefectIds.length}`)
+                      notify(t('panel.deletedCount', { count: selectedDefectIds.length }))
                     }}
-                    title="Удалить все дефекты в выделении (Shift+R)"
+                    title={t('panel.deleteSelectionTitle')}
                   >
-                    <kbd>Shift+R</kbd> удалить ({selectedDefectIds.length})
+                    <kbd>Shift+R</kbd>{' '}
+                    {t('panel.deleteSelection', { count: selectedDefectIds.length })}
                   </button>{' '}
                   ·{' '}
                 </>
               ) : null}
               <button className="link-btn" onClick={clearSelection}>
-                снять
+                {t('transcript.unconfirmSelection')}
               </button>
             </span>
           ) : null}
@@ -406,21 +412,19 @@ export default function Transcript({
             checked={onlyDefects}
             onChange={(event) => setOnlyDefects(event.target.checked)}
           />
-          только с дефектами
+          {t('transcript.onlyDefects')}
         </label>
         <button className={`btn ghost small ${follow ? 'active' : ''}`} onClick={() => setFollow(!follow)}>
-          {follow ? 'Следовать' : 'Свободно'}
+          {follow ? t('transcript.follow') : t('transcript.free')}
         </button>
         <button className="btn ghost small" onClick={copy}>
-          Копировать
+          {t('transcript.copy')}
         </button>
       </div>
 
       {rows.length === 0 ? (
         <div className="transcript-empty">
-          {onlyDefects
-            ? 'В этой записи не найдено дефектов по текущим правилам.'
-            : 'Речь не распознана. Проверьте, что в файле есть аудиодорожка.'}
+          {onlyDefects ? t('transcript.emptyNoDefects') : t('transcript.emptyNoSpeech')}
         </div>
       ) : (
         <div
@@ -462,7 +466,9 @@ export default function Transcript({
                     <div className="gap-row">
                       <span className="gap-line" />
                       <span className="gap-label">
-                        ⏸ {(row.end - row.start).toFixed(1)} c · пауза после фразы
+                        {t('transcript.sentencePause', {
+                          value: (row.end - row.start).toFixed(1)
+                        })}
                       </span>
                       <span className="gap-line" />
                     </div>

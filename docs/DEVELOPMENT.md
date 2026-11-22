@@ -193,7 +193,7 @@ If the app crashes, the job starts over. Completed projects and partial transcri
 - Do not modify `node_modules` in the container.
 - Do not enable `unclear` by default until audio.cpp provides real confidence values.
 - Do not add a light theme without a separate task.
-- Keep Russian UI strings and the existing code style.
+- Keep user-facing strings in the message catalogue (`src/shared/locales/`) and the existing code style. Russian is the source language; English must keep the same keys. CSV values stay English (see `docs/spec/12-i18n.md`).
 - When changing IPC, update `src/shared/ipc.ts`, `src/shared/api.ts`, `src/preload/index.ts` and `src/main/ipc.ts` together.
 - Detailed invariants — in `AGENTS.md` and `docs/DATA_MODEL.md`.
 

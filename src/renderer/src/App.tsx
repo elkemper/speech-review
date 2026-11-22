@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useApp } from './store'
+import { useT, useUiLanguage } from './i18n'
 import Welcome from './components/Welcome'
 import Workspace from './components/Workspace'
 import SettingsDialog from './components/SettingsDialog'
@@ -15,6 +16,8 @@ export default function App() {
   const init = useApp((state) => state.init)
   const openVideoPath = useApp((state) => state.openVideoPath)
   const setError = useApp((state) => state.setError)
+  const lang = useUiLanguage()
+  const t = useT()
   const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
@@ -24,6 +27,10 @@ export default function App() {
   useEffect(() => {
     if (status) document.body.dataset.platform = status.platform
   }, [status])
+
+  useEffect(() => {
+    document.documentElement.lang = lang
+  }, [lang])
 
   useEffect(() => {
     return window.api.onMenuAction((action) => {
@@ -89,7 +96,7 @@ export default function App() {
       {error ? (
         <div className="error-banner" role="alert">
           <span>{error}</span>
-          <button className="icon-btn" onClick={() => setError(null)} title="Закрыть">
+          <button className="icon-btn" onClick={() => setError(null)} title={t('common.close')}>
             ×
           </button>
         </div>
@@ -105,7 +112,7 @@ export default function App() {
         <div className="drop-overlay">
           <div className="drop-card">
             <div className="drop-icon">↓</div>
-            <div>Отпустите видео или аудио</div>
+            <div>{t('app.drop')}</div>
             <div className="muted">MP4, MOV, WebM, MKV, MP3, WAV</div>
           </div>
         </div>

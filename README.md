@@ -31,6 +31,7 @@ The MVP targets macOS + Apple Silicon. Processing is fully local: the recording 
 - Deleted defects stay as thin cards with an undo button when "Show deleted defects" is enabled. Confirmed cards collapse to a compact row with an undo button. Pending cards have delete/confirm buttons on the left.
 - Export defects to CSV (Excel) and JSON; CSV fields and delimiter are configurable. The base CSV columns are the final cut bounds; the original defect bounds are optional extra columns. JSON also contains the merged `cuts` list for a video editor.
 - Export a clean video from the current marks: resolution, three quality presets, and software H.264/HEVC or hardware VideoToolbox encoders. Progress can be cancelled; the source file is never modified.
+- Interface in Russian and English: the language is chosen in **Settings → General → Interface** and applies to the panel, menu, native dialogs, progress and errors. A fresh install follows the system locale when it is Russian or English. Export values in CSV stay in English regardless of the interface language.
 - Photoshop-like dark theme, automatic project save after every action.
 
 ## Requirements

@@ -11,13 +11,10 @@ import {
   MAX_PAUSE_MIN_DURATION,
   MIN_PAUSE_MIN_DURATION
 } from '@shared/defects'
+import { defectTypeLabel } from '@shared/labels'
 import type { DefectRules, DefectType, PlaybackSettings, SkipPadding } from '@shared/types'
-import { DEFECT_LABELS } from '../defectsUi'
-import {
-  PADDING_HISTORY,
-  RULES_HISTORY,
-  type SettingsHistoryMeta
-} from '../settingsHistory'
+import { useT, useUiLanguage } from '../i18n'
+import { paddingHistory, rulesHistory, type SettingsHistoryMeta } from '../settingsHistory'
 import { InlinePadding, PaddingField, RangeField } from './SettingsRangeField'
 
 /** Pause is deliberately the last row: it carries the most extra controls. */
@@ -59,6 +56,12 @@ export default function DefectRulesSection({
     playback?: Partial<PlaybackSettings>
   }, history?: SettingsHistoryMeta) => void
 }) {
+  const t = useT()
+  const lang = useUiLanguage()
+  // Labels are built per change so their merge keys and session stay the same.
+  const RULES_HISTORY = rulesHistory(lang)
+  const PADDING_HISTORY = paddingHistory(lang)
+
   const isEnabled = (type: DefectType): boolean =>
     type === 'unclear' ? false : rules.enabledTypes?.[type] !== false
 
@@ -109,18 +112,18 @@ export default function DefectRulesSection({
   return (
     <section className="settings-section">
       <div className="section-title-row">
-        <h3>Правила дефектов</h3>
+        <h3>{t('rules.title')}</h3>
         <button className="link-btn" onClick={() => setRules(DEFAULT_RULES, RULES_HISTORY.reset)}>
-          сбросить
+          {t('rules.reset')}
         </button>
       </div>
 
       <div className="defect-table">
         <div className="defect-row defect-row-head">
-          <span>Тип</span>
-          <span>Мин. длительность</span>
-          <span>Отступы до / после</span>
-          <span>Особенности</span>
+          <span>{t('rules.column.type')}</span>
+          <span>{t('rules.column.minDuration')}</span>
+          <span>{t('rules.column.padding')}</span>
+          <span>{t('rules.column.specific')}</span>
         </div>
 
         {ROW_ORDER.map((type) => {
@@ -140,7 +143,7 @@ export default function DefectRulesSection({
                     disabled={isUnclear}
                     onChange={(event) => setTypeEnabled(type, event.target.checked)}
                   />
-                  <span>{DEFECT_LABELS[type]}</span>
+                  <span>{defectTypeLabel(lang, type)}</span>
                 </label>
 
                 {isUnclear ? (
@@ -151,10 +154,12 @@ export default function DefectRulesSection({
                     min={type === 'pause' ? MIN_PAUSE_MIN_DURATION : 0}
                     max={MAX_MIN_DURATION[type]}
                     step={0.05}
-                    suffix="с"
+                    suffix={t('common.secondsSuffix')}
                     disabled={!enabled}
                     compact
-                    ariaLabel={`Минимальная длительность: ${DEFECT_LABELS[type]}`}
+                    ariaLabel={t('rules.minDurationAria', {
+                      type: defectTypeLabel(lang, type)
+                    })}
                     onChange={(value) => setMinDuration(type, value)}
                   />
                 )}
@@ -183,18 +188,18 @@ export default function DefectRulesSection({
                           )
                         }
                       />
-                      искать слова-филлеры
+                      {t('rules.lexicalFillers')}
                     </label>
                   ) : null}
 
                   {type === 'repetition' ? (
                     <RangeField
-                      label="окно повторов"
+                      label={t('rules.repetitionWindow')}
                       value={rules.repetitionWindowSec}
                       min={0.5}
                       max={MAX_REPETITION_WINDOW}
                       step={0.5}
-                      suffix="с"
+                      suffix={t('common.secondsSuffix')}
                       disabled={!enabled}
                       compact
                       onChange={(value) =>
@@ -205,7 +210,7 @@ export default function DefectRulesSection({
 
                   {type === 'elongation' ? (
                     <RangeField
-                      label="повторов буквы"
+                      label={t('rules.elongationRepeats')}
                       value={rules.elongationMinRepeats}
                       min={2}
                       max={MAX_ELONGATION_REPEATS}
@@ -223,8 +228,8 @@ export default function DefectRulesSection({
 
                   {type === 'unclear' ? (
                     <div className="unclear-note">
-                      <span className="badge">в разработке</span>
-                      <span className="muted small">нужна уверенность модели</span>
+                      <span className="badge">{t('rules.inDevelopment')}</span>
+                      <span className="muted small">{t('rules.needsConfidence')}</span>
                     </div>
                   ) : null}
 
@@ -233,7 +238,7 @@ export default function DefectRulesSection({
                   ) : null}
 
                   {type === 'pause' ? (
-                    <span className="muted small">тишина и конец предложения — ниже</span>
+                    <span className="muted small">{t('rules.pauseNote')}</span>
                   ) : null}
                 </div>
               </div>
@@ -241,12 +246,12 @@ export default function DefectRulesSection({
               {type === 'pause' ? (
                 <div className="defect-row-extra">
                   <RangeField
-                    label="оставить тишины"
+                    label={t('rules.pauseKeep')}
                     value={playback.pauseKeepSec ?? DEFAULT_PAUSE_KEEP_SEC}
                     min={MIN_PAUSE_KEEP_SEC}
                     max={MAX_PAUSE_KEEP_SEC}
                     step={0.05}
-                    suffix="с"
+                    suffix={t('common.secondsSuffix')}
                     disabled={!enabled}
                     compact
                     onChange={(value) =>
@@ -268,7 +273,7 @@ export default function DefectRulesSection({
                         )
                       }
                     />
-                    не считать дефектом паузу в конце предложения
+                    {t('rules.sentenceEndPause')}
                   </label>
                 </div>
               ) : null}
@@ -277,13 +282,7 @@ export default function DefectRulesSection({
         })}
       </div>
 
-      <div className="hint">
-        Дефект короче минимальной длительности не попадает в список. Для повтора
-        учитывается длительность повторяемого слова. Для паузы это порог тишины:
-        более короткие разрывы не считаются дефектом. 0 — без ограничения (кроме
-        паузы: минимум 0.3 с). Снятый тип не детектируется, но его настройки
-        сохраняются.
-      </div>
+      <div className="hint">{t('rules.minDurationHint')}</div>
 
       <div className="auto-group-row">
         <label className="check">
@@ -302,10 +301,10 @@ export default function DefectRulesSection({
               )
             }}
           />
-          Авто объединение
+          {t('rules.autoGroup')}
         </label>
         <RangeField
-          label="макс. пауза между дефектами"
+          label={t('rules.autoGroupGap')}
           value={
             rules.autoGroupEnabled
               ? Math.max(0.05, rules.autoGroupGapSec)
@@ -314,7 +313,7 @@ export default function DefectRulesSection({
           min={rules.autoGroupEnabled ? 0.05 : 0}
           max={MAX_AUTO_GROUP_GAP}
           step={0.05}
-          suffix="с"
+          suffix={t('common.secondsSuffix')}
           disabled={!rules.autoGroupEnabled}
           compact
           onChange={(value) =>
@@ -322,14 +321,10 @@ export default function DefectRulesSection({
           }
         />
       </div>
-      <div className="hint">
-        Соседние автоматические дефекты склеиваются, если между ними нет других
-        слов и пауза не больше указанной. Пауза внутри строки считается от
-        тишины, поэтому филлер прямо перед паузой объединяется с ней.
-      </div>
+      <div className="hint">{t('rules.autoGroupHint')}</div>
 
       <div className="padding-extra-head">
-        <span className="muted small">Отступы при пропуске</span>
+        <span className="muted small">{t('rules.padding.title')}</span>
         <button
           className="link-btn"
           onClick={() =>
@@ -350,34 +345,25 @@ export default function DefectRulesSection({
             )
           }
         >
-          сбросить отступы
+          {t('rules.padding.reset')}
         </button>
       </div>
 
       <div className="padding-extra">
         <PaddingField
-          label="Отступы ручных меток"
+          label={t('rules.padding.manual')}
           value={paddingFor('manual')}
           onChange={(value) => setPadding('manual', value)}
         />
         <PaddingField
-          label="Отступы группы дефектов"
+          label={t('rules.padding.group')}
           value={playback.groupPadding ?? DEFAULT_GROUP_PADDING}
           onChange={(value) =>
             updateSettings({ playback: { groupPadding: value } }, PADDING_HISTORY.group)
           }
         />
       </div>
-      <div className="hint">
-        Отступы оставляют базовую паузу по краям, чтобы вырезанное место не
-        склеивалось вплотную. Для паузы отдельно задаётся, сколько тишины
-        оставить: она делится поровну между краями, а отступы паузы могут
-        дополнительно расширить вырезанное место. Слишком короткий рез не
-        выполняется. Для объединённой группы применяются отступы группы, а не
-        каждого элемента внутри. Ручки на таймлайне двигают итоговые границы
-        выреза; двойной клик по ручке возвращает рассчитанные отступы. В режиме
-        пропуска вырезаются все дефекты и метки, кроме удалённых.
-      </div>
+      <div className="hint">{t('rules.padding.hint')}</div>
     </section>
   )
 }

@@ -2,8 +2,10 @@ import { app, BrowserWindow, dialog } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { buildCsv } from '@shared/exportCsv'
+import { translate } from '@shared/i18n'
 import { countDefects } from '@shared/defects'
 import type { ExportRequest } from '@shared/types'
+import { currentUiLanguage } from './uiLanguage'
 
 function safeName(name: string): string {
   return name.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'webinar'
@@ -16,7 +18,7 @@ export async function exportProject(
   const { project, defects, marks, format, exportSettings } = request
   const filename = `${safeName(project.name)}-defects.${format}`
   const options = {
-    title: 'Экспорт дефектов',
+    title: translate(currentUiLanguage(), 'dialog.exportDefects'),
     defaultPath: join(app.getPath('downloads'), filename),
     filters:
       format === 'csv'

@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { normalizeRules } from '@shared/defects'
@@ -11,9 +12,12 @@ import {
   normalizeMiniTimelinePad,
   normalizeModelVersions,
   normalizePlaybackSettings,
+  normalizeUiLanguageSetting,
   normalizeVideoExportSettings,
   normalizeWaveformContrast
 } from '@shared/settings'
+import { uiLanguageFromLocale, type UiLanguage } from '@shared/i18n'
+import { setCurrentUiLanguage } from './uiLanguage'
 import type {
   Backend,
   ExportField,
@@ -32,6 +36,15 @@ const DEFAULTS: Settings = {
 }
 
 const BACKENDS: Backend[] = ['metal', 'cpu']
+
+/** The language a brand-new install starts with. */
+export function systemUiLanguage(): UiLanguage {
+  try {
+    return uiLanguageFromLocale(app.getLocale())
+  } catch {
+    return 'ru'
+  }
+}
 
 function settingsFile(): string {
   return join(userDataDir(), 'settings.json')
@@ -70,10 +83,14 @@ function normalizeExport(value: unknown): ExportSettings {
 }
 
 export async function loadSettings(): Promise<Settings> {
+  let uiLanguage: UiLanguage
   try {
     const parsed = JSON.parse(await readFile(settingsFile(), 'utf8')) as Partial<Settings>
-    return {
+    // An existing file without `uiLanguage` migrates to the default `ru`.
+    uiLanguage = normalizeUiLanguageSetting(parsed.uiLanguage)
+    const settings: Settings = {
       language: typeof parsed.language === 'string' ? parsed.language : DEFAULTS.language,
+      uiLanguage,
       modelId: validModelId(parsed.modelId) ? parsed.modelId : DEFAULTS.modelId,
       backend: validBackend(parsed.backend) ? parsed.backend : DEFAULTS.backend,
       rules: normalizeRules(parsed.rules),
@@ -86,9 +103,15 @@ export async function loadSettings(): Promise<Settings> {
       showDismissed: parsed.showDismissed !== false,
       modelVersions: normalizeModelVersions(parsed.modelVersions)
     }
+    setCurrentUiLanguage(uiLanguage)
+    return settings
   } catch {
+    // No settings file yet: a fresh install follows the system locale.
+    uiLanguage = systemUiLanguage()
+    setCurrentUiLanguage(uiLanguage)
     return {
       ...DEFAULTS,
+      uiLanguage,
       rules: normalizeRules(DEFAULT_SETTINGS.rules),
       export: { ...DEFAULT_EXPORT_SETTINGS, fields: [...DEFAULT_EXPORT_SETTINGS.fields] },
       videoExport: { ...DEFAULT_SETTINGS.videoExport },
@@ -98,6 +121,7 @@ export async function loadSettings(): Promise<Settings> {
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
+  setCurrentUiLanguage(normalizeUiLanguageSetting(settings.uiLanguage))
   await mkdir(userDataDir(), { recursive: true })
   const path = settingsFile()
   const temporary = `${path}.tmp`

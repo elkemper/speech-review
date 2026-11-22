@@ -1,3 +1,4 @@
+import { translate, type UiLanguage } from './i18n'
 import { complementRanges, mergeRanges } from './cuts'
 import type {
   CutRange,
@@ -80,11 +81,12 @@ function seconds(value: number): string {
  */
 export function buildVideoFilterGraph(
   keep: CutRange[],
-  resolution: VideoExportResolution
+  resolution: VideoExportResolution,
+  lang: UiLanguage = 'ru'
 ): string {
   const ranges = mergeRanges(keep).filter((range) => range.end - range.start > 0.000001)
   if (ranges.length === 0) {
-    throw new Error('Нет фрагментов для экспорта')
+    throw new Error(translate(lang, 'error.videoNoFragments'))
   }
 
   const height = resolutionHeight(resolution)

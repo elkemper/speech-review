@@ -8,7 +8,6 @@ export interface ModelSpec {
   size: number
   sha256: string
   url: string
-  note: string
 }
 
 const BASE = 'https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/CrisperWhisper2.0-GGUF'
@@ -21,8 +20,7 @@ export const MODEL_SPECS: Record<ModelId, ModelSpec> = {
     file: 'crisperwhisper-2-large-q8_0.gguf',
     size: 1716306528,
     sha256: '392e636876d6d5ae8716f0f98b78480b61bb8c199d63f20523e95308b3425c2e',
-    url: `${BASE}/crisperwhisper-2-large-q8_0.gguf`,
-    note: 'Рекомендуемый баланс качества и скорости'
+    url: `${BASE}/crisperwhisper-2-large-q8_0.gguf`
   },
   bf16: {
     id: 'bf16',
@@ -31,8 +29,7 @@ export const MODEL_SPECS: Record<ModelId, ModelSpec> = {
     file: 'crisperwhisper-2-large-bf16.gguf',
     size: 3092563712,
     sha256: '7f2ddc0fc5a419441fcf2be713696cc5d6bcd8a8db65b4acbea4879534e47c1b',
-    url: `${BASE}/crisperwhisper-2-large-bf16.gguf`,
-    note: 'Максимальное качество, больше памяти и места'
+    url: `${BASE}/crisperwhisper-2-large-bf16.gguf`
   },
   q4_k: {
     id: 'q4_k',
@@ -41,8 +38,7 @@ export const MODEL_SPECS: Record<ModelId, ModelSpec> = {
     file: 'crisperwhisper-2-large-q4_k.gguf',
     size: 982302624,
     sha256: '13399e818dfe966e613dc0ba3db73d27bf9dd23ff63d7d946c77c75dd0ee1913',
-    url: `${BASE}/crisperwhisper-2-large-q4_k.gguf`,
-    note: 'Самый лёгкий вариант, качество ниже'
+    url: `${BASE}/crisperwhisper-2-large-q4_k.gguf`
   }
 }
 

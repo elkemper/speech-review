@@ -5,7 +5,7 @@ import { useApp } from './store'
 let element: HTMLVideoElement | null = null
 /**
  * While reviewing a single defect with skip mode enabled, jumping over that
- * same defect would make "прослушать" useless. The bypass expires by time, so
+ * same defect would make "listen" useless. The bypass expires by time, so
  * ordinary playback resumes skipping afterwards.
  */
 let skipBypassUntil = -1
@@ -45,7 +45,7 @@ export function playPause(): void {
   }
 }
 
-/** Seek and start playback. The defect panel's "прослушать" used to only seek. */
+/** Seek and start playback. The defect panel's "listen" used to only seek. */
 export function playFrom(time: number, until?: number): void {
   seekTo(time)
   skipBypassUntil = until ?? -1

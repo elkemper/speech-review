@@ -53,6 +53,7 @@ only the area it is working on.
 | [`09-export.md`](spec/09-export.md) | 38–39, 48 | CSV, JSON and video export |
 | [`10-mini-timeline.md`](spec/10-mini-timeline.md) | 40 | Selected defect snippet with editable cut handles |
 | [`11-model-updates.md`](spec/11-model-updates.md) | 49 | Model update discovery through a runtime manifest |
+| [`12-i18n.md`](spec/12-i18n.md) | 50–52 | Interface language (RU/EN), message catalogue, stable export values |
 
 ## Product invariants
 
@@ -151,7 +152,7 @@ Applies to every story.
 
 ### Done — do not regress
 
-Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48.
+Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48, 50–52.
 Verification only (implemented, needs a pass): 9, 24.
 
 ## Related documents

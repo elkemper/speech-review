@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { formatBytes } from '@shared/format'
+import { exportFieldLabel, modelNote } from '@shared/labels'
 import { BUILTIN_VERSION, MODEL_ORDER, MODEL_SPECS } from '@shared/models'
 import {
   DEFAULT_EXPORT_FIELDS,
   EXPORT_FIELDS,
-  EXPORT_FIELD_LABELS,
   MAX_CHUNK_TARGET_SEC,
   MAX_MINI_TIMELINE_PAD_SEC,
   MAX_WAVEFORM_CONTRAST,
@@ -19,16 +19,16 @@ import type {
   ModelStateInfo
 } from '@shared/types'
 import { useApp } from '../store'
+import { useT, useUiLanguage } from '../i18n'
 import DefectRulesSection from './DefectRulesSection'
 import { RangeField } from './SettingsRangeField'
 
 type SettingsTab = 'general' | 'defects' | 'export'
 
-const TABS: Array<{ id: SettingsTab; label: string }> = [
-  { id: 'general', label: 'Общие' },
-  { id: 'defects', label: 'Дефекты' },
-  { id: 'export', label: 'Экспорт' }
-]
+/** All export fields, grouped by the surface they are labelled for. */
+const ALL_EXPORT_FIELDS: ExportField[] = [...DEFAULT_EXPORT_FIELDS, ...EXPORT_FIELDS]
+
+const TAB_IDS: SettingsTab[] = ['general', 'defects', 'export']
 
 function PathRow({
   label,
@@ -41,15 +41,16 @@ function PathRow({
   path: string | null
   onReveal: () => void
 }) {
+  const t = useT()
   return (
     <div className="path-row">
       <span className={`dot ${ready ? 'ok' : 'bad'}`} />
       <span className="path-label">{label}</span>
       <span className={`path-value ${ready ? '' : 'muted'}`} title={path ?? ''}>
-        {path ?? 'не найден'}
+        {path ?? t('common.notFound')}
       </span>
       <button className="link-btn" disabled={!path} onClick={onReveal}>
-        показать
+        {t('common.show')}
       </button>
     </div>
   )
@@ -72,6 +73,8 @@ export default function SettingsDialog() {
   const checkModelUpdates = useApp((state) => state.checkModelUpdates)
   const refreshStatus = useApp((state) => state.refreshStatus)
   const notify = useApp((state) => state.notify)
+  const t = useT()
+  const lang = useUiLanguage()
 
   const [tab, setTab] = useState<SettingsTab>('general')
   const [modelStates, setModelStates] = useState<ModelStateInfo[]>([])
@@ -135,7 +138,7 @@ export default function SettingsDialog() {
     else selected.add(field)
     if (selected.size === 0) return
     updateSettings({
-      export: { fields: EXPORT_FIELDS.filter((item) => selected.has(item)) }
+      export: { fields: ALL_EXPORT_FIELDS.filter((item) => selected.has(item)) }
     })
   }
 
@@ -143,7 +146,7 @@ export default function SettingsDialog() {
     if (busy) return
     const model = MODEL_SPECS[id]
     const confirmed = window.confirm(
-      `Удалить модель ${model.shortLabel}? Файл будет удалён с диска. При необходимости её можно скачать заново.`
+      t('settings.model.deleteConfirm', { model: model.shortLabel })
     )
     if (!confirmed) return
     setDeletingModel(id)
@@ -152,7 +155,7 @@ export default function SettingsDialog() {
       setModelStates(await window.api.getModelStates())
       await refreshStatus()
       setModelUpdateCheck(null)
-      notify('Модель удалена', 'success')
+      notify(t('settings.model.deleted'), 'success')
     } catch (error) {
       notify(error instanceof Error ? error.message : String(error), 'error')
     } finally {
@@ -170,14 +173,18 @@ export default function SettingsDialog() {
       <div className="modal settings-modal">
         <header className="modal-head">
           <div>
-            <h2>Настройки</h2>
+            <h2>{t('settings.title')}</h2>
             <div className="muted small">
               {recognitionActive
-                ? 'Распознавание выполняется — настройки недоступны'
-                : 'Движок, модель, распознавание, дефекты и экспорт'}
+                ? t('settings.subtitleBusy')
+                : t('settings.subtitle')}
             </div>
           </div>
-          <button className="icon-btn" onClick={() => setShowSettings(false)} title="Закрыть">
+          <button
+            className="icon-btn"
+            onClick={() => setShowSettings(false)}
+            title={t('common.close')}
+          >
             ×
           </button>
         </header>
@@ -188,24 +195,29 @@ export default function SettingsDialog() {
           aria-disabled={settingsLocked}
         >
           <div className="settings-tabs" role="tablist">
-            {TABS.map((item) => {
-              const tabDisabled =
-                settingsLocked || (item.id === 'defects' && !projectOpen)
+            {TAB_IDS.map((id) => {
+              const tabDisabled = settingsLocked || (id === 'defects' && !projectOpen)
+              const label =
+                id === 'general'
+                  ? t('settings.tab.general')
+                  : id === 'defects'
+                    ? t('settings.tab.defects')
+                    : t('settings.tab.export')
               return (
                 <button
-                  key={item.id}
+                  key={id}
                   role="tab"
-                  aria-selected={activeTab === item.id}
-                  className={`settings-tab ${activeTab === item.id ? 'active' : ''}`}
+                  aria-selected={activeTab === id}
+                  className={`settings-tab ${activeTab === id ? 'active' : ''}`}
                   disabled={tabDisabled}
                   title={
-                    item.id === 'defects' && !projectOpen
-                      ? 'Откройте проект, чтобы настроить правила дефектов'
+                    id === 'defects' && !projectOpen
+                      ? t('settings.rulesUnavailableHint')
                       : undefined
                   }
-                  onClick={() => setTab(item.id)}
+                  onClick={() => setTab(id)}
                 >
-                  {item.label}
+                  {label}
                 </button>
               )
             })}
@@ -215,16 +227,33 @@ export default function SettingsDialog() {
             {activeTab === 'general' ? (
               <>
                 {!projectOpen ? (
-                  <div className="hint">
-                    Правила дефектов и отступы пропуска доступны после открытия
-                    проекта.
-                  </div>
+                  <div className="hint">{t('settings.rulesUnavailable')}</div>
                 ) : null}
                 <section className="settings-section">
+                  <h3>{t('settings.interface.title')}</h3>
+                  <div className="form-grid">
+                    <label className="field">
+                      <span>{t('settings.interface.language')}</span>
+                      <select
+                        value={settings.uiLanguage}
+                        onChange={(event) =>
+                          updateSettings({
+                            uiLanguage: event.target.value === 'en' ? 'en' : 'ru'
+                          })
+                        }
+                      >
+                        <option value="ru">Русский</option>
+                        <option value="en">English</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="hint">{t('settings.interface.hint')}</div>
+                </section>
+                <section className="settings-section">
                   <div className="section-title-row">
-                    <h3>Движок</h3>
+                    <h3>{t('settings.engine.title')}</h3>
                     <button className="link-btn" onClick={() => void refreshStatus()}>
-                      проверить
+                      {t('common.check')}
                     </button>
                   </div>
                   <PathRow
@@ -245,35 +274,37 @@ export default function SettingsDialog() {
                   />
                   {!status?.engineReady || !status?.ffmpegReady ? (
                     <div className="notice small">
-                      Не хватает бинарников. Выполните <code>npm run fetch:engine</code> в папке
-                      проекта, затем перезапустите приложение.
+                      {t('settings.engine.missingPrefix')}{' '}
+                      <code>npm run fetch:engine</code> {t('settings.engine.missingSuffix')}
                     </div>
                   ) : null}
                 </section>
 
                 <section className="settings-section">
                   <div className="section-title-row">
-                    <h3>Модель распознавания</h3>
+                    <h3>{t('settings.model.title')}</h3>
                     <div className="row-actions">
                       <button
                         className="link-btn"
                         disabled={busy || checkingModelUpdates}
                         onClick={() => void checkModelUpdates()}
                       >
-                        {checkingModelUpdates ? 'Проверяю…' : 'проверить обновления'}
+                        {checkingModelUpdates
+                          ? t('settings.model.checkingLabel')
+                          : t('settings.model.checkLabel')}
                       </button>
-                      <span className="muted small">скачанные модели можно удалять</span>
+                      <span className="muted small">{t('settings.model.deletableHint')}</span>
                     </div>
                   </div>
                   {modelUpdateCheck ? (
                     <div className="muted small">
                       {!modelUpdateCheck.reachable
-                        ? 'Не удалось проверить обновления: нет доступа к манифесту'
+                        ? t('settings.model.checkUnreachable')
                         : modelUpdateCheck.updates.length === 0
-                          ? 'Проверено: установлены актуальные версии моделей'
-                          : `Проверено: доступны обновления для ${modelUpdateCheck.updates.length} ${
-                              modelUpdateCheck.updates.length === 1 ? 'модели' : 'моделей'
-                            }`}
+                          ? t('settings.model.checkUpToDate')
+                          : t('settings.model.checkUpdates', {
+                              count: modelUpdateCheck.updates.length
+                            })}
                     </div>
                   ) : null}
                   <div className="model-options">
@@ -299,16 +330,24 @@ export default function SettingsDialog() {
                         >
                           <div className="model-option-top">
                             <span>{model.shortLabel}</span>
-                            <span className="muted">{formatBytes(model.size)}</span>
+                            <span className="muted">{formatBytes(model.size, lang)}</span>
                           </div>
                           <div className="model-option-label">{model.label}</div>
-                          <div className="model-option-note">{model.note}</div>
+                          <div className="model-option-note">{modelNote(lang, id)}</div>
                           <div className="model-option-foot">
                             <span className={`badge ${state?.ready ? 'ok' : ''}`}>
-                              {state?.ready ? `скачана · v${installedVersion(id)}` : 'не скачана'}
+                              {state?.ready
+                                ? t('settings.model.downloadedVersion', {
+                                    version: installedVersion(id)
+                                  })
+                                : t('settings.model.notDownloaded')}
                             </span>
                             {update && state?.ready ? (
-                              <span className="badge">доступна v{update.availableVersion}</span>
+                              <span className="badge">
+                                {t('settings.model.availableVersion', {
+                                  version: update.availableVersion
+                                })}
+                              </span>
                             ) : null}
                             {state?.ready ? (
                               <button
@@ -319,7 +358,7 @@ export default function SettingsDialog() {
                                   void removeModel(id)
                                 }}
                               >
-                                удалить
+                                {t('common.delete')}
                               </button>
                             ) : null}
                           </div>
@@ -333,10 +372,16 @@ export default function SettingsDialog() {
                       <div className="model-current-label">{spec.label}</div>
                       <div className="muted small">
                         {selectedReady
-                          ? `Скачана · v${installedVersion(settings.modelId)} · ${formatBytes(
-                              selectedState?.bytes ?? status?.modelBytes ?? spec.size
-                            )} · SHA-256 проверен`
-                          : `Не скачана · нужно ${formatBytes(spec.size)}`}
+                          ? t('settings.model.installedSize', {
+                              version: installedVersion(settings.modelId),
+                              size: formatBytes(
+                                selectedState?.bytes ?? status?.modelBytes ?? spec.size,
+                                lang
+                              )
+                            })
+                          : t('settings.model.notInstalledSize', {
+                              size: formatBytes(spec.size, lang)
+                            })}
                       </div>
                     </div>
                     <div className="row-actions">
@@ -346,7 +391,9 @@ export default function SettingsDialog() {
                           disabled={busy}
                           onClick={() => void removeModel(settings.modelId)}
                         >
-                          {deletingModel === settings.modelId ? 'Удаляю…' : 'Удалить модель'}
+                          {deletingModel === settings.modelId
+                            ? t('settings.model.deleting')
+                            : t('settings.model.deleteButton')}
                         </button>
                       ) : (
                         <button
@@ -354,7 +401,9 @@ export default function SettingsDialog() {
                           disabled={busy}
                           onClick={() => void downloadModel(settings.modelId)}
                         >
-                          {downloadingThis ? 'Скачиваю…' : 'Скачать модель'}
+                          {downloadingThis
+                            ? t('settings.model.downloading')
+                            : t('settings.model.downloadButton')}
                         </button>
                       )}
                     </div>
@@ -364,16 +413,22 @@ export default function SettingsDialog() {
                     <div className="model-current">
                       <div>
                         <div className="model-current-label">
-                          Доступна версия v{updateByModelId.get(settings.modelId)?.availableVersion}
+                          {t('settings.model.updateAvailable', {
+                            version:
+                              updateByModelId.get(settings.modelId)?.availableVersion ?? ''
+                          })}
                         </div>
                         <div className="muted small">
                           {updateByModelId.get(settings.modelId)?.installedVersion
-                            ? `Установлена v${
-                                updateByModelId.get(settings.modelId)?.installedVersion
-                              }`
-                            : 'Установлена неизвестная версия'}{' '}
-                          · размер загрузки{' '}
-                          {formatBytes(updateByModelId.get(settings.modelId)?.size ?? spec.size)}
+                            ? t('settings.model.updateLine', {
+                                version:
+                                  updateByModelId.get(settings.modelId)?.installedVersion ?? '',
+                                size: formatBytes(
+                                  updateByModelId.get(settings.modelId)?.size ?? spec.size,
+                                  lang
+                                )
+                              })
+                            : t('settings.model.unknownVersion')}
                         </div>
                       </div>
                       <div className="row-actions">
@@ -382,7 +437,7 @@ export default function SettingsDialog() {
                           disabled={busy}
                           onClick={() => void downloadModel(settings.modelId)}
                         >
-                          Обновить
+                          {t('settings.model.updateButton')}
                         </button>
                       </div>
                     </div>
@@ -397,18 +452,14 @@ export default function SettingsDialog() {
                     </div>
                   ) : null}
 
-                  <div className="hint">
-                    Модель хранится в папке приложения и скачивается один раз. Файл проверяется по
-                    SHA-256. Удаление освобождает место; перед распознаванием модель нужно будет
-                    скачать снова.
-                  </div>
+                  <div className="hint">{t('settings.model.storageHint')}</div>
                 </section>
 
                 <section className="settings-section">
-                  <h3>Распознавание</h3>
+                  <h3>{t('settings.recognition.title')}</h3>
                   <div className="form-grid">
                     <label className="field">
-                      <span>Язык</span>
+                      <span>{t('settings.recognition.language')}</span>
                       <select
                         value={settings.language}
                         onChange={(event) => updateSettings({ language: event.target.value })}
@@ -418,7 +469,7 @@ export default function SettingsDialog() {
                       </select>
                     </label>
                     <label className="field">
-                      <span>Бэкенд</span>
+                      <span>{t('settings.recognition.backend')}</span>
                       <select
                         value={settings.backend}
                         onChange={(event) =>
@@ -430,7 +481,7 @@ export default function SettingsDialog() {
                       </select>
                     </label>
                     <label className="field">
-                      <span>Фрагмент, минут</span>
+                      <span>{t('settings.recognition.chunk')}</span>
                       <input
                         type="number"
                         min={MIN_CHUNK_TARGET_SEC / 60}
@@ -453,22 +504,14 @@ export default function SettingsDialog() {
                       />
                     </label>
                   </div>
-                  <div className="hint">
-                    Смена языка или модели применяется при следующем распознавании. Первый фрагмент
-                    всегда короче (до 3 минут), поэтому первые слова появляются раньше. Меньший
-                    фрагмент даёт более быстрый отклик, но модель загружается чаще.
-                  </div>
+                  <div className="hint">{t('settings.recognition.hint')}</div>
                 </section>
 
                 <section className="settings-section">
-                  <h3>Данные и лицензии</h3>
+                  <h3>{t('settings.data.title')}</h3>
+                  <div className="hint">{t('settings.data.privacy')}</div>
                   <div className="hint">
-                    Запись и транскрипт остаются на этом компьютере. В сеть уходит только загрузка
-                    модели с Hugging Face.
-                  </div>
-                  <div className="hint">
-                    CrisperWhisper 2.0 распространяется по Nyra Health Non-Commercial Research
-                    License. audio.cpp — Apache-2.0. ffmpeg — GPL-3.0.
+                    {t('settings.data.license')} audio.cpp — Apache-2.0. ffmpeg — GPL-3.0.
                   </div>
                 </section>
               </>
@@ -476,13 +519,9 @@ export default function SettingsDialog() {
 
             {activeTab === 'defects' ? (
               <>
-                <div className="hint">
-                  Правила дефектов и отступы пропуска отменяются через ⌘Z / Ctrl+Z.
-                  Пока это окно открыто, история ограничена изменениями, сделанными
-                  после его открытия.
-                </div>
+                <div className="hint">{t('settings.historyHint')}</div>
                 <section className="settings-section">
-                  <h3>Список дефектов</h3>
+                  <h3>{t('settings.dismissed.title')}</h3>
                   <label className="check">
                     <input
                       type="checkbox"
@@ -491,13 +530,9 @@ export default function SettingsDialog() {
                         updateSettings({ showDismissed: event.target.checked })
                       }
                     />
-                    Показывать удалённые дефекты в списке
+                    {t('settings.dismissed.show')}
                   </label>
-                  <div className="hint">
-                    Удалённые дефекты и метки остаются тонкой карточкой с кнопкой
-                    возврата и не участвуют в пропуске и экспорте. Если галочка снята,
-                    карточки скрыты — включите её снова, чтобы вернуть их в список.
-                  </div>
+                  <div className="hint">{t('settings.dismissed.hint')}</div>
                 </section>
 
                 <DefectRulesSection
@@ -508,10 +543,10 @@ export default function SettingsDialog() {
                 />
 
                 <section className="settings-section">
-                  <h3>Таймлайн</h3>
+                  <h3>{t('settings.timeline.title')}</h3>
                   <div className="range-grid single">
                     <RangeField
-                      label="Контраст осциллограммы"
+                      label={t('settings.timeline.contrast')}
                       value={settings.waveformContrast}
                       min={MIN_WAVEFORM_CONTRAST}
                       max={MAX_WAVEFORM_CONTRAST}
@@ -520,31 +555,23 @@ export default function SettingsDialog() {
                       onChange={(value) => updateSettings({ waveformContrast: value })}
                     />
                   </div>
-                  <div className="hint">
-                    Поднимает тихую речь относительно громкой: шумовой пол отсекается, а тихие слова
-                    становятся заметнее. 0% — линейная осциллограмма, 55% — по умолчанию. Меняется
-                    только отображение, запись и транскрипт не затрагиваются.
-                  </div>
+                  <div className="hint">{t('settings.timeline.contrastHint')}</div>
                 </section>
 
                 <section className="settings-section">
-                  <h3>Мини-таймлайн</h3>
+                  <h3>{t('settings.miniTimeline.title')}</h3>
                   <div className="range-grid single">
                     <RangeField
-                      label="Отступ вокруг метки"
+                      label={t('settings.miniTimeline.pad')}
                       value={settings.miniTimelinePadSec}
                       min={MIN_MINI_TIMELINE_PAD_SEC}
                       max={MAX_MINI_TIMELINE_PAD_SEC}
                       step={0.5}
-                      suffix="с"
+                      suffix={t('common.secondsSuffix')}
                       onChange={(value) => updateSettings({ miniTimelinePadSec: value })}
                     />
                   </div>
-                  <div className="hint">
-                    Сколько секунд показывать слева и справа от выбранной метки в маленьком
-                    таймлайне. По умолчанию ±3 с. Внутри этого окна можно приближать до 400% и
-                    прокручивать.
-                  </div>
+                  <div className="hint">{t('settings.miniTimeline.hint')}</div>
                 </section>
               </>
             ) : null}
@@ -553,15 +580,15 @@ export default function SettingsDialog() {
               <>
                 <section className="settings-section">
                   <div className="section-title-row">
-                    <h3>Поля CSV</h3>
+                    <h3>{t('settings.export.fields.title')}</h3>
                     <div className="row-actions">
                       <button
                         className="link-btn"
                         onClick={() =>
-                          updateSettings({ export: { fields: [...EXPORT_FIELDS] } })
+                          updateSettings({ export: { fields: [...ALL_EXPORT_FIELDS] } })
                         }
                       >
-                        все
+                        {t('settings.export.fields.all')}
                       </button>
                       <button
                         className="link-btn"
@@ -573,29 +600,29 @@ export default function SettingsDialog() {
                           })
                         }
                       >
-                        основные
+                        {t('settings.export.fields.main')}
                       </button>
                     </div>
                   </div>
                   <div className="export-fields">
-                    {EXPORT_FIELDS.map((field) => (
+                    {ALL_EXPORT_FIELDS.map((field) => (
                       <label key={field} className="check export-field">
                         <input
                           type="checkbox"
                           checked={exportSettings.fields.includes(field)}
                           onChange={() => toggleField(field)}
                         />
-                        {EXPORT_FIELD_LABELS[field]}
+                        {exportFieldLabel(lang, field)}
                       </label>
                     ))}
                   </div>
                 </section>
 
                 <section className="settings-section">
-                  <h3>Формат</h3>
+                  <h3>{t('settings.export.format.title')}</h3>
                   <div className="form-grid">
                     <label className="field">
-                      <span>Разделитель CSV</span>
+                      <span>{t('settings.export.delimiter')}</span>
                       <select
                         value={exportSettings.delimiter}
                         onChange={(event) =>
@@ -606,8 +633,10 @@ export default function SettingsDialog() {
                           })
                         }
                       >
-                        <option value=";">точка с запятой (Excel)</option>
-                        <option value=",">запятая</option>
+                        <option value=";">
+                          {t('settings.export.delimiter.semicolon')}
+                        </option>
+                        <option value=",">{t('settings.export.delimiter.comma')}</option>
                       </select>
                     </label>
                   </div>
@@ -621,20 +650,14 @@ export default function SettingsDialog() {
                         })
                       }
                     />
-                    Выводить строку заголовков
+                    {t('settings.export.header')}
                   </label>
-                  <div className="hint">
-                    JSON всегда содержит полный набор полей и исходные заметки. Настройки полей
-                    применяются к CSV.
-                  </div>
+                  <div className="hint">{t('settings.export.jsonHint')}</div>
                 </section>
 
                 <section className="settings-section">
-                  <h3>Видео</h3>
-                  <div className="hint">
-                    Разрешение, качество и энкодер задаются в окне «Экспорт видео»
-                    в панели дефектов. Параметры последнего экспорта сохраняются.
-                  </div>
+                  <h3>{t('settings.video.title')}</h3>
+                  <div className="hint">{t('settings.video.hint')}</div>
                 </section>
               </>
             ) : null}
@@ -643,10 +666,15 @@ export default function SettingsDialog() {
 
         <footer className="modal-foot">
           <span className="muted small">
-            {status ? `${status.platform} · версия ${status.appVersion}` : ''}
+            {status
+              ? t('settings.footer', {
+                  platform: status.platform,
+                  version: status.appVersion
+                })
+              : ''}
           </span>
           <button className="btn primary" onClick={() => setShowSettings(false)}>
-            Готово
+            {t('common.done')}
           </button>
         </footer>
       </div>

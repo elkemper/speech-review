@@ -1,4 +1,6 @@
+import { translate } from '@shared/i18n'
 import { runProcess, tail } from './proc'
+import { currentUiLanguage } from '../uiLanguage'
 
 export interface SilenceInterval {
   start: number
@@ -23,7 +25,11 @@ export async function probeMedia(ffmpeg: string, input: string, signal?: AbortSi
   const result = await runProcess(ffmpeg, ['-hide_banner', '-nostdin', '-i', input], { signal })
   const duration = parseDurationLine(result.stderr)
   if (duration === null) {
-    throw new Error(`Не удалось прочитать файл: ${tail(result.stderr, 6) || 'неизвестный формат'}`)
+    throw new Error(
+      translate(currentUiLanguage(), 'error.ffmpegRead', {
+        details: tail(result.stderr, 6) || '—'
+      })
+    )
   }
   const videoLines = result.stderr
     .split('\n')
@@ -85,7 +91,11 @@ export async function extractAudio(options: ExtractOptions): Promise<void> {
   })
 
   if (result.code !== 0) {
-    throw new Error(`ffmpeg не смог извлечь аудио:\n${tail(result.stderr, 12)}`)
+    throw new Error(
+      translate(currentUiLanguage(), 'error.ffmpegExtract', {
+        details: tail(result.stderr, 12)
+      })
+    )
   }
 }
 
@@ -117,7 +127,11 @@ export async function detectSilences(
 
   const result = await runProcess(ffmpeg, args, { signal: options.signal })
   if (result.code !== 0) {
-    throw new Error(`ffmpeg не смог найти паузы:\n${tail(result.stderr, 12)}`)
+    throw new Error(
+      translate(currentUiLanguage(), 'error.ffmpegSilence', {
+        details: tail(result.stderr, 12)
+      })
+    )
   }
 
   const intervals: SilenceInterval[] = []

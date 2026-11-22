@@ -1,16 +1,8 @@
 import { useEffect } from 'react'
+import { formatClock } from '@shared/format'
 import { canRedo, canUndo } from '../history'
 import { useApp } from '../store'
-
-function clock(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
-}
+import { useT, useUiLanguage } from '../i18n'
 
 export default function HistoryDialog() {
   const show = useApp((state) => state.showHistory)
@@ -19,6 +11,8 @@ export default function HistoryDialog() {
   const redo = useApp((state) => state.redo)
   const jumpHistory = useApp((state) => state.jumpHistory)
   const setShowHistory = useApp((state) => state.setShowHistory)
+  const t = useT()
+  const lang = useUiLanguage()
 
   useEffect(() => {
     if (!show) return
@@ -43,14 +37,21 @@ export default function HistoryDialog() {
       <div className="modal history-modal">
         <header className="modal-head">
           <div>
-            <h2>История действий</h2>
+            <h2>{t('history.title')}</h2>
             <div className="muted small">
               {entries.length === 0
-                ? 'Пока нет действий по этому проекту'
-                : `Действий: ${entries.length} · текущая позиция ${history.index + 1}`}
+                ? t('history.empty')
+                : t('history.count', {
+                    count: entries.length,
+                    position: history.index + 1
+                  })}
             </div>
           </div>
-          <button className="icon-btn" onClick={() => setShowHistory(false)} title="Закрыть">
+          <button
+            className="icon-btn"
+            onClick={() => setShowHistory(false)}
+            title={t('common.close')}
+          >
             ×
           </button>
         </header>
@@ -60,27 +61,24 @@ export default function HistoryDialog() {
             className="btn ghost small"
             onClick={undo}
             disabled={!canUndo(history)}
-            title="Отменить последнее действие"
+            title={t('history.undoTitle')}
           >
-            ↶ Отменить
+            ↶ {t('common.undo')}
           </button>
           <button
             className="btn ghost small"
             onClick={redo}
             disabled={!canRedo(history)}
-            title="Повторить отменённое действие"
+            title={t('history.redoTitle')}
           >
-            ↷ Повторить
+            ↷ {t('common.retry')}
           </button>
-          <span className="muted small">Клик по записи переходит к этому состоянию</span>
+          <span className="muted small">{t('history.clickHint')}</span>
         </div>
 
         <div className="modal-body history-body">
           {entries.length === 0 ? (
-            <div className="panel-empty">
-              Добавьте метку, подтвердите или удалите дефект, измените границы или
-              настройки дефектов — действия появятся здесь.
-            </div>
+            <div className="panel-empty">{t('history.help')}</div>
           ) : (
             <div className="history-list">
               <button
@@ -90,7 +88,7 @@ export default function HistoryDialog() {
                 onClick={() => jumpHistory(-1)}
               >
                 <span className="history-dot" />
-                <span className="history-label">Исходное состояние</span>
+                <span className="history-label">{t('history.initial')}</span>
                 <span className="history-time" />
               </button>
               {entries.map((entry, index) => (
@@ -103,8 +101,10 @@ export default function HistoryDialog() {
                 >
                   <span className="history-dot" />
                   <span className="history-label">{entry.label}</span>
-                  <span className="history-time">{clock(entry.at)}</span>
-                  {index > history.index ? <span className="badge">отменено</span> : null}
+                  <span className="history-time">{formatClock(entry.at, lang)}</span>
+                  {index > history.index ? (
+                    <span className="badge">{t('history.undone')}</span>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -113,11 +113,11 @@ export default function HistoryDialog() {
 
         <footer className="modal-foot">
           <span className="muted small">
-            <kbd>⌘Z</kbd> / <kbd>Ctrl+Z</kbd> — отменить, <kbd>⇧⌘Z</kbd> /{' '}
-            <kbd>Ctrl+Y</kbd> — повторить
+            <kbd>⌘Z</kbd> / <kbd>Ctrl+Z</kbd> — {t('history.hotkeyUndo')},{' '}
+            <kbd>⇧⌘Z</kbd> / <kbd>Ctrl+Y</kbd> — {t('history.hotkeyRedo')}
           </span>
           <button className="btn primary" onClick={() => setShowHistory(false)}>
-            Готово
+            {t('common.done')}
           </button>
         </footer>
       </div>

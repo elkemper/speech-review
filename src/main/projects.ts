@@ -1,3 +1,4 @@
+import { translate } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
@@ -12,6 +13,7 @@ import type {
   Transcript
 } from '@shared/types'
 import { projectsDir } from './paths'
+import { currentUiLanguage } from './uiLanguage'
 
 export interface LoadedProject {
   project: Project
@@ -57,7 +59,9 @@ export async function createProject(
 ): Promise<Project> {
   const id = randomUUID()
   const now = new Date().toISOString()
-  const name = basename(media.path, extname(media.path)).trim() || 'Вебинар'
+  const name =
+    basename(media.path, extname(media.path)).trim() ||
+    translate(currentUiLanguage(), 'project.defaultName')
 
   const project: Project = {
     id,

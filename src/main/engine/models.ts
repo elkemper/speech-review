@@ -4,6 +4,7 @@ import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promis
 import { get } from 'node:https'
 import type { IncomingMessage } from 'node:http'
 import { dirname } from 'node:path'
+import { translate } from '@shared/i18n'
 import {
   BUILTIN_VERSION,
   compareVersions,
@@ -21,6 +22,11 @@ import type {
 } from '@shared/types'
 import { modelPath } from '../paths'
 import { loadSettings, saveSettings } from '../settings'
+import { currentUiLanguage } from '../uiLanguage'
+
+function t(key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]): string {
+  return translate(currentUiLanguage(), key, params)
+}
 
 export interface ModelDownloadOptions {
   signal?: AbortSignal
@@ -169,7 +175,7 @@ function requestBuffer(url: string, redirects = 0): Promise<Buffer> {
       }
       if (status !== 200) {
         response.resume()
-        reject(new Error(`Не удалось получить манифест: HTTP ${status}`))
+        reject(new Error(t('error.manifestHttp', { status })))
         return
       }
       const chunks: Buffer[] = []
@@ -178,7 +184,7 @@ function requestBuffer(url: string, redirects = 0): Promise<Buffer> {
       response.on('end', () => resolve(Buffer.concat(chunks)))
     })
     request.on('error', reject)
-    request.setTimeout(30_000, () => request.destroy(new Error('Таймаут загрузки манифеста')))
+    request.setTimeout(30_000, () => request.destroy(new Error(t('error.manifestTimeout'))))
   })
 }
 
@@ -309,7 +315,7 @@ export async function ensureModel(id: ModelId): Promise<string> {
   const builtIn = getModelSpec(id)
   const info = await stat(path).catch(() => null)
   if (!info) {
-    throw new Error(`Модель ${builtIn.label} не скачана. Откройте настройки и загрузите её.`)
+    throw new Error(t('error.modelNotDownloaded', { model: builtIn.label }))
   }
 
   const marker = await readMarker(id)
@@ -322,13 +328,13 @@ export async function ensureModel(id: ModelId): Promise<string> {
 
   const spec = expected ?? { ...builtIn, version: BUILTIN_VERSION }
   if (info.size !== spec.size) {
-    throw new Error(`Модель ${builtIn.label} не скачана. Откройте настройки и загрузите её.`)
+    throw new Error(t('error.modelNotDownloaded', { model: builtIn.label }))
   }
 
   const actual = await hashFile(path)
   if (actual !== spec.sha256) {
     throw new Error(
-      `Файл модели повреждён (SHA-256 ${actual.slice(0, 12)}…). Скачайте модель заново в настройках.`
+      t('error.modelCorrupt', { hash: actual.slice(0, 12) })
     )
   }
   await writeMarker(id, spec.sha256, spec.version, spec.size)
@@ -352,7 +358,7 @@ function requestStream(
       resolve(response)
     })
     request.on('error', reject)
-    request.setTimeout(60_000, () => request.destroy(new Error('Таймаут загрузки модели')))
+    request.setTimeout(60_000, () => request.destroy(new Error(t('error.modelTimeout'))))
   })
 }
 
@@ -371,7 +377,7 @@ export async function downloadModel(
   const existingMarker = await readMarker(id)
   if (current.ready && current.bytes === spec.size) {
     if (existingMarker?.sha256 === spec.sha256) {
-      options.onProgress?.(100, 'Модель уже скачана')
+      options.onProgress?.(100, t('progress.modelAlreadyDownloaded'))
       await recordModelVersion(id, existingMarker.version ?? spec.version)
       return ensureModel(id)
     }
@@ -382,7 +388,7 @@ export async function downloadModel(
       if (actual === spec.sha256) {
         await writeMarker(id, spec.sha256, spec.version, spec.size)
         await recordModelVersion(id, spec.version)
-        options.onProgress?.(100, 'Модель уже скачана')
+        options.onProgress?.(100, t('progress.modelAlreadyDownloaded'))
         return path
       }
     }
@@ -408,14 +414,14 @@ export async function downloadModel(
       offset = 0
     }
     if (offset > 0) {
-      options.onProgress?.(Math.min(99, (offset / spec.size) * 100), 'Проверяю скачанную часть…')
+      options.onProgress?.(Math.min(99, (offset / spec.size) * 100), t('progress.modelVerifying'))
       if (offset === spec.size) {
         const existing = await hashFile(partPath)
         if (existing === spec.sha256) {
           await rename(partPath, path)
           await writeMarker(id, spec.sha256, spec.version, spec.size)
           await recordModelVersion(id, spec.version)
-          options.onProgress?.(100, 'Модель скачана')
+          options.onProgress?.(100, t('progress.modelDownloaded'))
           return path
         }
         await unlink(partPath).catch(() => undefined)
@@ -444,7 +450,7 @@ export async function downloadModel(
   const status = response.statusCode ?? 0
   if (status !== 200 && status !== 206) {
     response.resume()
-    throw new Error(`Не удалось скачать модель: HTTP ${status}`)
+    throw new Error(t('error.modelDownloadHttp', { status }))
   }
 
   const append = status === 206 && offset > 0
@@ -484,7 +490,7 @@ export async function downloadModel(
       const percent = Math.min(99, Math.round((received / total) * 100))
       if (percent !== lastPercent) {
         lastPercent = percent
-        options.onProgress?.(percent, `Скачиваю модель… ${percent}%`)
+        options.onProgress?.(percent, t('progress.modelDownloading', { percent }))
       }
     })
     response.on('error', (error) => fail(error))
@@ -503,13 +509,13 @@ export async function downloadModel(
   if (finalSize !== spec.size || actual !== spec.sha256) {
     await unlink(partPath).catch(() => undefined)
     throw new Error(
-      `Скачанная модель не прошла проверку (${finalSize} Б, SHA-256 ${actual.slice(0, 12)}…). Попробуйте ещё раз.`
+      t('error.modelVerifyFailed', { size: finalSize, hash: actual.slice(0, 12) })
     )
   }
 
   await rename(partPath, path)
   await writeMarker(id, spec.sha256, spec.version, spec.size)
   await recordModelVersion(id, spec.version)
-  options.onProgress?.(100, 'Модель скачана')
+  options.onProgress?.(100, t('progress.modelDownloaded'))
   return path
 }

@@ -3,6 +3,7 @@ import { constants } from 'node:fs'
 import { access, mkdtemp, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { extname, join, resolve } from 'node:path'
+import { translate } from '@shared/i18n'
 import { normalizeVideoExportSettings } from '@shared/settings'
 import type { VideoExportProgress, VideoExportRequest } from '@shared/types'
 import {
@@ -15,9 +16,14 @@ import {
 import { probeMedia } from './engine/ffmpeg'
 import { runProcess, tail } from './engine/proc'
 import { ffmpegBinary, tempDir } from './paths'
+import { currentUiLanguage } from './uiLanguage'
 
 let active: AbortController | null = null
 let busy = false
+
+function t(key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]): string {
+  return translate(currentUiLanguage(), key, params)
+}
 
 export function cancelVideoExport(): void {
   active?.abort()
@@ -52,13 +58,13 @@ async function runVideoExport(
 ): Promise<string | null> {
   const ffmpeg = ffmpegBinary()
   if (!(await executable(ffmpeg))) {
-    throw new Error('ffmpeg не найден. Запустите npm run fetch:engine и перезапустите приложение.')
+    throw new Error(t('error.ffmpegMissing'))
   }
 
   const settings = normalizeVideoExportSettings(request.settings)
   const keep = videoKeepRanges(request.cuts, request.duration)
   if (keep.length === 0) {
-    throw new Error('Все отмеченные места вырезаны — экспортировать нечего')
+    throw new Error(t('error.videoNoFragments'))
   }
   const totalSec = exportDuration(keep)
 
@@ -68,17 +74,15 @@ async function runVideoExport(
     percent: 0,
     processedSec: 0,
     totalSec,
-    message: 'Проверяю исходный файл…'
+    message: t('progress.videoPrepare')
   })
 
   const probe = await probeMedia(ffmpeg, request.videoPath)
   if (!probe.hasVideo) {
-    throw new Error(
-      'В исходном файле нет видеодорожки. Экспорт аудиофайлов пока не поддерживается.'
-    )
+    throw new Error(t('error.noVideoTrack'))
   }
   if (!probe.hasAudio) {
-    throw new Error('В исходном файле нет аудиодорожки')
+    throw new Error(t('error.noAudioTrack'))
   }
 
   const extension = '.mp4'
@@ -87,7 +91,7 @@ async function runVideoExport(
     { name: 'MOV', extensions: ['mov'] }
   ]
   const saveOptions = {
-    title: 'Экспорт видео',
+    title: t('dialog.exportVideo'),
     defaultPath: join(
       app.getPath('downloads'),
       `${safeName(request.projectName)}-clean${extension}`
@@ -101,10 +105,10 @@ async function runVideoExport(
 
   const output = ensureExtension(result.filePath, extension)
   if (resolve(output) === resolve(request.videoPath)) {
-    throw new Error('Нельзя перезаписать исходный видеофайл')
+    throw new Error(t('error.overwriteSource'))
   }
   if (!['.mp4', '.m4v', '.mov'].includes(extname(output).toLowerCase())) {
-    throw new Error('Видео можно сохранить только в MP4 или MOV')
+    throw new Error(t('error.videoFormat'))
   }
 
   const workDir = await mkdtemp(join(tempDir(), 'video-export-'))
@@ -116,7 +120,7 @@ async function runVideoExport(
     const filterScript = join(workDir, 'filter.txt')
     await writeFile(
       filterScript,
-      buildVideoFilterGraph(keep, settings.resolution),
+      buildVideoFilterGraph(keep, settings.resolution, currentUiLanguage()),
       'utf8'
     )
     const args = buildReencodeArgs({
@@ -126,7 +130,7 @@ async function runVideoExport(
       settings
     })
 
-    const message = 'Кодирую видео…'
+    const message = t('progress.videoRender')
     onProgress({
       projectId: request.projectId,
       phase: 'render',
@@ -167,9 +171,9 @@ async function runVideoExport(
 
     if (finished.code !== 0) {
       throw new Error(
-        `ffmpeg не смог экспортировать видео:\n${
-          tail(finished.stderr, 12) || `код ${finished.code}`
-        }`
+        t('error.videoExportFailed', {
+          details: tail(finished.stderr, 12) || `${finished.code}`
+        })
       )
     }
     if (controller.signal.aborted) {
@@ -179,7 +183,7 @@ async function runVideoExport(
 
     const info = await stat(temporary).catch(() => null)
     if (!info || info.size <= 0) {
-      throw new Error('ffmpeg завершился без файла результата')
+      throw new Error(t('error.videoNoOutput'))
     }
     await rename(temporary, output)
 
@@ -189,7 +193,7 @@ async function runVideoExport(
       percent: 100,
       processedSec: totalSec,
       totalSec,
-      message: 'Готово'
+      message: t('progress.videoDone')
     })
     return output
   } catch (error) {
@@ -207,7 +211,7 @@ export async function exportVideo(
   request: VideoExportRequest,
   onProgress: (value: VideoExportProgress) => void
 ): Promise<string | null> {
-  if (busy) throw new Error('Видеоэкспорт уже идёт')
+  if (busy) throw new Error(t('error.videoExportRunning'))
   busy = true
   try {
     return await runVideoExport(window, request, onProgress)

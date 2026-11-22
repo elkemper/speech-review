@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatDuration } from '@shared/format'
 import {
+  videoEncoderLabel,
+  videoQualityNameLabel,
+  videoResolutionLabel
+} from '@shared/labels'
+import {
   DEFAULT_VIDEO_EXPORT_SETTINGS,
   VIDEO_EXPORT_ENCODERS,
-  VIDEO_EXPORT_ENCODER_LABELS,
   VIDEO_EXPORT_QUALITIES,
-  VIDEO_EXPORT_QUALITY_LABELS,
-  VIDEO_EXPORT_RESOLUTIONS,
-  VIDEO_EXPORT_RESOLUTION_LABELS
+  VIDEO_EXPORT_RESOLUTIONS
 } from '@shared/settings'
 import type {
   Defect,
@@ -17,6 +19,7 @@ import type {
 import { videoQualityLabel } from '@shared/videoExport'
 import { buildCutList, complementRanges } from '../skip'
 import { useApp } from '../store'
+import { useT, useUiLanguage } from '../i18n'
 
 function cleanError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
@@ -34,6 +37,8 @@ export default function VideoExportDialog({
   const settings = useApp((state) => state.settings)
   const updateSettings = useApp((state) => state.updateSettings)
   const notify = useApp((state) => state.notify)
+  const t = useT()
+  const lang = useUiLanguage()
 
   const [options, setOptions] = useState<VideoExportSettings>(() => ({
     ...(settings.videoExport ?? DEFAULT_VIDEO_EXPORT_SETTINGS)
@@ -110,7 +115,7 @@ export default function VideoExportDialog({
       percent: 0,
       processedSec: 0,
       totalSec: keepSec,
-      message: 'Подготовка…'
+      message: t('videoExport.prepare')
     })
 
     try {
@@ -124,7 +129,7 @@ export default function VideoExportDialog({
       })
       if (path) {
         setResult(path)
-        notify(`Видео экспортировано: ${path}`, 'success')
+        notify(t('videoExport.exported', { path }), 'success')
       } else {
         setProgress(null)
       }
@@ -160,16 +165,14 @@ export default function VideoExportDialog({
       <div className="modal video-export-modal">
         <header className="modal-head">
           <div>
-            <h2>Экспорт видео</h2>
-            <div className="muted small">
-              Чистая запись по текущим меткам: все неудалённые дефекты и ручные метки.
-            </div>
+            <h2>{t('videoExport.title')}</h2>
+            <div className="muted small">{t('videoExport.subtitle')}</div>
           </div>
           <button
             className="icon-btn"
             onClick={onClose}
             disabled={running}
-            title={running ? 'Дождитесь завершения или отмените экспорт' : 'Закрыть'}
+            title={running ? t('videoExport.closeTitle') : t('common.close')}
           >
             ×
           </button>
@@ -177,30 +180,28 @@ export default function VideoExportDialog({
 
         <div className="modal-body">
           <section className="settings-section">
-            <h3>Что будет вырезано</h3>
+            <h3>{t('videoExport.cutsTitle')}</h3>
             <div className="video-export-summary">
               <span>
-                Вырезов: <strong>{cuts.length}</strong>
+                {t('videoExport.cuts')} <strong>{cuts.length}</strong>
               </span>
               <span>
-                Вырезано: <strong>{formatDuration(cutSec)}</strong>
+                {t('videoExport.cut')} <strong>{formatDuration(cutSec)}</strong>
               </span>
               <span>
-                Останется: <strong>{formatDuration(keepSec)}</strong>
+                {t('videoExport.keep')} <strong>{formatDuration(keepSec)}</strong>
               </span>
             </div>
             {nothingToExport ? (
-              <div className="video-export-error">
-                Все отмеченные места вырезаны — экспортировать нечего.
-              </div>
+              <div className="video-export-error">{t('videoExport.nothing')}</div>
             ) : null}
           </section>
 
           <section className="settings-section">
-            <h3>Параметры</h3>
+            <h3>{t('videoExport.options')}</h3>
             <div className="form-grid">
               <label className="field">
-                <span>Разрешение</span>
+                <span>{t('videoExport.resolution')}</span>
                 <select
                   value={options.resolution}
                   disabled={running}
@@ -213,14 +214,14 @@ export default function VideoExportDialog({
                 >
                   {VIDEO_EXPORT_RESOLUTIONS.map((resolution) => (
                     <option key={resolution} value={resolution}>
-                      {VIDEO_EXPORT_RESOLUTION_LABELS[resolution]}
+                      {videoResolutionLabel(lang, resolution)}
                     </option>
                   ))}
                 </select>
               </label>
 
               <label className="field">
-                <span>Качество</span>
+                <span>{t('videoExport.quality')}</span>
                 <select
                   value={options.quality}
                   disabled={running}
@@ -233,7 +234,7 @@ export default function VideoExportDialog({
                 >
                   {VIDEO_EXPORT_QUALITIES.map((quality) => (
                     <option key={quality} value={quality}>
-                      {VIDEO_EXPORT_QUALITY_LABELS[quality]} ·{' '}
+                      {videoQualityNameLabel(lang, quality)} ·{' '}
                       {videoQualityLabel(options.encoder, quality)}
                     </option>
                   ))}
@@ -242,7 +243,7 @@ export default function VideoExportDialog({
             </div>
 
             <label className="field">
-              <span>Энкодер</span>
+              <span>{t('videoExport.encoder')}</span>
               <select
                 value={options.encoder}
                 disabled={running}
@@ -253,24 +254,24 @@ export default function VideoExportDialog({
                   )
                 }
               >
-                <optgroup label="Программные · CRF">
+                <optgroup label={t('videoExport.softwareGroup')}>
                   {VIDEO_EXPORT_ENCODERS.filter(
                     (encoder) =>
                       encoder === 'h264' || encoder === 'hevc'
                   ).map((encoder) => (
                     <option key={encoder} value={encoder}>
-                      {VIDEO_EXPORT_ENCODER_LABELS[encoder]}
+                      {videoEncoderLabel(lang, encoder)}
                     </option>
                   ))}
                 </optgroup>
-                <optgroup label="Аппаратные · VideoToolbox">
+                <optgroup label={t('videoExport.hardwareGroup')}>
                   {VIDEO_EXPORT_ENCODERS.filter(
                     (encoder) =>
                       encoder === 'h264_videotoolbox' ||
                       encoder === 'hevc_videotoolbox'
                   ).map((encoder) => (
                     <option key={encoder} value={encoder}>
-                      {VIDEO_EXPORT_ENCODER_LABELS[encoder]}
+                      {videoEncoderLabel(lang, encoder)}
                     </option>
                   ))}
                 </optgroup>
@@ -280,14 +281,14 @@ export default function VideoExportDialog({
 
           {running || progress ? (
             <section className="settings-section">
-              <h3>Прогресс</h3>
+              <h3>{t('videoExport.progress')}</h3>
               <div className="video-export-progress">
                 <div className="progress-track">
                   <div style={{ width: `${progress?.percent ?? 0}%` }} />
                 </div>
                 <div className="progress-meta">
                   <span>{progress?.percent ?? 0}%</span>
-                  <span>{progress?.message ?? 'Подготовка…'}</span>
+                  <span>{progress?.message ?? t('videoExport.prepare')}</span>
                   {progress ? (
                     <span>
                       {formatDuration(progress.processedSec)} /{' '}
@@ -304,7 +305,7 @@ export default function VideoExportDialog({
           {result ? (
             <div className="video-export-result">
               <div>
-                Файл готов:
+                {t('videoExport.ready')}
                 <div className="path-value" title={result}>
                   {result}
                 </div>
@@ -313,7 +314,7 @@ export default function VideoExportDialog({
                 className="btn ghost small"
                 onClick={() => void window.api.showItemInFolder(result)}
               >
-                Показать в папке
+                {t('videoExport.showInFolder')}
               </button>
             </div>
           ) : null}
@@ -321,27 +322,27 @@ export default function VideoExportDialog({
 
         <footer className="modal-foot">
           <span className="muted small">
-            Исходный файл не изменяется. Экспорт идёт локально.
+            {t('videoExport.sourceUntouched')}
           </span>
           {running ? (
             <button className="btn ghost" onClick={() => void cancel()} disabled={cancelling}>
-              {cancelling ? 'Отменяю…' : 'Отменить'}
+              {cancelling ? t('videoExport.cancelling') : t('common.cancel')}
             </button>
           ) : result ? (
             <button className="btn primary" onClick={onClose}>
-              Готово
+              {t('common.done')}
             </button>
           ) : (
             <div className="row-actions">
               <button className="btn ghost" onClick={onClose}>
-                Отмена
+                {t('common.cancel')}
               </button>
               <button
                 className="btn primary"
                 onClick={() => void start()}
                 disabled={nothingToExport}
               >
-                Экспортировать
+                {t('videoExport.export')}
               </button>
             </div>
           )}

@@ -1,3 +1,4 @@
+import { defectTypeLabel, severityLabel, yesNo } from './labels'
 import type { ExportDefect, ExportField, ExportSettings } from './types'
 
 /** CSV consumers expect a fixed-width timecode, including leading zero hours. */
@@ -11,23 +12,6 @@ export function exportTimecode(seconds: number): string {
   const h = Math.floor(totalSec / 3600)
   const pad = (value: number): string => String(value).padStart(2, '0')
   return `${pad(h)}:${pad(m)}:${pad(s)}.${String(ms).padStart(3, '0')}`
-}
-
-const TYPE_LABEL: Record<string, string> = {
-  filler: 'филлер',
-  pause: 'пауза',
-  repetition: 'повтор',
-  elongation: 'растяжка',
-  false_start: 'обрыв',
-  vocal_sound: 'звук',
-  unclear: 'неразборчиво',
-  manual: 'ручная метка'
-}
-
-const SEVERITY_LABEL: Record<string, string> = {
-  low: 'низкая',
-  medium: 'средняя',
-  high: 'высокая'
 }
 
 export function csvCell(value: string | number | boolean): string {
@@ -69,7 +53,7 @@ export function exportValue(defect: ExportDefect, field: ExportField): string | 
     case 'duration_sec':
       return cutDuration(defect)
     case 'cut':
-      return cutBounds(defect) ? 'да' : 'нет'
+      return yesNo('en', cutBounds(defect) !== null)
     case 'defect_start_tc':
       return exportTimecode(defect.start)
     case 'defect_end_tc':
@@ -81,13 +65,13 @@ export function exportValue(defect: ExportDefect, field: ExportField): string | 
     case 'defect_duration_sec':
       return (defect.end - defect.start).toFixed(3)
     case 'type':
-      return TYPE_LABEL[defect.type] ?? defect.type
+      return defectTypeLabel('en', defect.type)
     case 'severity':
-      return SEVERITY_LABEL[defect.severity] ?? defect.severity
+      return severityLabel('en', defect.severity)
     case 'source':
       return defect.source
     case 'confirmed':
-      return defect.confirmed ? 'да' : 'нет'
+      return yesNo('en', defect.confirmed)
     case 'text':
       return defect.text
     case 'note':

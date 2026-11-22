@@ -11,7 +11,7 @@ npm run typecheck     # checks main/preload/shared and renderer types separately
 npm run build         # checks that the production build succeeds
 ```
 
-Current state: **200 tests in 14 files**. A run takes less than a second in the Linux container.
+Current state: **233 tests in 16 files**. A run takes less than a second in the Linux container.
 
 ## 2. Configuration
 
@@ -40,11 +40,12 @@ Current state: **200 tests in 14 files**. A run takes less than a second in the 
 | `test/core.test.ts` | 16 | `words.json` parser, trailing comma, real fixture, `buildTranscript`, confidence, event classification, active word/segment, automatic defects, sentence-boundary pauses, manual marks, exact word boundaries, old marks without `wordIds`, logical marks |
 | `test/defectCardView.test.ts` | 7 | pending/confirmed/deleted card layout, candidate card, collapsing in skip mode, automatic group marker, manual badges and split visibility |
 | `test/engine.test.ts` | 8 | chunk planner (short recording, silence, max size, short first chunk, target), WAV reading, slicing, waveform |
-| `test/export.test.ts` | 6 | CSV field order, escaping, delimiter/header, cut vs defect bounds, uncut rows, all fields |
-| `test/format.test.ts` | 11 | number parsing (dot/comma/empty/partial), step snapping, float noise, display formatting, slider fill |
+| `test/export.test.ts` | 6 | CSV field order, escaping, delimiter/header, cut vs defect bounds, uncut rows, all fields; values are English (`filler`, `yes`/`no`) |
+| `test/format.test.ts` | 13 | number parsing (dot/comma/empty/partial), step snapping, float noise, display formatting (RU/EN), slider fill |
 | `test/grouping.test.ts` | 29 | per-type minimum duration, pause hard threshold and normalization, automatic grouping rules and limits, enabled types and id stability, grouping toggle and migration, per-type/group skip padding, settings normalization (padding, pause room tone, mini timeline, waveform contrast) |
 | `test/history.test.ts` | 10 | undo/redo by index, redo branch truncation, `mergeKey` coalescing, different keys, deleted-marks archive, rules and padding snapshots, `skipEnabled` preservation, rules equality, session guard and no cross-session coalescing |
-| `test/settingsHistory.test.ts` | 5 | labels and merge keys for rule/padding changes, fallback metadata, `skipEnabled` excluded |
+| `test/i18n.test.ts` | 20 | catalogue key parity and placeholders, no Cyrillic in English, interpolation/fallback, language normalization and system locale, plural categories, label helpers, locale-aware bytes/seconds/ETA, `uiLanguage` excluded from settings history, manual mark fallback text |
+| `test/settingsHistory.test.ts` | 5 | labels and merge keys for rule/padding changes, fallback metadata (RU/EN), `skipEnabled` excluded |
 | `test/marks.test.ts` | 14 | merge on add, split, logical mark ID, combined bounds/words/notes, confirmation reconciliation on merge/split, new marks, cut-span capture, edge-specific capture and nested override scope |
 | `test/selection.test.ts` | 39 | selection range in both directions, exact mark boundaries, exact time range, defect overlap, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, cut handle dragging, bulk confirmation/deletion of a selection, mini timeline zoom/pan and colored word mapping |
 | `test/skip.test.ts` | 27 | padding and interval merging, pause room tone and minimum cut, cut overrides, cut view hatching, complement and subtract ranges, all non-dismissed items, dismissed and candidate filtering, clamp/disabled, interval lookup |

@@ -4,6 +4,7 @@ import type { Defect } from '@shared/types'
 import { DEFECT_COLORS, defectByWordId } from '../defectsUi'
 import { seekTo } from '../player'
 import { useApp } from '../store'
+import { useT } from '../i18n'
 import { clampDefectEdge, chooseTickStep, type DefectEdge } from '../timelineView'
 import { buildWaveLut, computeWaveStats, waveAmp } from '../waveform'
 import { cutRangeFor, cutView, subtractRanges, type CutRange } from '../skip'
@@ -73,6 +74,7 @@ export default function MiniTimeline({
   const playback = useApp((state) => state.settings.playback)
   const setCutBounds = useApp((state) => state.setCutBounds)
   const resetCutBounds = useApp((state) => state.resetCutBounds)
+  const t = useT()
 
   const cut = useMemo(
     () => cutRangeFor(defect, playback, duration, project?.cutOverrides?.[defect.id]),
@@ -610,7 +612,7 @@ export default function MiniTimeline({
       <div
         className="mini-timeline-canvas"
         ref={wrapRef}
-        title={`${rangeLabel}. Потяните ручки выреза; Ctrl/⌘+колесо — масштаб, Shift+колесо — прокрутка. Двойной клик по ручке сбрасывает вырез, вне ручки — масштаб.`}
+        title={t('mini.gestureHint', { range: rangeLabel })}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -632,7 +634,7 @@ export default function MiniTimeline({
       {zoomed ? (
         <div
           className="mini-scrollbar"
-          title="Прокрутите или потяните ползунок"
+          title={t('mini.scrollHint')}
           onPointerDown={onScrollTrackDown}
         >
           <div
@@ -655,7 +657,7 @@ export default function MiniTimeline({
             type="button"
             onClick={() => zoomStep(-1)}
             disabled={zoom <= MINI_ZOOM_MIN + 1e-6}
-            title="Отдалить (минимум 1×)"
+            title={t('mini.zoomOut')}
           >
             −
           </button>
@@ -663,7 +665,7 @@ export default function MiniTimeline({
             type="button"
             onClick={() => zoomStep(1)}
             disabled={zoom >= MINI_ZOOM_MAX - 1e-6}
-            title="Приблизить (до 4×)"
+            title={t('mini.zoomIn')}
           >
             +
           </button>

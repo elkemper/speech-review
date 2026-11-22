@@ -1,16 +1,7 @@
-import type { Defect, DefectType, Severity } from '@shared/types'
+import { translate, type UiLanguage } from '@shared/i18n'
+import { defectTypeLabel } from '@shared/labels'
+import type { Defect, DefectType } from '@shared/types'
 import type { DefectCandidate } from '@shared/defects'
-
-export const DEFECT_LABELS: Record<DefectType, string> = {
-  filler: 'филлер',
-  pause: 'пауза',
-  repetition: 'повтор',
-  elongation: 'растяжка',
-  false_start: 'обрыв',
-  vocal_sound: 'звук',
-  unclear: 'неразборчиво',
-  manual: 'ручная метка'
-}
 
 export const DEFECT_COLORS: Record<DefectType, string> = {
   filler: '#f59e0b',
@@ -21,12 +12,6 @@ export const DEFECT_COLORS: Record<DefectType, string> = {
   vocal_sound: '#34d399',
   unclear: '#94a3b8',
   manual: '#eab308'
-}
-
-export const SEVERITY_LABELS: Record<Severity, string> = {
-  low: 'низкая',
-  medium: 'средняя',
-  high: 'высокая'
 }
 
 export const TYPE_ORDER: DefectType[] = [
@@ -44,14 +29,20 @@ export const TYPE_ORDER: DefectType[] = [
  * Tooltip for a word that only carries a hidden candidate. Such a word keeps
  * its kind styling hint but is not a defect and is not cut by skip mode.
  */
-export function candidateHint(candidate: DefectCandidate, minSec: number): string {
+export function candidateHint(
+  candidate: DefectCandidate,
+  minSec: number,
+  lang: UiLanguage
+): string {
+  const label = defectTypeLabel(lang, candidate.type)
   if (candidate.reason === 'type-disabled') {
-    return `${DEFECT_LABELS[candidate.type]} · тип выключен · не пропускается`
+    return `${label} · ${translate(lang, 'candidate.typeDisabled')}`
   }
   const measured = Math.max(0, candidate.measuredSec).toFixed(2)
-  return `${DEFECT_LABELS[candidate.type]} · ниже порога ${measured} c < ${minSec.toFixed(
-    2
-  )} c · не пропускается`
+  return `${label} · ${translate(lang, 'candidate.belowThreshold', {
+    measured,
+    min: minSec.toFixed(2)
+  })}`
 }
 
 /**

@@ -1,5 +1,7 @@
 export type Backend = 'metal' | 'cpu'
 export type ModelId = 'q8_0' | 'bf16' | 'q4_k'
+/** Interface language. `Settings.language` is the recognition language. */
+export type UiLanguage = 'ru' | 'en'
 
 export type WordKind = 'word' | 'filler' | 'vocal_sound' | 'event'
 
@@ -271,7 +273,10 @@ export interface PlaybackSettings {
 }
 
 export interface Settings {
+  /** Recognition (ASR) language passed to the engine. */
   language: string
+  /** Interface language for the renderer, menu and native dialogs. */
+  uiLanguage: UiLanguage
   modelId: ModelId
   backend: Backend
   rules: DefectRules

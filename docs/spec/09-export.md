@@ -23,12 +23,14 @@ Excel-friendly file whose base time columns are the final cut bounds.
 - Optional fields expose the original defect bounds (`defect_start_*`,
   `defect_end_*`) and a `cut` yes/no flag.
 - An uncut defect (for example a pause shorter than the kept room tone) has
-  empty cut cells and `cut = нет`.
+  empty cut cells and `cut = no`.
 - Delimiter `;` or `,`.
 - Optional header.
 - BOM `\uFEFF`, CRLF.
 - Escaping for quotes, delimiters and newlines.
 - Timecodes `HH:MM:SS.mmm`.
+- Type/severity names and `yes`/`no` values are English and do not depend on
+  the interface language ([story 52](12-i18n.md)).
 
 ### Story 39 — JSON export with full data
 
@@ -88,7 +90,7 @@ resolution, quality and encoder.
 - [ ] Timecodes are fixed-width.
 - [ ] Base time fields use the final cut; optional fields use the original
       defect bounds.
-- [ ] An uncut defect has empty cut cells and `cut = нет`.
+- [ ] An uncut defect has empty cut cells and `cut = no`.
 - [ ] Export uses the current open project's defects and marks.
 
 ### Story 39

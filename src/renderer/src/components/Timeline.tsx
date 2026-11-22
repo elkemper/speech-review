@@ -13,6 +13,7 @@ import {
 } from '../skip'
 import { hatchPattern, TRACK_BG, TRACK_BG_LIGHT } from '../hatch'
 import { useApp } from '../store'
+import { useT } from '../i18n'
 import { buildWaveLut, computeWaveStats, waveAmp } from '../waveform'
 import {
   chooseTickStep,
@@ -54,6 +55,7 @@ export default function Timeline({
   const selectTimeRange = useApp((state) => state.selectTimeRange)
   const clearSelection = useApp((state) => state.clearSelection)
   const setFollow = useApp((state) => state.setFollow)
+  const t = useT()
 
   const HEIGHT = Math.max(64, Math.round(height))
   const bookmarks = project?.bookmarks ?? []
@@ -686,7 +688,7 @@ export default function Timeline({
   const selectedLabel = timeSelection
     ? `${formatTimecode(timeSelection.start, true)}–${formatTimecode(timeSelection.end, true)}`
     : selectedRange
-      ? `выделено ${selectedRange.wordIds.length} слов`
+      ? t('timeline.selectedWords', { count: selectedRange.wordIds.length })
       : `${formatTimecode(view.start)}–${formatTimecode(view.end)}`
 
   return (
@@ -710,20 +712,20 @@ export default function Timeline({
         setHover(null)
         if (!boundaryRef.current) setHandleHover(null)
       }}
-      title="Клик — перемотка, Shift+драг — выделение области, Ctrl/⌘+колесо — зум, прокрутка — панорама. Ручки двигают границы выреза; двойной клик по ручке сбрасывает вырез."
+      title={t('timeline.gestureHint')}
     >
       <canvas ref={canvasRef} />
       <div
         className="timeline-tools"
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <button onClick={() => zoomBy(1.8)} title="Приблизить">
+        <button onClick={() => zoomBy(1.8)} title={t('timeline.zoomIn')}>
           +
         </button>
-        <button onClick={() => zoomBy(1 / 1.8)} title="Отдалить">
+        <button onClick={() => zoomBy(1 / 1.8)} title={t('timeline.zoomOut')}>
           −
         </button>
-        <button onClick={() => setView(fitView(duration))} title="Вся запись">
+        <button onClick={() => setView(fitView(duration))} title={t('timeline.fit')}>
           ⤢
         </button>
         <span className="timeline-scale">{selectedLabel}</span>
