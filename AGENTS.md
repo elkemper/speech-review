@@ -36,7 +36,7 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 - **Filler lexicons follow the recognition language.** `FILLER_LEXICONS` in `src/shared/defects.ts` holds the RU and EN lists; `Settings.language` selects one, never `Settings.uiLanguage`. Keep both lists in sync with any new filler; see `docs/DATA_MODEL.md` §6.
 - **Word confidence / `unclear` is backlog.** `audiocpp_cli` currently writes `confidence: 0`. The parser stores `null` when no positive confidence exists and the `unclear` rule is disabled. Do not enable it by default or treat `0` as a low-confidence signal.
 - **Skip mode cuts every defect and manual mark except dismissed ones.** Confirmation does not decide whether an item is cut; it freezes the cut range at confirmation time. See `src/shared/cuts.ts`.
-- **Video export uses the same cut list.** `buildCutList` plus `complementRanges` are the only source of exported ranges; do not introduce a second cut model. Export always re-encodes, so cuts are frame-accurate. Audio-only export is deferred.
+- **Video export uses the same cut list.** `buildCutList` plus `complementRanges` are the only source of exported ranges; do not introduce a second cut model. Export always re-encodes, so cuts are frame-accurate. The export plan merges a kept fragment shorter than two crossfade lengths into the cut (export-time only; the project's cut list is unchanged), because two fades cannot fit inside it. Audio-only export is deferred.
 - **Do not silently change defect-lifecycle semantics.** Automatic defect IDs are derived from the type and the covered words; manual marks have explicit group IDs; confirmed state is reconciled when marks merge/split; deleted manual marks live in `dismissedMarks`, deleted automatic IDs in `dismissedDefectIds`. See `docs/DATA_MODEL.md`.
 - **History is for editable project state only:** marks, confirmed IDs, dismissed IDs, dismissed marks, notes, cut overrides, the project defect rules and the skip padding that drives recalculation. Do not put skip mode, playback position, filters, selection, transcript, model/recognition language/interface language (`uiLanguage`)/export or UI-only settings into undo/redo snapshots. While the settings dialog is open, undo is limited to settings changes made since it was opened.
 - **Schema changes go through numbered migrations.** A renamed or removed field, or a one-time conversion, gets a step in `src/shared/projectMigrations.ts` or `src/shared/settingsMigrations.ts`, a bumped version constant and a test. Filling a new field with a default is not a migration: keep that in `normalizeRules` / `normalizePlaybackSettings`. See `docs/DATA_MODEL.md` §11.
@@ -56,10 +56,13 @@ src/
 │   ├── paths.ts          userData, resources, models, projects, tmp paths
 │   ├── mediaServer.ts    app-media:// protocol with HTTP Range support
 │   ├── export.ts         CSV/JSON save dialog and file writing
-│   ├── videoExport.ts    video export dialog, ffmpeg args, progress and cancel
+│   ├── videoExport.ts    export dialog, ports wiring, localized errors
 │   └── engine/
+│       ├── audioMix.ts   streaming PCM cut and crossfade mixer
 │       ├── chunks.ts     silence-aware chunk planner
 │       ├── crisperwhisper.ts  audiocpp_cli invocation and words.json parsing
+│       ├── exportJob.ts  export validation and plan resolution
+│       ├── exportPipeline.ts  export stages behind injected ports
 │       ├── ffmpeg.ts     probe, audio extraction, silencedetect
 │       ├── models.ts     model download, SHA-256, delete, state
 │       ├── proc.ts       child-process wrapper with abort support
@@ -96,6 +99,7 @@ src/
                           SettingsRangeField, HistoryDialog, VideoExportDialog
 scripts/                  engine/ffmpeg fetch, platform/resource checks, after-pack
 test/                     Vitest suites and fixtures
+test/integration/         opt-in real-ffmpeg export suite (`npm run test:integration`)
 ```
 
 ## Commands
@@ -103,7 +107,8 @@ test/                     Vitest suites and fixtures
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | `tsc --noEmit` for node and web configs |
-| `npm test` | Vitest run (296 tests / 25 files) |
+| `npm test` | Vitest run (345 tests / 29 files) |
+| `npm run test:integration` | opt-in real-ffmpeg export suite (18 tests; needs a runnable ffmpeg) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run build` | electron-vite production build into `out/` |
 | `npm run dev` | electron-vite dev + Electron |
@@ -122,6 +127,10 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+If the export pipeline, plan or filter graph changed, also run
+`npm run test:integration` where a runnable ffmpeg is available; report it as
+skipped, not passed, when it was not run.
 
 If you changed UI behavior or runtime code, verify it by running the app with `npm run dev` on macOS, including real media playback, transcription and export. If you could not run a check, say explicitly which runtime checks were not performed. Never claim a runtime check that did not happen.
 
@@ -162,7 +171,12 @@ If you changed UI behavior or runtime code, verify it by running the app with `n
 - Tests live in `test/**/*.test.ts`; Vitest includes only that pattern.
 - Add regression tests for every pure rule change: defect detection, automatic grouping, per-type minimum duration, chunk planning, marks/groups, confirmation reconciliation, cut ranges and overrides, selection, timeline math, skip intervals and padding, settings normalization, CSV.
 - Tests may import renderer helpers by relative path (for example `../src/renderer/src/skip`); the only configured alias is `@shared`.
-- Do not add e2e or Electron launch tests. If behavior depends on Electron, extract the pure part and test that.
+- Do not launch Electron in tests. If behavior depends on Electron, extract the
+  pure part and test that. The one exception is the opt-in
+  `test/integration/**/*.int.test.ts` suite: it runs the real export pipeline
+  against real ffmpeg (not Electron), is excluded from `npm test`, and must
+  keep reporting "skipped" on a host without a runnable ffmpeg rather than
+  failing.
 - Keep the sample fixture expectations intact unless the fixture itself is intentionally replaced: the current `test/fixtures/chunk.json` produces 6 fillers, 3 pauses and 1 false start (10 defects).
 
 ## Runtime and platform caveats

@@ -6,6 +6,7 @@ import type {
   ExportRequest,
   MediaInfo,
   MediaRegistration,
+  MediaStreamInfo,
   ModelDownloadProgress,
   ModelId,
   ModelStateInfo,
@@ -41,6 +42,8 @@ const api: AppApi = {
   openVideo: (): Promise<MediaInfo | null> => ipcRenderer.invoke(IPC.mediaOpen),
   openVideoPath: (path: string): Promise<MediaInfo | null> =>
     ipcRenderer.invoke(IPC.mediaOpenPath, path),
+  probeVideo: (path: string): Promise<MediaStreamInfo | null> =>
+    ipcRenderer.invoke(IPC.mediaProbe, path),
   pathForFile: (file: File): string => webUtils.getPathForFile(file),
   registerMedia: (path: string): Promise<MediaRegistration> =>
     ipcRenderer.invoke(IPC.mediaRegister, path),

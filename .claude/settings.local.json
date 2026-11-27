@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(npx vitest *)",
+      "Bash(npm run *)",
+      "Bash(SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npx vitest run --config vitest.integration.config.mts)",
+      "Bash(SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npm run test:integration)",
+      "Bash(python3 -)",
+      "Bash(SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npx vitest run --config vitest.integration.config.mts -t \"re-encodes the whole source\")",
+      "Bash(python3 -I gen.py)",
+      "Bash(python3 -I proto.py)",
+      "Bash(python3 -I -)",
+      "Bash(SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npx vitest run --config vitest.integration.config.mts test/integration/scratch.int.test.ts)",
+      "Bash(python3 -I -c ' *)",
+      "Bash(SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npx vitest run --config vitest.integration.config.mts --silent=false test/integration/scratch.int.test.ts 2>&1 | grep -E 'plan |decoded|frame |source last|export last|audio time|video |Tests|stdout' | head -40)",
+      "Bash(python3 *)",
+      "Bash(npx tsc *)",
+      "Bash(KEEP_SCRATCH=1 SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npx vitest run --config vitest.integration.config.mts --silent=false test/integration/scratch.int.test.ts 2>&1 | grep -E 'KEPT|Tests|last audio')",
+      "Bash(node -e ' *)",
+      "Bash(SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npx vitest run --config vitest.integration.config.mts test/integration/content.int.test.ts)"
+    ]
+  }
+}

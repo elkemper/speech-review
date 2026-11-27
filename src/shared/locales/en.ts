@@ -413,6 +413,10 @@ export const en: Record<MessageKey, string> = {
   'videoExport.resolution': 'Resolution',
   'videoExport.quality': 'Quality',
   'videoExport.encoder': 'Encoder',
+  'videoExport.crossfade': 'Crossfade at cuts',
+  'videoExport.crossfadeSec': 'Crossfade length',
+  'videoExport.crossfadeHint':
+    'Blends the audio and video at every join. The export gets shorter by this amount per cut; a kept fragment shorter than two crossfades is cut away.',
   'videoExport.softwareGroup': 'Software · CRF',
   'videoExport.hardwareGroup': 'Hardware · VideoToolbox',
   'videoExport.progress': 'Progress',
@@ -550,6 +554,7 @@ export const en: Record<MessageKey, string> = {
   'error.videoExportFailed': 'ffmpeg could not export the video:\n{details}',
   'error.videoNoOutput': 'ffmpeg finished without a result file',
   'error.videoNoFragments': 'No fragments to export',
+  'error.videoFpsUnknown': 'Could not determine the source frame rate',
   'error.recognitionRunning': 'Recognition is already running for this project',
   'error.noVideoPath': 'The project has no video file',
   'error.engineMissing':
@@ -597,6 +602,7 @@ export const en: Record<MessageKey, string> = {
   'progress.modelDownloaded': 'Model downloaded',
   'progress.modelDownloading': 'Downloading the model… {percent}%',
   'progress.videoPrepare': 'Checking the source file…',
+  'progress.videoAudio': 'Preparing audio…',
   'progress.videoRender': 'Encoding video…',
   'progress.videoDone': 'Done',
   'progress.exportPrepare': 'Preparing…'

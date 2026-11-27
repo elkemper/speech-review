@@ -4,6 +4,7 @@ export const IPC = {
   settingsSave: 'settings:save',
   mediaOpen: 'media:open',
   mediaOpenPath: 'media:open-path',
+  mediaProbe: 'media:probe',
   mediaRegister: 'media:register',
   projectsList: 'projects:list',
   projectsCreate: 'projects:create',

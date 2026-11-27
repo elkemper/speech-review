@@ -410,6 +410,10 @@ export const ru = {
   'videoExport.resolution': 'Разрешение',
   'videoExport.quality': 'Качество',
   'videoExport.encoder': 'Энкодер',
+  'videoExport.crossfade': 'Кроссфейд на стыках',
+  'videoExport.crossfadeSec': 'Длина кроссфейда',
+  'videoExport.crossfadeHint':
+    'Плавно смешивает звук и видео на каждом стыке. Ролик становится короче на эту величину на каждый вырез; оставленный кусок короче двух кроссфейдов вырезается целиком.',
   'videoExport.softwareGroup': 'Программные · CRF',
   'videoExport.hardwareGroup': 'Аппаратные · VideoToolbox',
   'videoExport.progress': 'Прогресс',
@@ -547,6 +551,7 @@ export const ru = {
   'error.videoExportFailed': 'ffmpeg не смог экспортировать видео:\n{details}',
   'error.videoNoOutput': 'ffmpeg завершился без файла результата',
   'error.videoNoFragments': 'Нет фрагментов для экспорта',
+  'error.videoFpsUnknown': 'Не удалось определить частоту кадров исходного видео',
   'error.recognitionRunning': 'Для этого проекта уже идёт распознавание',
   'error.noVideoPath': 'В проекте не указан видеофайл',
   'error.engineMissing':
@@ -594,6 +599,7 @@ export const ru = {
   'progress.modelDownloaded': 'Модель скачана',
   'progress.modelDownloading': 'Скачиваю модель… {percent}%',
   'progress.videoPrepare': 'Проверяю исходный файл…',
+  'progress.videoAudio': 'Готовлю звук…',
   'progress.videoRender': 'Кодирую видео…',
   'progress.videoDone': 'Готово',
   'progress.exportPrepare': 'Подготовка…'

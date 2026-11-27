@@ -7,19 +7,23 @@ import {
 } from '@shared/labels'
 import {
   DEFAULT_VIDEO_EXPORT_SETTINGS,
+  MAX_VIDEO_CROSSFADE_SEC,
+  MIN_VIDEO_CROSSFADE_SEC,
   VIDEO_EXPORT_ENCODERS,
   VIDEO_EXPORT_QUALITIES,
   VIDEO_EXPORT_RESOLUTIONS
 } from '@shared/settings'
 import type {
   Defect,
+  MediaStreamInfo,
   VideoExportProgress,
   VideoExportSettings
 } from '@shared/types'
-import { videoQualityLabel } from '@shared/videoExport'
+import { buildExportPlan, videoQualityLabel } from '@shared/videoExport'
 import { buildCutList, complementRanges } from '../skip'
 import { useApp } from '../store'
 import { useT, useUiLanguage } from '../i18n'
+import { RangeField } from './SettingsRangeField'
 
 function cleanError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
@@ -48,6 +52,7 @@ export default function VideoExportDialog({
   const [progress, setProgress] = useState<VideoExportProgress | null>(null)
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [media, setMedia] = useState<MediaStreamInfo | null>(null)
   const startingRef = useRef(false)
 
   const exportable = useMemo(
@@ -74,7 +79,41 @@ export default function VideoExportDialog({
     (total, range) => total + Math.max(0, range.end - range.start),
     0
   )
-  const cutSec = Math.max(0, (project?.duration ?? 0) - keepSec)
+
+  // The summary must match the file, not the raw cut list: the crossfade
+  // shortens every join and merges fragments shorter than two fades. One
+  // ffprobe gives the frame rate and sample rate, then the same plan the
+  // export resolves is built here. Until it answers, the cut-list total stands.
+  useEffect(() => {
+    const path = project?.video.path
+    if (!path) return
+    let cancelled = false
+    setMedia(null)
+    window.api
+      .probeVideo(path)
+      .then((info) => {
+        if (!cancelled) setMedia(info)
+      })
+      .catch(() => {
+        if (!cancelled) setMedia(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [project?.video.path])
+
+  const plan = useMemo(() => {
+    if (!project || !media || !(media.fps > 0) || keep.length === 0) return null
+    return buildExportPlan(
+      keep,
+      media.fps,
+      media.sampleRate || 48000,
+      options.crossfade ? options.crossfadeSec : 0
+    )
+  }, [keep, media, project, options.crossfade, options.crossfadeSec])
+
+  const exportedSec = plan ? plan.audioSamples / plan.sampleRate : keepSec
+  const cutSec = Math.max(0, (project?.duration ?? 0) - exportedSec)
   const nothingToExport = keep.length === 0
 
   useEffect(() => {
@@ -114,7 +153,7 @@ export default function VideoExportDialog({
       phase: 'prepare',
       percent: 0,
       processedSec: 0,
-      totalSec: keepSec,
+      totalSec: exportedSec,
       message: t('videoExport.prepare')
     })
 
@@ -189,7 +228,7 @@ export default function VideoExportDialog({
                 {t('videoExport.cut')} <strong>{formatDuration(cutSec)}</strong>
               </span>
               <span>
-                {t('videoExport.keep')} <strong>{formatDuration(keepSec)}</strong>
+                {t('videoExport.keep')} <strong>{formatDuration(exportedSec)}</strong>
               </span>
             </div>
             {nothingToExport ? (
@@ -277,6 +316,35 @@ export default function VideoExportDialog({
                 </optgroup>
               </select>
             </label>
+
+            <div className="field">
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={options.crossfade}
+                  disabled={running}
+                  onChange={(event) => setOption('crossfade', event.target.checked)}
+                />
+                <span>{t('videoExport.crossfade')}</span>
+              </label>
+              {options.crossfade ? (
+                <>
+                  <RangeField
+                    label={t('videoExport.crossfadeSec')}
+                    value={options.crossfadeSec}
+                    min={MIN_VIDEO_CROSSFADE_SEC}
+                    max={MAX_VIDEO_CROSSFADE_SEC}
+                    step={0.01}
+                    suffix={t('common.secondsSuffix')}
+                    disabled={running}
+                    compact
+                    ariaLabel={t('videoExport.crossfadeSec')}
+                    onChange={(value) => setOption('crossfadeSec', value)}
+                  />
+                  <div className="muted small">{t('videoExport.crossfadeHint')}</div>
+                </>
+              ) : null}
+            </div>
           </section>
 
           {running || progress ? (

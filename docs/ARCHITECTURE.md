@@ -60,7 +60,7 @@ User-facing features are listed in `README.md`; the requirement index is `docs/S
 | App shell | `src/main/index.ts`, `src/preload/index.ts`, `src/renderer/src/App.tsx`, `src/renderer/src/components/Welcome.tsx`, `src/renderer/src/components/Workspace.tsx` | lifecycle, window, menu, typed bridge, entry screen and main grid |
 | IPC and persistence | `src/main/ipc.ts`, `src/main/projects.ts`, `src/main/settings.ts`, `src/main/paths.ts`, `src/main/export.ts`, `src/main/videoExport.ts` | handlers and dialogs, project files, settings normalization, paths, CSV/JSON/video export |
 | Media | `src/main/mediaServer.ts` | privileged `app-media://` scheme with Range support |
-| Engine | `src/main/engine/ffmpeg.ts`, `chunks.ts`, `wav.ts`, `models.ts`, `crisperwhisper.ts`, `proc.ts` | probe/extract/silence, chunk plan, WAV slicing/peaks, model state, CLI invocation, child processes |
+| Engine | `src/main/engine/ffmpeg.ts`, `chunks.ts`, `wav.ts`, `models.ts`, `crisperwhisper.ts`, `proc.ts`, `audioMix.ts`, `exportJob.ts`, `exportPipeline.ts` | probe/extract/silence, chunk plan, WAV slicing/peaks, model state, CLI invocation, child processes, export validation and plan resolution, export stages behind injected ports, PCM cut/crossfade mixing |
 | Shared domain | `src/shared/types.ts`, `transcript.ts`, `defects.ts`, `marks.ts`, `settings.ts`, `models.ts`, `exportCsv.ts`, `videoExport.ts`, `format.ts`, `i18n.ts`, `locales/`, `labels.ts`, `ipc.ts`, `api.ts` | canonical types, pure rules, parsing, export and formatting, typed RU/EN catalogue and language-aware labels |
 | Renderer state | `src/renderer/src/store.ts`, `history.ts`, `settingsHistory.ts` | app state, save orchestration, undo/redo snapshots and settings labels |
 | Renderer logic | `src/renderer/src/player.ts`, `skip.ts`, `selection.ts`, `timelineView.ts`, `defectsUi.ts`, `defectCardView.ts`, `miniTimeline.ts`, `waveform.ts`, `hooks/useHotkeys.ts` | playback control, intervals, selection, timeline math, labels/cards, mini window, waveform, hotkeys |
@@ -140,7 +140,7 @@ transcript + rules + marks
 - `src/shared/migrations.ts` is the schema-migration runner; `projectMigrations.ts` and `settingsMigrations.ts` hold the numbered steps for the two state files. See `DATA_MODEL.md` §11.
 - `Project` is the source of truth for editable state: marks, cut overrides, confirmed IDs, dismissed IDs/marks, notes, rules and skip padding.
 - History (`history.ts`) snapshots only that editable state; `skipEnabled` is player state. See `docs/SPEC.md` (story 32/47) and `DATA_MODEL.md` §9.
-- `src/renderer/src/skip.ts` re-exports `shared/cuts.ts`. `buildCutList` derives every non-dismissed cut, applies per-type or group padding plus the pause room tone, clamps to the duration and merges overlaps; it does not depend on skip mode. `buildSkipIntervals` is the same list only while skip mode is on. Video export uses the same list through `complementRanges`.
+- `src/renderer/src/skip.ts` re-exports `shared/cuts.ts`. `buildCutList` derives every non-dismissed cut, applies per-type or group padding plus the pause room tone, clamps to the duration and merges overlaps; it does not depend on skip mode. `buildSkipIntervals` is the same list only while skip mode is on. Video export uses the same list through `complementRanges`. The export plan may additionally merge a kept fragment shorter than two crossfade lengths into the cut — an export-time adaptation, not a change to the project's cut list.
 - A revealed minimum-duration candidate is computed from the active ID and disappears when selection changes; only an explicit cut edit, confirmation, deletion or note promotes it into project state.
 
 The rules themselves — thresholds, enable flags, grouping conditions, candidate promotion and confirmation semantics — are specified in `docs/spec/02-defects.md` and `docs/spec/03-marks.md` and stored as described in `DATA_MODEL.md` §6–8. Do not restate them here.
@@ -166,7 +166,7 @@ Main IPC groups:
 | Group | Channels |
 |---|---|
 | Engine/settings | `engine:status`, `settings:get`, `settings:save` |
-| Media | `media:open`, `media:open-path`, `media:register` |
+| Media | `media:open`, `media:open-path`, `media:probe`, `media:register` |
 | Projects | `projects:list`, `projects:create`, `projects:load`, `projects:save`, `projects:delete` |
 | Transcription | `transcribe:start`, `transcribe:cancel`; events: `transcribe:progress`, `transcribe:partial`, `transcribe:done`, `transcribe:error` |
 | Models | `models:download`, `models:state`, `models:delete`, `models:check-updates`; event: `models:progress` |

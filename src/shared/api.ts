@@ -5,6 +5,7 @@ import type {
   ManualMark,
   MediaInfo,
   MediaRegistration,
+  MediaStreamInfo,
   ModelDownloadProgress,
   ModelId,
   ModelStateInfo,
@@ -30,6 +31,8 @@ export interface AppApi {
 
   openVideo(): Promise<MediaInfo | null>
   openVideoPath(path: string): Promise<MediaInfo | null>
+  /** Frame rate and sample rate for the export dialog's length preview. */
+  probeVideo(path: string): Promise<MediaStreamInfo | null>
   pathForFile(file: File): string
   registerMedia(path: string): Promise<MediaRegistration>
 

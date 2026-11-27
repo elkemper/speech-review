@@ -1,20 +1,21 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import { constants } from 'node:fs'
-import { access, mkdtemp, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { access } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { extname, join, resolve } from 'node:path'
+import { extname, join } from 'node:path'
 import { translate } from '@shared/i18n'
-import { normalizeVideoExportSettings } from '@shared/settings'
 import type { VideoExportProgress, VideoExportRequest } from '@shared/types'
+import { videoKeepRanges } from '@shared/videoExport'
+import { ffmpegPorts } from './engine/ffmpegPorts'
 import {
-  buildReencodeArgs,
-  buildVideoFilterGraph,
-  exportDuration,
-  parseFfmpegOutTime,
-  videoKeepRanges
-} from '@shared/videoExport'
+  ExportError,
+  resolveExportJob,
+  validateExportSource,
+  type ExportErrorCode,
+  type ExportMedia
+} from './engine/exportJob'
+import { runExport, type ExportProgressEvent } from './engine/exportPipeline'
 import { probeMedia } from './engine/ffmpeg'
-import { runProcess, tail } from './engine/proc'
 import { ffmpegBinary, tempDir } from './paths'
 import { currentUiLanguage } from './uiLanguage'
 
@@ -25,8 +26,41 @@ function t(key: Parameters<typeof translate>[1], params?: Parameters<typeof tran
   return translate(currentUiLanguage(), key, params)
 }
 
-export function cancelVideoExport(): void {
-  active?.abort()
+/** Codes that carry ffmpeg's stderr into the message. */
+const DETAILED_ERRORS: ReadonlySet<ExportErrorCode> = new Set([
+  'decodeFailed',
+  'renderFailed',
+  'mediaFailed'
+])
+
+const ERROR_KEYS: Record<ExportErrorCode, Parameters<typeof translate>[1]> = {
+  noFragments: 'error.videoNoFragments',
+  noVideoTrack: 'error.noVideoTrack',
+  noAudioTrack: 'error.noAudioTrack',
+  fpsUnknown: 'error.videoFpsUnknown',
+  videoFormat: 'error.videoFormat',
+  overwriteSource: 'error.overwriteSource',
+  decodeFailed: 'error.videoExportFailed',
+  renderFailed: 'error.videoExportFailed',
+  mediaFailed: 'error.videoExportFailed',
+  noOutput: 'error.videoNoOutput'
+}
+
+/** The only place an export failure becomes user-facing text. */
+function errorMessage(code: ExportErrorCode, details?: string): string {
+  const key = ERROR_KEYS[code]
+  return DETAILED_ERRORS.has(code) ? t(key, { details: details ?? '' }) : t(key)
+}
+
+const STEP_KEYS = {
+  decode: 'progress.videoPrepare',
+  mix: 'progress.videoAudio'
+} as const
+
+function progressMessage(event: ExportProgressEvent): string {
+  if (event.phase === 'render') return t('progress.videoRender')
+  if (event.phase === 'finalize') return t('progress.videoDone')
+  return t(STEP_KEYS[event.step ?? 'decode'])
 }
 
 function safeName(name: string): string {
@@ -51,6 +85,7 @@ function temporaryOutputPath(output: string): string {
   return `${base}.part-${randomUUID()}${extension}`
 }
 
+
 async function runVideoExport(
   window: BrowserWindow | null,
   request: VideoExportRequest,
@@ -61,42 +96,32 @@ async function runVideoExport(
     throw new Error(t('error.ffmpegMissing'))
   }
 
-  const settings = normalizeVideoExportSettings(request.settings)
+  // Validate the source before asking for a destination: a file with no video
+  // track should fail without opening a save dialog.
   const keep = videoKeepRanges(request.cuts, request.duration)
-  if (keep.length === 0) {
-    throw new Error(t('error.videoNoFragments'))
-  }
-  const totalSec = exportDuration(keep)
-
-  onProgress({
-    projectId: request.projectId,
-    phase: 'prepare',
-    percent: 0,
-    processedSec: 0,
-    totalSec,
-    message: t('progress.videoPrepare')
-  })
-
+  if (keep.length === 0) throw new Error(errorMessage('noFragments'))
   const probe = await probeMedia(ffmpeg, request.videoPath)
-  if (!probe.hasVideo) {
-    throw new Error(t('error.noVideoTrack'))
+  const media: ExportMedia = {
+    hasVideo: probe.hasVideo,
+    hasAudio: probe.hasAudio,
+    fps: probe.fps,
+    sampleRate: probe.sampleRate
   }
-  if (!probe.hasAudio) {
-    throw new Error(t('error.noAudioTrack'))
-  }
+  const invalid = validateExportSource(keep, media)
+  if (invalid) throw new Error(errorMessage(invalid))
 
+  const settings = request.settings
   const extension = '.mp4'
-  const filters = [
-    { name: 'MP4', extensions: ['mp4'] },
-    { name: 'MOV', extensions: ['mov'] }
-  ]
   const saveOptions = {
     title: t('dialog.exportVideo'),
     defaultPath: join(
       app.getPath('downloads'),
       `${safeName(request.projectName)}-clean${extension}`
     ),
-    filters
+    filters: [
+      { name: 'MP4', extensions: ['mp4'] },
+      { name: 'MOV', extensions: ['mov'] }
+    ]
   }
   const result = window
     ? await dialog.showSaveDialog(window, saveOptions)
@@ -104,106 +129,46 @@ async function runVideoExport(
   if (result.canceled || !result.filePath) return null
 
   const output = ensureExtension(result.filePath, extension)
-  if (resolve(output) === resolve(request.videoPath)) {
-    throw new Error(t('error.overwriteSource'))
-  }
-  if (!['.mp4', '.m4v', '.mov'].includes(extname(output).toLowerCase())) {
-    throw new Error(t('error.videoFormat'))
-  }
+  const resolved = resolveExportJob({
+    videoPath: request.videoPath,
+    outputPath: output,
+    temporaryPath: temporaryOutputPath(output),
+    cuts: request.cuts,
+    duration: request.duration,
+    media,
+    settings
+  })
+  if (!resolved.ok) throw new Error(errorMessage(resolved.code))
 
-  const workDir = await mkdtemp(join(tempDir(), 'video-export-'))
-  const temporary = temporaryOutputPath(output)
   const controller = new AbortController()
   active = controller
-
   try {
-    const filterScript = join(workDir, 'filter.txt')
-    await writeFile(
-      filterScript,
-      buildVideoFilterGraph(keep, settings.resolution, currentUiLanguage()),
-      'utf8'
-    )
-    const args = buildReencodeArgs({
-      input: request.videoPath,
-      output: temporary,
-      filterScriptPath: filterScript,
-      settings
-    })
-
-    const message = t('progress.videoRender')
-    onProgress({
-      projectId: request.projectId,
-      phase: 'render',
-      percent: 0,
-      processedSec: 0,
-      totalSec,
-      message
-    })
-
-    let buffer = ''
-    let lastPercent = -1
-    const finished = await runProcess(ffmpeg, args, {
+    return await runExport({
+      job: resolved.job,
+      ports: ffmpegPorts(ffmpeg, tempDir()),
       signal: controller.signal,
-      onStdout: (chunk) => {
-        buffer += chunk
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-        for (const line of lines) {
-          const processedSec = parseFfmpegOutTime(line)
-          if (processedSec === null) continue
-          const percent =
-            totalSec > 0
-              ? Math.max(0, Math.min(99, Math.floor((processedSec / totalSec) * 100)))
-              : 0
-          if (percent === lastPercent) continue
-          lastPercent = percent
-          onProgress({
-            projectId: request.projectId,
-            phase: 'render',
-            percent,
-            processedSec,
-            totalSec,
-            message
-          })
-        }
-      }
-    })
-
-    if (finished.code !== 0) {
-      throw new Error(
-        t('error.videoExportFailed', {
-          details: tail(finished.stderr, 12) || `${finished.code}`
+      onProgress: (event) =>
+        onProgress({
+          projectId: request.projectId,
+          phase: event.phase,
+          percent: event.percent,
+          processedSec: event.processedSec,
+          totalSec: event.totalSec,
+          message: progressMessage(event)
         })
-      )
-    }
-    if (controller.signal.aborted) {
-      await rm(temporary, { force: true }).catch(() => undefined)
-      return null
-    }
-
-    const info = await stat(temporary).catch(() => null)
-    if (!info || info.size <= 0) {
-      throw new Error(t('error.videoNoOutput'))
-    }
-    await rename(temporary, output)
-
-    onProgress({
-      projectId: request.projectId,
-      phase: 'finalize',
-      percent: 100,
-      processedSec: totalSec,
-      totalSec,
-      message: t('progress.videoDone')
     })
-    return output
   } catch (error) {
-    await rm(temporary, { force: true }).catch(() => undefined)
-    if (controller.signal.aborted) return null
+    if (error instanceof ExportError) {
+      throw new Error(errorMessage(error.code, error.details))
+    }
     throw error
   } finally {
     if (active === controller) active = null
-    await rm(workDir, { recursive: true, force: true }).catch(() => undefined)
   }
+}
+
+export function cancelVideoExport(): void {
+  active?.abort()
 }
 
 export async function exportVideo(

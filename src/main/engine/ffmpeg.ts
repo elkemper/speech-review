@@ -1,4 +1,5 @@
 import { translate } from '@shared/i18n'
+import { snapFrameRate } from '@shared/videoExport'
 import { runProcess, tail } from './proc'
 import { currentUiLanguage } from '../uiLanguage'
 
@@ -15,10 +16,25 @@ function parseDurationLine(text: string): number | null {
   return Number(h) * 3600 + Number(m) * 60 + Number(s)
 }
 
+/** `30000/1001` and `25` are both accepted; returns 0 when unknown. */
+function parseRate(text: string): number {
+  const [numerator, denominator] = text.split('/')
+  const top = Number(numerator)
+  const bottom = denominator === undefined ? 1 : Number(denominator)
+  if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= 0) return 0
+  return snapFrameRate(top / bottom)
+}
+
 export interface ProbeResult {
   duration: number
   hasAudio: boolean
   hasVideo: boolean
+  /** Frame rate of the first video stream; 0 when unknown. */
+  fps: number
+  /** Sample rate of the first audio stream; 0 when unknown. */
+  sampleRate: number
+  /** Channel count of the first audio stream; 0 when unknown. */
+  channels: number
 }
 
 export async function probeMedia(ffmpeg: string, input: string, signal?: AbortSignal): Promise<ProbeResult> {
@@ -34,11 +50,27 @@ export async function probeMedia(ffmpeg: string, input: string, signal?: AbortSi
   const videoLines = result.stderr
     .split('\n')
     .filter((line) => /Stream #\d+:\d+.*: Video:/i.test(line))
+  const audioLine = result.stderr
+    .split('\n')
+    .find((line) => /Stream #\d+:\d+.*: Audio:/i.test(line))
+  const fpsMatch = videoLines.length > 0 ? /(\d+(?:\.\d+)?|\d+\/\d+)\s*fps/.exec(videoLines[0]) : null
+  const rateMatch = audioLine ? /(\d+)\s*Hz/.exec(audioLine) : null
+  const channelsMatch = audioLine ? /\b(mono|stereo|(\d+) channels)\b/.exec(audioLine) : null
+  const channels = channelsMatch
+    ? channelsMatch[1] === 'mono'
+      ? 1
+      : channelsMatch[1] === 'stereo'
+        ? 2
+        : Number(channelsMatch[2])
+    : 0
   return {
     duration,
-    hasAudio: /Stream #\d+:\d+.*: Audio:/i.test(result.stderr),
+    hasAudio: audioLine !== undefined,
     // Cover art in an audio file is a video stream with `(attached pic)`.
-    hasVideo: videoLines.some((line) => !/\(attached pic\)/i.test(line))
+    hasVideo: videoLines.some((line) => !/\(attached pic\)/i.test(line)),
+    fps: fpsMatch ? parseRate(fpsMatch[1]) : 0,
+    sampleRate: rateMatch ? Number(rateMatch[1]) : 0,
+    channels
   }
 }
 

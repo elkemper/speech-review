@@ -5,13 +5,15 @@ The project has only unit tests for pure logic. There are no e2e tests or Electr
 ## 1. Commands
 
 ```bash
-npm test              # single run
-npm run test:watch    # watch mode
-npm run typecheck     # checks main/preload/shared and renderer types separately
-npm run build         # checks that the production build succeeds
+npm test                # single run
+npm run test:watch      # watch mode
+npm run test:integration  # real ffmpeg, opt-in (see §2.1)
+npm run typecheck       # checks main/preload/shared and renderer types separately
+npm run build           # checks that the production build succeeds
 ```
 
-Current state: **296 tests in 25 files**. A run takes about a second.
+Current state: **345 unit tests in 29 files** (about a second) and **18
+integration tests** (about ten seconds).
 
 ## 2. Configuration
 
@@ -27,21 +29,74 @@ Current state: **296 tests in 25 files**. A run takes about a second.
 }
 ```
 
-- Tests live only in `test/**/*.test.ts`.
+- Tests live only in `test/**/*.test.ts`; the real-ffmpeg suite uses `test/integration/**/*.int.test.ts` and is excluded from `npm test`.
+- The content model in `test/integration/contentMap.ts` is shared by the unit
+  and integration suites.
 - `node_modules_linux` is excluded because it is a stale Linux tree; the app uses the macOS `node_modules`.
 - The `@shared` alias is available. Renderer helper tests import them by relative path (for example, `../src/renderer/src/skip`).
 - Vitest runs in a Node environment; DOM and Electron are not emulated.
+
+### 2.1 Integration suite (opt-in)
+
+`npm run test:integration` runs the **real pipeline** — `resolveExportJob` plus
+`runExport` with `ffmpegPorts` — against real ffmpeg and real media. Only the
+Electron dialog and IPC are left out.
+
+- The binary is found in this order: `SPEECH_REVIEW_FFMPEG`, the bundled
+  `resources/ffmpeg/ffmpeg`, then `ffmpeg` from `PATH`. A candidate that exists
+  but cannot start (a macOS arm64 build on Linux) is skipped, so a host without
+  a usable ffmpeg reports the suite as skipped instead of failing.
+- The source is generated on the fly: 10 s, 320×180, 25 fps, carrying a
+  **continuous** timecode in both tracks. The frame colour encodes the whole
+  second in the red channel and the fraction of the second in the green one;
+  the audio is a linear chirp rising 270 Hz per second. A sampled output
+  position can therefore be traced back to the source time to within a few
+  milliseconds (measured: 4 ms video, 11 ms audio), so a drift of a tenth of a
+  second fails the suite. Nothing reuses the export code to compute the
+  expectation.
+- Assertions are invariants, not snapshots: exact decoded frame count, audio
+  length against video length, traced video/audio source time at chosen output
+  positions, a dissolve at the middle of a fade traced to the midpoint of the
+  two source moments, direct video-versus-audio lip sync across four 0.4 s
+  joins, a variable-frame-rate source, exact rate recovery from the rounded
+  ffmpeg banner, cleanup on cancel, output height after scaling.
+- `test/integration/contentMap.ts` is an independent model of the output: from
+  the cut list, the frame rate and the fade length alone it says which source
+  frame is shown at any output frame (and which two are mixed inside a
+  dissolve) and which source sample is heard at any output sample. It does not
+  import the export code, so a bug in `buildExportPlan` or in the filter graph
+  cannot hide behind the expectation. `test/contentMap.test.ts` pins the model
+  itself on hand-computed cases. Both the plan and the model apply the same
+  contract: a kept fragment shorter than two fades is merged into the cut, so
+  one full fade spans it and the fragment is never mixed twice.
+- `test/integration/content.int.test.ts` runs a cut list with a dissolve near
+  both edges and checks every decoded frame against the model, the first and
+  last frames against the original file (plus negative controls that the
+  neighbouring frames are measurably different), and the audio by waveform
+  correlation at the start, inside every kept piece and at the very end, with a
+  shifted window proving the match is not accidental. A third scenario keeps a
+  fragment shorter than two fades between two cuts: it must be merged away and
+  the audio must keep the video's clock after the join.
+- The hardware case runs only on `darwin` and only when the binary advertises
+  `h264_videotoolbox`; otherwise it is skipped with the rest of the suite
+  green.
+- The suite is excluded from `npm test` so the fast unit run never needs
+  ffmpeg. It creates a temporary directory and removes it afterwards.
 
 ## 3. What is covered
 
 | File | Tests | What it checks |
 |---|---:|---|
+| `test/audioMix.test.ts` | 7 | streaming audio mixer: exact piece copy without a fade, constant level through 39 joins, output length equal to the export plan, stereo channel independence, abort, progress, defensive handling of a mismatched fade |
+| `test/contentMap.test.ts` | 10 | the independent content model: identity, the four-join cut list frame by frame, plain concatenation, a fade clamped by a short piece, a fragment shorter than two fades merged into the cut, a fragment exactly two fades long, untouched source ends, positions outside the export |
 | `test/candidates.test.ts` | 8 | suppressed minimum-duration candidates, ID stability, promotion, disabled types, dismissed promotion |
 | `test/autoIds.test.ts` | 6 | word-based automatic ID derivation, stability across rule/transcript changes, same-type collision suffix |
 | `test/core.test.ts` | 16 | `words.json` parser, trailing comma, real fixture, `buildTranscript`, confidence, event classification, active word/segment, automatic defects, sentence-boundary pauses, manual marks, exact word boundaries, old marks without `wordIds`, logical marks |
 | `test/defectCardView.test.ts` | 7 | pending/confirmed/deleted card layout, candidate card, collapsing in skip mode, automatic group marker, manual badges and split visibility |
 | `test/engine.test.ts` | 8 | chunk planner (short recording, silence, max size, short first chunk, target), WAV reading, slicing, waveform |
 | `test/export.test.ts` | 7 | CSV field order, escaping, delimiter/header, cut vs defect bounds, uncut rows, all fields; values are English (`filler`, `yes`/`no`), including the synthetic manual label |
+| `test/exportJob.test.ts` | 9 | export source validation (empty keep, missing track, unknown fps), job resolution (plan and total length, crossfade shortening, settings normalization, sample-rate fallback, overwrite and container refusals) |
+| `test/exportPipeline.test.ts` | 7 | stage order and filter script, monotonic progress capped at 99 until the rename, partial-file and work-directory cleanup on failure and cancel, empty-output refusal, abort before rendering |
 | `test/fillerLanguage.test.ts` | 12 | RU/EN filler lexicons, language mapping, default rules per language, `normalizeRules` language fill, adopting a default list vs keeping a custom one, English filler detection |
 | `test/format.test.ts` | 11 | number parsing (dot/comma/empty/partial), step snapping, float noise, display formatting (RU/EN), slider fill |
 | `test/grouping.test.ts` | 29 | per-type minimum duration, pause hard threshold and normalization, automatic grouping rules and limits, enabled types and id stability, grouping toggle and migration, per-type/group skip padding, settings normalization (padding, pause room tone, mini timeline, waveform contrast) |
@@ -57,7 +112,7 @@ Current state: **296 tests in 25 files**. A run takes about a second.
 | `test/marks.test.ts` | 14 | merge on add, split, logical mark ID, combined bounds/words/notes, confirmation reconciliation on merge/split, new marks, cut-span capture, edge-specific capture and nested override scope |
 | `test/selection.test.ts` | 39 | selection range in both directions, exact mark boundaries, exact time range, defect overlap, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, cut handle dragging, bulk confirmation/deletion of a selection, mini timeline zoom/pan and colored word mapping |
 | `test/skip.test.ts` | 27 | padding and interval merging, pause room tone and minimum cut, cut overrides, cut view hatching, complement and subtract ranges, all non-dismissed items, dismissed and candidate filtering, clamp/disabled, interval lookup |
-| `test/videoExport.test.ts` | 11 | video settings normalization, filter graph, CRF/q:v encoder args, kept ranges, duration and progress parsing |
+| `test/videoExport.test.ts` | 27 | video settings normalization (including crossfade), single-pass select graph with frame-rate normalization, xfade dissolve graph with frame-accurate trims and offsets, concat fallback, filter-thread cap, export plan sync between video and audio, merging of a kept fragment shorter than two fades, the one-sample NTSC sample-overlap clamp, exact NTSC frame-rate snapping, CRF/q:v encoder args, kept ranges, duration and progress parsing |
 | `test/waveform.test.ts` | 9 | waveform statistics (noise floor, loud reference, degenerate input), contrast lookup table (linear mode, gamma lift, gate, monotonicity), signed mapping |
 
 ## 4. Fixtures
@@ -84,7 +139,8 @@ Expectations that must not be changed without replacing the fixture:
 - project save/load/delete and defect-state reset;
 - partial transcripts and confirmation-state merging in the renderer;
 - IPC contracts and preload;
-- real ffmpeg video export and VideoToolbox encoding;
+- VideoToolbox encoding on hosts other than macOS (the integration suite
+  exercises it only where the platform and the binary allow);
 - React components, canvas timeline rendering, transcript virtualization;
 - real `audiocpp_cli` and Metal execution;
 - DMG packaging and ad-hoc signing.
@@ -105,6 +161,8 @@ These are deliberate MVP limitations. When improving these areas, extract a pure
 - [ ] `npm run typecheck` passes.
 - [ ] `npm test` passes; the test count did not decrease without a reason.
 - [ ] `npm run build` passes.
+- [ ] If the export pipeline, plan or graph changed, `npm run test:integration`
+      passes where ffmpeg is available.
 - [ ] The new rule/branch has a regression test.
 - [ ] If IDs, confirmation state, grouping, minimum duration, skip padding or cut handles changed, tests in `core`, `marks`, `selection`, `skip` or `grouping` are updated.
 - [ ] If the parser/chunking/WAV changed, `core` or `engine` is updated.
@@ -114,4 +172,4 @@ These are deliberate MVP limitations. When improving these areas, extract a pure
 
 ## 8. Environment limitations
 
-The suite does not launch Electron, read `resources/engine`, download the model or work with real video. A green `npm test` therefore does not prove that the app works on macOS: a manual run with `npm run dev` and a real webinar file is still required.
+The unit suite does not launch Electron, read `resources/engine`, download the model or work with real video. The opt-in integration suite does exercise real video through real ffmpeg, but still not the Electron layer. A green `npm test` (and even a green `npm run test:integration`) therefore does not prove that the app works on macOS: a manual run with `npm run dev` and a real webinar file is still required.

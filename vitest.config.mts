@@ -9,6 +9,13 @@ export default defineConfig({
   },
   test: {
     include: ['test/**/*.test.ts'],
-    exclude: ['**/node_modules/**', '**/node_modules_linux/**', '**/dist/**', '**/out/**']
+    exclude: [
+      '**/node_modules/**',
+      '**/node_modules_linux/**',
+      '**/dist/**',
+      '**/out/**',
+      // Real-ffmpeg suite; run it with `npm run test:integration`.
+      '**/*.int.test.ts'
+    ]
   }
 })

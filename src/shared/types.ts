@@ -139,6 +139,17 @@ export interface MediaInfo {
   mtimeMs: number
 }
 
+/**
+ * The stream facts the export plan and the export dialog's preview need.
+ * `fps` is the exact frame rate (NTSC rates are snapped back to the rational).
+ */
+export interface MediaStreamInfo {
+  hasVideo: boolean
+  hasAudio: boolean
+  fps: number
+  sampleRate: number
+}
+
 export interface Peaks {
   peaksPerSecond: number
   duration: number
@@ -244,6 +255,10 @@ export interface VideoExportSettings {
   resolution: VideoExportResolution
   quality: VideoExportQuality
   encoder: VideoExportEncoder
+  /** Blend the audio across every cut instead of an abrupt jump. */
+  crossfade: boolean
+  /** Crossfade length in seconds, taken from both sides of each join. */
+  crossfadeSec: number
 }
 
 /**

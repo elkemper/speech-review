@@ -8,6 +8,7 @@ import type {
   EngineStatus,
   ExportRequest,
   MediaInfo,
+  MediaStreamInfo,
   ModelId,
   Settings,
   TranscribeRequest,
@@ -143,6 +144,29 @@ export function registerIpc(dependencies: IpcDependencies): TranscriptionManager
     if (!path) return null
     return mediaInfo(path)
   })
+
+  // The export dialog builds the same plan as the export to show the exact
+  // mixed length; it needs only the stream rates. A source that cannot be
+  // probed returns null and the dialog keeps its cut-list fallback.
+  ipcMain.handle(
+    IPC.mediaProbe,
+    async (_event, path: string): Promise<MediaStreamInfo | null> => {
+      if (!path) return null
+      const ffmpeg = ffmpegBinary()
+      if (!(await executable(ffmpeg))) return null
+      try {
+        const probe = await probeMedia(ffmpeg, path)
+        return {
+          hasVideo: probe.hasVideo,
+          hasAudio: probe.hasAudio,
+          fps: probe.fps,
+          sampleRate: probe.sampleRate
+        }
+      } catch {
+        return null
+      }
+    }
+  )
 
   ipcMain.handle(IPC.mediaRegister, async (_event, path: string) => {
     const info = await stat(path).catch(() => null)

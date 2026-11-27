@@ -36,7 +36,7 @@ Requirements: macOS 13 or newer on Apple Silicon, about 3 GB of free disk space 
 - Editable cut boundaries: the fill shows the detected span, draggable handles set the final cut, and per-type padding plus a configurable pause room tone keep cuts from sounding clipped.
 - Skip mode during playback cuts every defect and manual mark except dismissed ones; a confirmed defect keeps the cut it had at confirmation.
 - Undo/redo with an action history dialog, automatic project save after every action, bookmarks, loop and playback speed 0.5–2×.
-- CSV/JSON export with configurable fields and delimiter; clean video export with resolution, quality presets and software or hardware VideoToolbox encoders, with progress and cancel.
+- CSV/JSON export with configurable fields and delimiter; clean video export with resolution, quality presets, software or hardware VideoToolbox encoders, an optional audio/video crossfade at every join, progress and cancel.
 - Interface in Russian and English, dark theme only.
 
 ## Hotkeys

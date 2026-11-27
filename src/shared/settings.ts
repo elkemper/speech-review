@@ -66,10 +66,16 @@ export const VIDEO_EXPORT_ENCODERS: VideoExportEncoder[] = [
   'hevc_videotoolbox'
 ]
 
+export const MIN_VIDEO_CROSSFADE_SEC = 0
+export const MAX_VIDEO_CROSSFADE_SEC = 1
+export const DEFAULT_VIDEO_CROSSFADE_SEC = 0.1
+
 export const DEFAULT_VIDEO_EXPORT_SETTINGS: VideoExportSettings = {
   resolution: 'source',
   quality: 'balanced',
-  encoder: 'h264'
+  encoder: 'h264',
+  crossfade: false,
+  crossfadeSec: DEFAULT_VIDEO_CROSSFADE_SEC
 }
 
 export function normalizeVideoExportSettings(value: unknown): VideoExportSettings {
@@ -83,7 +89,14 @@ export function normalizeVideoExportSettings(value: unknown): VideoExportSetting
       : DEFAULT_VIDEO_EXPORT_SETTINGS.quality,
     encoder: VIDEO_EXPORT_ENCODERS.includes(raw.encoder as VideoExportEncoder)
       ? (raw.encoder as VideoExportEncoder)
-      : DEFAULT_VIDEO_EXPORT_SETTINGS.encoder
+      : DEFAULT_VIDEO_EXPORT_SETTINGS.encoder,
+    crossfade: raw.crossfade === true,
+    crossfadeSec: clampNumber(
+      raw.crossfadeSec,
+      MIN_VIDEO_CROSSFADE_SEC,
+      MAX_VIDEO_CROSSFADE_SEC,
+      DEFAULT_VIDEO_CROSSFADE_SEC
+    )
   }
 }
 
