@@ -6,7 +6,7 @@ Instructions for coding agents working in this repository. Read this file before
 
 **Speech Review** is a local Electron app for reviewing webinar recordings. It extracts audio, transcribes it with **CrisperWhisper 2.0** through the native **audio.cpp** runtime on Metal, detects speech defects, and provides a review workflow: click a word to seek, confirm real defects or delete false positives, add manual marks, loop, skip, and export.
 
-The current MVP targets **macOS 13+ on Apple Silicon** and Russian speech. The UI is available in Russian and English (`Settings.uiLanguage`) and the theme is dark-only.
+The current release targets **macOS 13+ on Apple Silicon** and Russian and English speech (`Settings.language`). The UI is available in Russian and English (`Settings.uiLanguage`), the main window is dark-only, and the defect table window has an opt-in light theme.
 
 User-facing documentation is available in English (`README.md`) and Russian (`README.RU.md`); requested features and bugs are consolidated in `docs/SPEC.md`; deferred work is in `docs/BACKLOG.md`.
 

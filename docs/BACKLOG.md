@@ -1,6 +1,6 @@
 # Backlog
 
-A list of work deliberately left out of the MVP. The order roughly reflects usefulness for the "review a webinar" scenario.
+A list of work deliberately deferred from the current release. The order roughly reflects usefulness for the "review a webinar" scenario.
 
 Current feature requests, their triage (fix now / next / backlog) and acceptance criteria live in [`docs/SPEC.md`](SPEC.md). This file is the long-term list of deferred work.
 
@@ -35,17 +35,7 @@ Measure the gain on M4 Pro: 10 minutes ≈ 1.5 minutes now (RTF ≈ 0.15).
 
 If the app crashes, an unfinished job starts over. Completed chunks could be saved in the project folder and skipped on the next run.
 
-## 4. Stable defect IDs when rules change
-
-Automatic defect IDs are based on order (`auto-filler-3`). Changing the pause minimum duration or filler list shifts the numbering, and old confirmation/dismissal flags and notes may end up on different defects.
-
-Options:
-
-- Store flags by `(type, word/time)` instead of ID.
-- Recompute the mapping when rules change.
-- Warn the user that changing rules resets confirmation progress.
-
-## 5. Developer ID signing and notarization
+## 4. Developer ID signing and notarization
 
 The build is currently ad-hoc signed, and the first launch may require `xattr -cr` or "Open" from the context menu. To distribute to users without Terminal, the following are needed:
 
@@ -53,7 +43,7 @@ The build is currently ad-hoc signed, and the first launch may require `xattr -c
 - `notarytool` + stapling;
 - hardened runtime and entitlements for JIT/unsigned executable memory (Electron).
 
-## 6. Diarization and speakers
+## 5. Diarization and speakers
 
 CrisperWhisper 2.0 does ASR but does not label speakers. For webinars with audience questions, useful additions are:
 
@@ -61,11 +51,11 @@ CrisperWhisper 2.0 does ASR but does not label speakers. For webinars with audie
 - a "host only" filter;
 - different track colors on the timeline.
 
-## 7. Codec check and proxy transcode for video
+## 6. Codec check and proxy transcode for video
 
 Transcription works with any file ffmpeg can read, but Chromium does not play some MKV/HEVC/AV1 files. Currently the user sees a "re-encode" message. It would be possible to automatically create an MP4/H.264 proxy in a temporary folder and play it without touching the original.
 
-## 8. SRT/VTT export and editing marks
+## 7. SRT/VTT export and editing marks
 
 CSV/JSON already exist. Useful for editing:
 
@@ -73,7 +63,7 @@ CSV/JSON already exist. Useful for editing:
 - EDL/FCPXML with a cut list;
 - `file:///...#t=12.34` links for jumping from a table.
 
-## 9. Transcript search
+## 8. Transcript search
 
 There is no word search field. Needed:
 
@@ -81,14 +71,14 @@ There is no word search field. Needed:
 - a time-range filter;
 - search in notes.
 
-## 10. Optimize defect recomputation
+## 9. Optimize defect recomputation
 
 `detectDefects` is recomputed on every change to `confirmedDefectIds`, `dismissedDefectIds` or notes, even though the transcript itself has not changed. For a one-hour recording that is tens of thousands of words. It should be split:
 
 - `autoDefects` — memoized by `(transcript, rules)`;
 - `confirmed/dismissed/notes` — applied separately.
 
-## 11. Waveform performance
+## 10. Waveform performance
 
 `peaks.json` for a 3-hour recording contains hundreds of thousands of values, a file of several megabytes, and the canvas is redrawn on every `currentTime` change. Options:
 
@@ -96,16 +86,15 @@ There is no word search field. Needed:
 - draw the playhead on a separate layer/canvas;
 - downsample peaks to the window width.
 
-## 12. Fine-tune rules for language and speaker
+## 11. Fine-tune rules for language and speaker
 
 Rules are currently shared for the project. Useful additions:
 
 - profiles "lecturer", "interview", "fast pace";
-- separate filler lists for Russian/English;
 - exceptions for words the model constantly marks as fillers;
 - a pause minimum duration that depends on speech rate.
 
-## 13. Improve chunking
+## 12. Improve chunking
 
 If there is no silence in a 5–15 minute window, the chunk is cut at the ideal length and may split a word. Possible improvements:
 
@@ -113,7 +102,7 @@ If there is no silence in a 5–15 minute window, the chunk is cut at the ideal 
 - use VAD instead of `silencedetect`;
 - overlap chunks by 0.5–1 s and merge by timestamps.
 
-## 14. Windows and Linux
+## 13. Windows and Linux
 
 Path and engine-loader code is partially cross-platform, but only macOS arm64 has been verified. Needed:
 
@@ -121,24 +110,23 @@ Path and engine-loader code is partially cross-platform, but only macOS arm64 ha
 - verification of `app-media://` and Metal/CUDA/Vulkan;
 - separate icons and labels.
 
-## 15. Engine and ffmpeg integrity checks
+## 14. Engine and ffmpeg integrity checks
 
 `npm run fetch:engine` downloads binaries without SHA-256. Checksums should be added and verified by `npm run check:resources` to rule out corrupted downloads.
 
-## 16. Auto-update
+## 15. Auto-update
 
 The app does not update itself. For a single user this is not critical, but multiple copies need `electron-updater` and signed releases.
 
-## 17. Accessibility and UI polish
+## 16. Accessibility and UI polish
 
 - Full keyboard navigation in the defect panel.
 - Configurable hotkeys.
 - Undo/redo for notes.
 - An "About" screen with engine and model versions. Model versions are already tracked (see `docs/spec/11-model-updates.md`); only the screen is missing.
 - A "model is loading" indicator with phases, not just a percentage.
-- Dark/light theme.
 
-## 18. Tests
+## 17. Tests
 
 - parsing `silencedetect` and ffmpeg progress;
 - model resume and SHA-256 verification;
@@ -147,19 +135,19 @@ The app does not update itself. For a single user this is not critical, but mult
 - IPC contracts;
 - component rendering.
 
-## 19. Streaming recognition inside a chunk
+## 18. Streaming recognition inside a chunk
 
 Currently a partial result appears only after a whole chunk (the first one up to 3 minutes). Even faster startup needs streaming ASR: emit words as they are decoded. audio.cpp currently runs on a whole file, so first check whether it has a streaming mode or can emit partial output.
 
-## 20. Editable pause tokens
+## 19. Editable pause tokens
 
 Pauses are shown as separate chips and separator rows, but they cannot be turned into a transcript word or have their boundaries edited directly in the text. Ad-hoc pause tokens with editable start/end are needed so the editing list matches the user's edits exactly.
 
-## 21. Light theme and appearance switcher
+## 20. Light theme and appearance switcher for the main window
 
-The theme is currently dark only, in the spirit of Photoshop. Needed: a light palette, a switcher in settings, and persistence of the choice. Defect color contrast on a light background should be checked separately.
+The defect table window already has an opt-in light theme (story 56). The main window is still dark only, in the spirit of Photoshop. Needed: a light palette for the whole app, a switcher in settings, and persistence of the choice. Defect colors, the waveform and the timeline hatching need a contrast pass on a light background.
 
-## 22. Audio-only export and audio-file cuts
+## 21. Audio-only export and audio-file cuts
 
 Video export is implemented as story 48. Recordings without a video track still
 cannot be exported: the app creates a project for MP3/WAV/M4A, but the export
@@ -175,7 +163,7 @@ Needed:
 Do not introduce a second cut model: playback, the timeline hatching, CSV/JSON
 and both export paths must use the same `buildCutList`.
 
-## 23. Stream-copy video export (без перекодирования)
+## 22. Stream-copy video export (без перекодирования)
 
 Video export always re-encodes so that cuts are frame-accurate. A fast
 keyframe-bound mode was removed; it would use the concat demuxer with

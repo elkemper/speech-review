@@ -65,8 +65,10 @@ Applies to every story.
    the machine. Network is used only for the model and engine/ffmpeg downloads.
 2. **No Python or torch at runtime.** `audiocpp_cli` + GGUF + ffmpeg only.
 3. **macOS on Apple Silicon is the only verified target.**
-4. **Dark theme only.** No light theme or theme switcher without an explicit
-   task.
+4. **The main window stays dark.** No light theme or theme switcher for it
+   without an explicit task. The separate defect table window (story 56) has
+   its own opt-in light theme, stored in `sr.tableTheme` and applied to that
+   window only.
 5. **`unclear` / word confidence stays disabled** while the engine writes
    `confidence: 0`.
 6. **Skip mode cuts every defect and manual mark except dismissed ones.**
@@ -83,8 +85,9 @@ Applies to every story.
    undo is limited to settings changes made since it was opened.
 9. **Manual grouping is explicit.** Group on add, or when a cut handle captures
    a neighbour; do not regroup every render.
-10. **ID rules stay stable.** Automatic `auto-${type}-${sequence}`; manual
-    UUIDs; logical manual `manual-group-${groupId}`; automatic group
+10. **ID rules stay stable.** Automatic `auto-${type}-w${wordIds}` (words
+    joined with `_`; `-2`, `-3` on a same-word collision); manual UUIDs;
+    logical manual `manual-group-${groupId}`; automatic group
     `auto-group-${firstDefectId}`.
 11. **First partial transcript resets defect lifecycle state** because automatic ids may
     change. Later partials preserve edits to the visible prefix. Marks and
@@ -143,8 +146,6 @@ Applies to every story.
 | 23 | Dim items skipped by fast-forward |
 | 35 | Honest progress only for transcription |
 | 36 | Shorter default chunks (3 min) |
-| 9 | Verify multi-word selection end to end |
-| 24 | Verify partial chunks remain reviewable |
 
 ### Backlog (P2/P3)
 
@@ -154,12 +155,12 @@ Applies to every story.
 | 29 / `06a` | Clean playback without marked places (needs approval) |
 | 33 / `07a` | Visual refresh toward Photoshop/Audacity 3 |
 | 37 / `08a` | Streaming ASR |
-| `BACKLOG` §22 | Audio-only export and audio-file cuts |
-| `BACKLOG` §23 | Stream-copy video export without re-encoding |
+| `BACKLOG` §21 | Audio-only export and audio-file cuts |
+| `BACKLOG` §22 | Stream-copy video export without re-encoding |
 
 ### Done — do not regress
 
-Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48, 50–55, 56.
+Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–49, 50–55, 56.
 Verification only (implemented, needs a pass): 9, 24.
 
 ## Related documents

@@ -156,7 +156,7 @@ Expectations that must not be changed without replacing the fixture:
 - real `audiocpp_cli` and Metal execution;
 - DMG packaging and ad-hoc signing.
 
-These are deliberate MVP limitations. When improving these areas, extract a pure function first, then add a test.
+These are deliberate test gaps. When improving these areas, extract a pure function first, then add a test.
 
 ## 6. How to add tests
 

@@ -167,7 +167,7 @@ being reviewed in the main window.
       applied by the main window's store actions.
 - [ ] Closing the project or the main window closes the table.
 - [ ] Interface language changes update the table's headers and title.
-- [ ] No light theme, no new dependency, no schema migration.
+- [ ] No new dependency and no schema migration; the theme is UI-only.
 
 ## Verification
 

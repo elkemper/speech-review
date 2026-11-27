@@ -54,9 +54,11 @@ Detail: [`07a-visual-refresh.md`](07a-visual-refresh.md).
 
 **Status:** Done (invariant) · **Priority:** P0
 
-As a user, I want the app to stay dark-only.
+As a user, I want the main window to stay dark-only.
 
 - No light theme or switcher unless an explicit task asks for it.
+- The defect table window is the one explicit exception: its own opt-in light
+  theme (story 56) never affects the main window.
 - New components must use the existing CSS variables and contrast.
 
 ### Story 47 — Project settings in undo/redo
@@ -113,7 +115,8 @@ the defect list and skip intervals they recalculated.
 
 ### Story 34
 
-- [ ] No light theme is added.
+- [ ] No light theme is added, except the defect table window's opt-in theme
+      (story 56).
 - [ ] New UI uses existing variables and keeps contrast.
 - [ ] Defect colors and waveform remain readable.
 

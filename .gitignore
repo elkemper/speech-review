@@ -6,6 +6,7 @@ resources/engine/
 resources/ffmpeg/
 *.log
 .DS_Store
+.claude/
 samples/
 test/fixtures/*.wav
 *.mp4

@@ -169,7 +169,7 @@ ffmpeg -i input.mkv -c:v libx264 -c:a aac -movflags +faststart output.mp4
 
 ### Transcription is slow
 
-Reference for M4 Pro: 10 minutes of audio ≈ 1.5 minutes of transcription (RTF ≈ 0.15). M5 Air may be slower. The Q4_K model is faster and lighter, but quality is lower. The model is reloaded for each chunk — a known MVP limitation.
+Reference for M4 Pro: 10 minutes of audio ≈ 1.5 minutes of transcription (RTF ≈ 0.15). M5 Air may be slower. The Q4_K model is faster and lighter, but quality is lower. The model is reloaded for each chunk — a known limitation.
 
 ### Unfinished transcription
 

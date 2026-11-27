@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes **how the current MVP is built**: processes, modules, data flow and runtime constraints. It does not own product behavior.
+This document describes **how the current release is built**: processes, modules, data flow and runtime constraints. It does not own product behavior.
 
 | Question | Owner |
 |---|---|
@@ -15,12 +15,12 @@ If a sentence describes a user scenario, it belongs in the spec. If it names a f
 
 Speech Review is a local macOS app for reviewing webinar recordings: it extracts audio, transcribes it with CrisperWhisper 2.0 through `audiocpp_cli`, detects speech defects and supports a review workflow with export.
 
-MVP constraints:
+Product constraints:
 
 - macOS 13+ on Apple Silicon is the only verified target.
 - Everything is local: only the model and engine/ffmpeg downloads use the network.
 - One project per window, no background job queue.
-- Dark theme only.
+- Dark theme in the main window; only the defect table window may switch to light.
 - `unclear` / word-level confidence stays disabled while the engine writes `confidence: 0`.
 
 User-facing features are listed in `README.md`; the requirement index is `docs/SPEC.md`.
@@ -119,7 +119,7 @@ Details:
    --request-option return_timestamps=true
    --text-out <chunk.txt> --words-out <chunk.json> --log
    ```
-   The model is reloaded for each chunk — a deliberate MVP trade-off.
+   The model is reloaded for each chunk — a deliberate trade-off.
 8. **Time offset.** `words.json` contains `start_sample`/`end_sample` at 16 kHz. `transcribeChunk` adds `offsetSec * 16000`, so words land on the global recording timeline.
 9. **Partial and final results.** After each chunk, the recognized prefix is written and emitted as `partial`; the first partial resets the review mapping because automatic IDs may change, later partials preserve edits in the visible prefix. Final words are sorted by `start_sample`, written with `transcriptComplete: true`, then `done` is emitted. The reset rules live in `DATA_MODEL.md` §10.
 10. **Cancellation.** `cancel(jobId)` / `cancelProject(projectId)` aborts the controller. `runProcess` sends `SIGTERM`, then `SIGKILL` after 3 seconds. `userData/tmp/jobs/<jobId>` is removed in `finally`.
@@ -203,7 +203,8 @@ Status triage and cross-cutting product invariants are in [`SPEC.md`](SPEC.md).
 
 - The model is reloaded between chunks, and interrupted transcription cannot be resumed.
 - Automatic IDs depend on detection order, so changing rules can reset the review mapping.
-- No diarization, transcript search, SRT/VTT or light theme.
+- No diarization, transcript search, SRT/VTT or app-wide light theme; only the
+  defect table window can switch to light.
 - Video export always re-encodes; there is no fast stream-copy mode, and
   audio-only export is not implemented.
 - No e2e tests; Electron, real media playback, the engine, packaging and the
