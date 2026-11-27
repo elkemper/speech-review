@@ -1,7 +1,7 @@
 {
   "name": "webinar-speech-review",
   "productName": "Speech Review",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Local webinar speech defect review with CrisperWhisper",
   "main": "./out/main/index.js",
   "author": "",
