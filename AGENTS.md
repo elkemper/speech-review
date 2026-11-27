@@ -32,7 +32,7 @@ User-facing documentation is available in English (`README.md`) and Russian (`RE
 - **Fully local:** recording, transcript, project data and model inference stay on the machine. The only network access is the one-time model download from Hugging Face and the engine/ffmpeg download at setup.
 - **No Python/torch at runtime.** `resources/engine/tools/*.py` may exist in the downloaded engine bundle, but the app must not invoke Python. The runtime path is `audiocpp_cli` + GGUF + ffmpeg.
 - **Dependencies stay minimal.** Run `npm install` on macOS after pulling changes to `package.json`. Avoid new dependencies unless the task requires one: the macOS packaging setup makes dependency changes expensive.
-- **Dark theme only.** Do not add a light theme or a theme switcher unless the task explicitly asks for it.
+- **Dark theme only.** Do not add a light theme or a theme switcher unless the task explicitly asks for it. The defect table window has an explicit opt-in light theme: its button stores `sr.tableTheme` in this window's `localStorage` and sets `data-theme` on its own document, so the main window always stays dark.
 - **Filler lexicons follow the recognition language.** `FILLER_LEXICONS` in `src/shared/defects.ts` holds the RU and EN lists; `Settings.language` selects one, never `Settings.uiLanguage`. Keep both lists in sync with any new filler; see `docs/DATA_MODEL.md` §6.
 - **Word confidence / `unclear` is backlog.** `audiocpp_cli` currently writes `confidence: 0`. The parser stores `null` when no positive confidence exists and the `unclear` rule is disabled. Do not enable it by default or treat `0` as a low-confidence signal.
 - **Skip mode cuts every defect and manual mark except dismissed ones.** Confirmation does not decide whether an item is cut; it freezes the cut range at confirmation time. See `src/shared/cuts.ts`.
@@ -78,7 +78,13 @@ src/
 │   ├── defects.ts        automatic defect rules and ordering
 │   ├── marks.ts          logical manual marks, confirmation reconciliation
 │   ├── cuts.ts           final cut ranges, merging, complement for video export
+│   ├── cutEdit.ts        validate a cut edge edited in the defect table
 │   ├── exportCsv.ts      CSV formatting
+│   ├── exportRows.ts     exportable defects with final cut bounds
+│   ├── defectTable.ts    defect table snapshot and command types
+│   ├── manualMarkAdd.ts  shared core for adding a manual mark
+│   ├── timeInput.ts      time parsed from table cells and the add dialog
+│   ├── tableTheme.ts     table window theme value (dark default, light opt-in)
 │   ├── videoExport.ts    pure ffmpeg args and filter graph
 │   ├── i18n.ts           translate, plurals, locale helpers
 │   ├── locales/          ru.ts (source) and en.ts message catalogues
@@ -90,12 +96,18 @@ src/
     ├── player.ts         video element control, seek, loop, skip bypass
     ├── skip.ts           renderer re-export of shared/cuts
     ├── selection.ts      word selection and manual-mark ranges
+    ├── tableSelection.ts row selection in the defect table
+    ├── tableColumns.ts   defect table column widths, add-row fields
+    ├── tableDraft.ts     inline new-row draft: defaults, placement, validation
+    ├── tableTheme.ts     light/dark theme of the table window (localStorage)
+    ├── defectTableBridge.ts  main-window side of the table IPC relay
     ├── timelineView.ts   zoom/pan/LOD/cut-handle math
     ├── hatch.ts          canvas hatching for padding and kept room tone
     ├── defectsUi.ts      labels, colors, ordering
     ├── hooks/useHotkeys.ts
     └── components/       Welcome, Workspace, Player, Timeline, Transcript,
-                          DefectPanel, SettingsDialog, DefectRulesSection,
+                          DefectPanel, DefectTableApp, DefectTable,
+                          AddTableRowDialog, SettingsDialog, DefectRulesSection,
                           SettingsRangeField, HistoryDialog, VideoExportDialog
 scripts/                  engine/ffmpeg fetch, platform/resource checks, after-pack
 test/                     Vitest suites and fixtures
@@ -107,7 +119,7 @@ test/integration/         opt-in real-ffmpeg export suite (`npm run test:integra
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | `tsc --noEmit` for node and web configs |
-| `npm test` | Vitest run (345 tests / 29 files) |
+| `npm test` | Vitest run (400 tests / 37 files) |
 | `npm run test:integration` | opt-in real-ffmpeg export suite (18 tests; needs a runnable ffmpeg) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run build` | electron-vite production build into `out/` |
@@ -164,6 +176,7 @@ If you changed UI behavior or runtime code, verify it by running the app with `n
 - **Minimum duration** is a per-type rule (`rules.minDurationByType`). For pauses it measures the silence and is the only pause threshold: the default is 1.2 s, it is clamped to 0.3–10 s, and a shorter gap is neither a defect nor a candidate. For repetitions it measures the shorter repeated word. For other types a match below the limit is returned as a hidden `DefectCandidate` with the same automatic ID; it is not a defect until `promotedIds` contains it.
 - **A revealed candidate is transient.** The renderer adds it to `defects` only while `activeDefectId` matches, so it gets the normal controls, timeline markers and skip intervals. A cut edit, confirmation, deletion or a note promotes it through existing project state; switching away drops it.
 - **Timeline Shift+drag selects exact time.** The transcript keeps word-based selection; `M` / «＋ метка» turns a time range into a normal `ManualMark` with exact `start`/`end`, then `mergeMarkNeighbours` and `reconcileConfirmedIds` run as before.
+- **The defect table is a mirror of the export rows.** The `#/table` window never derives defects, never writes `project.json` and has no history of its own: the main window publishes `toExportDefects` snapshots and applies table commands (`removeDefects`, `setNote`, `setCutBounds`, `addMarkRange`). Editing a cut time cell is the same cut override a timeline handle writes; `defect_*` columns are read-only; a `duration_sec` edit moves only the end, so it cannot capture a neighbour through the untouched start. Add and delete carry a `token` that the main window echoes in `lastCommand`, so a toast reports success only after the command was applied. Column widths are `localStorage` UI state, not project state.
 - **Bookmarks** (`Project.bookmarks`) are navigation markers, not defects. They persist with the project but stay out of undo/redo, skip intervals and exports.
 
 ## Testing rules

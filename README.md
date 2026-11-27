@@ -37,6 +37,7 @@ Requirements: macOS 13 or newer on Apple Silicon, about 3 GB of free disk space 
 - Skip mode during playback cuts every defect and manual mark except dismissed ones; a confirmed defect keeps the cut it had at confirmation.
 - Undo/redo with an action history dialog, automatic project save after every action, bookmarks, loop and playback speed 0.5–2×.
 - CSV/JSON export with configurable fields and delimiter; clean video export with resolution, quality presets, software or hardware VideoToolbox encoders, an optional audio/video crossfade at every join, progress and cancel.
+- Excel-like **defect table** in a separate window: the exported CSV view with resizable columns, row selection and bulk delete, adding rows with an exact time and note, in-place editing of time and note cells, note copy/paste, undo/redo, click sync with the main window, and an optional light theme for the table window.
 - Interface in Russian and English, dark theme only.
 
 ## Hotkeys

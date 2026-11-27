@@ -23,6 +23,7 @@ import type {
   VideoExportProgress,
   VideoExportRequest
 } from './types'
+import type { DefectTableCommand, DefectTableState } from './defectTable'
 
 export interface AppApi {
   getEngineStatus(): Promise<EngineStatus>
@@ -61,6 +62,20 @@ export interface AppApi {
   exportVideo(input: VideoExportRequest): Promise<string | null>
   cancelVideoExport(): Promise<void>
   onVideoExportProgress(callback: (progress: VideoExportProgress) => void): () => void
+
+  /** Open or focus the defect table window for the current project. */
+  openDefectTable(): Promise<void>
+  closeDefectTable(): Promise<void>
+  /** Main window → main process → table window. */
+  sendDefectTableState(state: DefectTableState): void
+  /** Table window: asks the main window for a fresh snapshot. */
+  requestDefectTableState(): void
+  /** Table window → main process → main window. */
+  sendDefectTableCommand(command: DefectTableCommand): void
+  onDefectTableState(callback: (state: DefectTableState) => void): () => void
+  /** The table window is ready or wants a fresh snapshot. */
+  onDefectTableReady(callback: () => void): () => void
+  onDefectTableCommand(callback: (command: DefectTableCommand) => void): () => void
 
   showItemInFolder(path: string): Promise<void>
 }

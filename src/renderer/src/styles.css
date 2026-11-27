@@ -3246,3 +3246,395 @@ kbd {
   cursor: grabbing;
   background: var(--accent);
 }
+
+/* ---------- defect table window ---------- */
+
+.defect-table-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.table-loading {
+  align-items: center;
+  justify-content: center;
+}
+
+.table-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.table-toolbar-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.table-toolbar-title h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.table-toolbar-title .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 34vw;
+}
+
+.table-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-toolbar-meta {
+  margin-left: auto;
+  display: flex;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.table-hint {
+  flex: 0 0 auto;
+  padding: 7px 16px;
+  color: var(--muted);
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg2);
+}
+
+.table-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+
+.table-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+.table-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.defect-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.defect-grid th,
+.defect-grid td {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 0 8px;
+  height: 28px;
+  line-height: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.defect-grid th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 11.5px;
+  user-select: none;
+  border-bottom-color: var(--line2);
+  /* The resize handle sits on the right border; the title truncates itself. */
+  overflow: visible;
+}
+
+.defect-grid th .col-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 8px;
+}
+
+.defect-grid .row-number {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 56px;
+  text-align: right;
+  color: var(--faint);
+  background: var(--panel);
+  font-variant-numeric: tabular-nums;
+  /* Drag along the numbers selects a range; do not select their text. */
+  user-select: none;
+  touch-action: none;
+}
+
+.defect-grid th.row-number {
+  z-index: 3;
+}
+
+.defect-grid tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.defect-grid tbody tr.active td {
+  background: rgba(138, 123, 255, 0.1);
+}
+
+.defect-grid tbody tr.active .row-number {
+  color: var(--text);
+}
+
+/* A selected row also carries the active highlight; selection wins. */
+.defect-grid tbody tr.selected td {
+  background: rgba(59, 156, 255, 0.18);
+}
+
+.defect-grid tbody tr.selected .row-number {
+  color: var(--text);
+  background: #243447;
+}
+
+.defect-grid td.cell-focused {
+  box-shadow: inset 0 0 0 1px var(--accent2);
+}
+
+.draft-row td {
+  background: rgba(110, 168, 254, 0.07);
+}
+
+.draft-cell {
+  padding: 0 3px !important;
+}
+
+.draft-preview {
+  color: var(--muted);
+}
+
+.draft-marker {
+  color: var(--accent) !important;
+  font-weight: 600;
+  text-align: center !important;
+  cursor: default;
+}
+
+.defect-grid td.editable {
+  cursor: text;
+}
+
+.defect-grid td.editable:hover {
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+
+.defect-grid td.editing {
+  padding: 0 3px;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.cell-input.invalid {
+  border-color: var(--danger);
+}
+
+.cell-input {
+  width: 100%;
+  height: 22px;
+  padding: 0 4px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+  vertical-align: middle;
+}
+
+.col-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 4;
+}
+
+.col-resize:hover {
+  background: linear-gradient(180deg, transparent, var(--accent), transparent);
+}
+
+.table-add-modal {
+  width: min(480px, 100%);
+}
+
+.table-add-body {
+  gap: 14px;
+}
+
+.table-add-error {
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+/* ---------- defect table window: opt-in light theme ---------- */
+/* Scoped to the table window's own document, which alone sets data-theme.
+   The main window never carries the attribute and stays dark. */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f8fb;
+  --bg2: #eef2f7;
+  --panel: #ffffff;
+  --panel2: #f3f6fa;
+  --line: rgba(15, 23, 42, 0.1);
+  --line2: rgba(15, 23, 42, 0.2);
+  --text: #16202f;
+  --muted: #5d6b80;
+  --faint: #8693a6;
+  --accent: #2563eb;
+  --accent2: #7c3aed;
+  --ok: #047857;
+  --warn: #b45309;
+  --danger: #dc2626;
+  --shadow: 0 18px 50px rgba(15, 23, 42, 0.18);
+}
+
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(1100px 560px at 18% -10%, rgba(37, 99, 235, 0.07), transparent 62%),
+    radial-gradient(900px 520px at 100% 0%, rgba(124, 58, 237, 0.05), transparent 58%),
+    var(--bg);
+}
+
+:root[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.18);
+  background-clip: content-box;
+}
+
+:root[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.3);
+  background-clip: content-box;
+}
+
+:root[data-theme="light"] .defect-grid tbody tr:hover td {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+:root[data-theme="light"] .defect-grid tbody tr.active td {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+:root[data-theme="light"] .defect-grid tbody tr.selected td {
+  background: rgba(37, 99, 235, 0.16);
+}
+
+:root[data-theme="light"] .defect-grid tbody tr.selected .row-number {
+  background: #dbe7fb;
+}
+
+:root[data-theme="light"] .draft-row td {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+:root[data-theme="light"] .btn {
+  background: var(--panel);
+  border-color: var(--line2);
+  color: var(--text);
+}
+
+:root[data-theme="light"] .btn:hover:not(:disabled) {
+  background: var(--bg2);
+  border-color: rgba(37, 99, 235, 0.55);
+}
+
+:root[data-theme="light"] .btn.ghost {
+  background: transparent;
+}
+
+:root[data-theme="light"] .btn.ghost:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+:root[data-theme="light"] .btn.primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+:root[data-theme="light"] .btn.primary:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea {
+  background: #fff;
+  border-color: var(--line2);
+  color: var(--text);
+}
+
+:root[data-theme="light"] input:focus,
+:root[data-theme="light"] select:focus,
+:root[data-theme="light"] textarea:focus {
+  border-color: rgba(37, 99, 235, 0.65);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+:root[data-theme="light"] .cell-input {
+  background: #fff;
+  border-color: var(--accent);
+}
+
+:root[data-theme="light"] .cell-input.invalid {
+  border-color: var(--danger);
+}
+
+:root[data-theme="light"] .modal-backdrop {
+  background: rgba(15, 23, 42, 0.32);
+}
+
+:root[data-theme="light"] .modal {
+  background: linear-gradient(180deg, #ffffff, #f7f9fc);
+}
+
+:root[data-theme="light"] .toast {
+  background: #fff;
+}
+
+:root[data-theme="light"] .toast-success {
+  border-color: rgba(4, 120, 87, 0.45);
+}
+
+:root[data-theme="light"] .toast-error {
+  border-color: rgba(220, 38, 38, 0.45);
+  color: var(--danger);
+}

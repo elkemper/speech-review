@@ -306,6 +306,7 @@ interface ManualMark {
 Rules:
 
 - When added, a mark gets the exact `wordIds` and boundaries of the selected words. If there is no selection, the playhead position and a 1.5 s range are used.
+- The defect table adds a mark from typed start/end bounds through the shared `addManualMark` core. The same merge, confirmation reconciliation and pin reconciliation run; the typed range is also stored as an explicit cut override unless the mark merged into a group (then the group padding applies).
 - `mergeMarkNeighbours` merges only **changed** marks with those they touch within a gap of ≤ 0.2 s. Merging happens when a mark is added.
 - A cut drag does not move the mark. `mergeMarksAtSpan` uses the dragged **cut** span for adjacency: if the cut handle reaches a neighbour, the marks join a logical group, the handle becomes the group cut, and every nested cut override is dropped. The marks keep their original `start`/`end`.
 - If a changed mark no longer touches its group, it leaves the group (`groupId = undefined`). Old adjacent marks that the user explicitly split do not merge by themselves.

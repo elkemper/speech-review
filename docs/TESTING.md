@@ -12,7 +12,7 @@ npm run typecheck       # checks main/preload/shared and renderer types separate
 npm run build           # checks that the production build succeeds
 ```
 
-Current state: **345 unit tests in 29 files** (about a second) and **18
+Current state: **400 unit tests in 37 files** (about a second) and **18
 integration tests** (about ten seconds).
 
 ## 2. Configuration
@@ -34,7 +34,10 @@ integration tests** (about ten seconds).
   and integration suites.
 - `node_modules_linux` is excluded because it is a stale Linux tree; the app uses the macOS `node_modules`.
 - The `@shared` alias is available. Renderer helper tests import them by relative path (for example, `../src/renderer/src/skip`).
-- Vitest runs in a Node environment; DOM and Electron are not emulated.
+- Vitest runs in a Node environment; DOM and Electron are not emulated. A
+  renderer helper must stay importable without `window`; the defect table
+  window's IPC relay and cell editing are therefore covered only manually with
+  `npm run dev` on macOS.
 
 ### 2.1 Integration suite (opt-in)
 
@@ -89,6 +92,8 @@ Electron dialog and IPC are left out.
 |---|---:|---|
 | `test/audioMix.test.ts` | 7 | streaming audio mixer: exact piece copy without a fade, constant level through 39 joins, output length equal to the export plan, stereo channel independence, abort, progress, defensive handling of a mismatched fade |
 | `test/contentMap.test.ts` | 10 | the independent content model: identity, the four-join cut list frame by frame, plain concatenation, a fade clamped by a short piece, a fragment shorter than two fades merged into the cut, a fragment exactly two fades long, untouched source ends, positions outside the export |
+| `test/cutEdit.test.ts` | 8 | cut edge edits from the defect table: start/end/duration, the edge a duration edit moves, uncut-row fallbacks, inverted, too short, negative and out-of-range rejection, derived vs overridden cuts |
+| `test/exportRows.test.ts` | 5 | exportable rows only (dismissed and candidates dropped), derived and overridden cut bounds, uncut pause, no mutation |
 | `test/candidates.test.ts` | 8 | suppressed minimum-duration candidates, ID stability, promotion, disabled types, dismissed promotion |
 | `test/autoIds.test.ts` | 6 | word-based automatic ID derivation, stability across rule/transcript changes, same-type collision suffix |
 | `test/core.test.ts` | 16 | `words.json` parser, trailing comma, real fixture, `buildTranscript`, confidence, event classification, active word/segment, automatic defects, sentence-boundary pauses, manual marks, exact word boundaries, old marks without `wordIds`, logical marks |
@@ -102,6 +107,7 @@ Electron dialog and IPC are left out.
 | `test/grouping.test.ts` | 29 | per-type minimum duration, pause hard threshold and normalization, automatic grouping rules and limits, enabled types and id stability, grouping toggle and migration, per-type/group skip padding, settings normalization (padding, pause room tone, mini timeline, waveform contrast) |
 | `test/history.test.ts` | 10 | undo/redo by index, redo branch truncation, `mergeKey` coalescing, different keys, deleted-marks archive, rules and padding snapshots, `skipEnabled` preservation, rules equality, session guard and no cross-session coalescing |
 | `test/manualPins.test.ts` | 6 | pinning the derived cut on confirmation, dropping pinned ranges on unconfirm, keeping hand-dragged ranges, re-pinning on double-click |
+| `test/manualMarkAdd.test.ts` | 6 | shared manual-mark core: standalone mark and note stores, exact cut override, merging into a group, unconfirmed group after a merge, frozen cut dropped when the group gains an unconfirmed mark |
 | `test/migrations.test.ts` | 7 | schema version reading, ordered migration runner, unknown/newer versions, partial migration application |
 | `test/modelManifest.test.ts` | 13 | runtime manifest fetching/validation, version comparison, `normalizeModelVersions`, manifest diffing and version bump |
 | `test/pinnedCuts.test.ts` | 8 | pinned override helpers, `withoutPinnedCuts`, manual pin reconciliation, derived re-pin |
@@ -112,6 +118,11 @@ Electron dialog and IPC are left out.
 | `test/marks.test.ts` | 14 | merge on add, split, logical mark ID, combined bounds/words/notes, confirmation reconciliation on merge/split, new marks, cut-span capture, edge-specific capture and nested override scope |
 | `test/selection.test.ts` | 39 | selection range in both directions, exact mark boundaries, exact time range, defect overlap, playhead fallback, clamp, nearest word, fit/zoom/pan, LOD and labels, cut handle dragging, bulk confirmation/deletion of a selection, mini timeline zoom/pan and colored word mapping |
 | `test/skip.test.ts` | 27 | padding and interval merging, pause room tone and minimum cut, cut overrides, cut view hatching, complement and subtract ranges, all non-dismissed items, dismissed and candidate filtering, clamp/disabled, interval lookup |
+| `test/tableColumns.test.ts` | 5 | defect table width normalization, clamping, known-field filtering, per-field defaults, total width and the columns an inline draft edits |
+| `test/tableDraft.test.ts` | 12 | inline draft validation, default bounds near the recording end, time text per column and placement below the selection or at the playhead |
+| `test/tableSelection.test.ts` | 9 | defect table replace/toggle/range selection, stale anchor fallback, unknown ids, select-all, pruning unchanged input, playhead insertion index |
+| `test/timeInput.test.ts` | 8 | time typed into the table: seconds/minutes/hours, comma decimals, overflowing parts, malformed input, same-moment comparison at display precision, fixed-width formatting |
+| `test/tableTheme.test.ts` | 2 | the table window's theme value: only `light` opts in, anything else keeps the window dark |
 | `test/videoExport.test.ts` | 27 | video settings normalization (including crossfade), single-pass select graph with frame-rate normalization, xfade dissolve graph with frame-accurate trims and offsets, concat fallback, filter-thread cap, export plan sync between video and audio, merging of a kept fragment shorter than two fades, the one-sample NTSC sample-overlap clamp, exact NTSC frame-rate snapping, CRF/q:v encoder args, kept ranges, duration and progress parsing |
 | `test/waveform.test.ts` | 9 | waveform statistics (noise floor, loud reference, degenerate input), contrast lookup table (linear mode, gamma lift, gate, monotonicity), signed mapping |
 

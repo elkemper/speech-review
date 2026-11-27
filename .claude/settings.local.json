@@ -18,7 +18,8 @@
       "Bash(npx tsc *)",
       "Bash(KEEP_SCRATCH=1 SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npx vitest run --config vitest.integration.config.mts --silent=false test/integration/scratch.int.test.ts 2>&1 | grep -E 'KEPT|Tests|last audio')",
       "Bash(node -e ' *)",
-      "Bash(SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npx vitest run --config vitest.integration.config.mts test/integration/content.int.test.ts)"
+      "Bash(SPEECH_REVIEW_FFMPEG=/tmp/int-ffmpeg/ffmpeg-7.0.2-arm64-static/ffmpeg npx vitest run --config vitest.integration.config.mts test/integration/content.int.test.ts)",
+      "Bash(git -C /app status --short)"
     ]
   }
 }

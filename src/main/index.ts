@@ -24,6 +24,7 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 let mainWindow: BrowserWindow | null = null
+let tableWindow: BrowserWindow | null = null
 let manager: TranscriptionManager | null = null
 
 app.setName('Speech Review')
@@ -154,6 +155,9 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+    // The table mirrors the main window's project; without it there is
+    // nothing to show and no state owner left.
+    closeTableWindow()
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -169,12 +173,84 @@ function createWindow(): void {
     }
   })
 
+  // A reload of the main window throws away the renderer store, so the table
+  // would be left with a stale snapshot and no state owner.
+  mainWindow.webContents.on('did-start-navigation', () => {
+    closeTableWindow()
+  })
+
   const devUrl = process.env.ELECTRON_RENDERER_URL
   if (isDev && devUrl) {
     void mainWindow.loadURL(devUrl)
   } else {
     void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+/**
+ * The defect table is a separate, non-modal window that mirrors the project
+ * of the main window. It loads the same renderer bundle at `#/table`; the main
+ * window remains the only owner of project state.
+ */
+function createTableWindow(): BrowserWindow {
+  const table = new BrowserWindow({
+    width: 1280,
+    height: 820,
+    minWidth: 760,
+    minHeight: 480,
+    show: false,
+    backgroundColor: '#1c1c1c',
+    title: translate(currentUiLanguage(), 'table.title'),
+    titleBarStyle: 'default',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: false
+    }
+  })
+
+  table.on('ready-to-show', () => table.show())
+  table.on('closed', () => {
+    tableWindow = null
+  })
+
+  table.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/i.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  table.webContents.on('will-navigate', (event, url) => {
+    const currentUrl = table.webContents.getURL()
+    if (url !== currentUrl && /^https?:/i.test(url)) {
+      event.preventDefault()
+      void shell.openExternal(url)
+    }
+  })
+
+  const devUrl = process.env.ELECTRON_RENDERER_URL
+  if (isDev && devUrl) {
+    void table.loadURL(`${devUrl}#/table`)
+  } else {
+    void table.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/table' })
+  }
+  return table
+}
+
+function openTableWindow(): void {
+  if (tableWindow && !tableWindow.isDestroyed()) {
+    if (tableWindow.isMinimized()) tableWindow.restore()
+    tableWindow.show()
+    tableWindow.focus()
+    return
+  }
+  tableWindow = createTableWindow()
+}
+
+function closeTableWindow(): void {
+  if (tableWindow && !tableWindow.isDestroyed()) tableWindow.close()
+  tableWindow = null
 }
 
 const gotLock = app.requestSingleInstanceLock()
@@ -212,6 +288,9 @@ if (!gotLock) {
     registerMediaProtocol()
     manager = registerIpc({
       getWindow: () => mainWindow,
+      getTableWindow: () => tableWindow,
+      openTableWindow,
+      closeTableWindow,
       onUiLanguageChange: (next) => {
         buildMenu(next)
         app.setAboutPanelOptions({

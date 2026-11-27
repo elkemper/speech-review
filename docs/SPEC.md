@@ -55,6 +55,7 @@ only the area it is working on.
 | [`11-model-updates.md`](spec/11-model-updates.md) | 49 | Model update discovery through a runtime manifest |
 | [`12-i18n.md`](spec/12-i18n.md) | 52–54 | Interface language (RU/EN), message catalogue, stable export values |
 | [`13-defect-panel.md`](spec/13-defect-panel.md) | 55 | Review panel map and the display-only type filter |
+| [`14-defect-table.md`](spec/14-defect-table.md) | 56 | Excel-like defect table in a separate window |
 
 ## Product invariants
 
@@ -116,6 +117,9 @@ Applies to every story.
   exact bounds and `M` creates a normal manual mark. Generated pause tokens
   remain deferred because `ManualMark` already stores exact start/end.
 - **Visual refresh** is a separate track (`07a`); it does not change behaviour.
+- **The defect table window** (`14`) is a passive mirror of the exportable rows;
+  the main window keeps the single project state and applies its commands
+  through the normal store actions. Column widths are UI-only.
 
 ## Triage
 
@@ -155,7 +159,7 @@ Applies to every story.
 
 ### Done — do not regress
 
-Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48, 50–55.
+Stories 1–7, 10–13, 16–17, 20–21, 25–26, 30–32, 34, 38–48, 50–55, 56.
 Verification only (implemented, needs a pass): 9, 24.
 
 ## Related documents

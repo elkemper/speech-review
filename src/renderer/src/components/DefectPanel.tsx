@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef } from 'react'
 import { formatShortSeconds, formatTimecode } from '@shared/format'
 import { defectTypeLabel } from '@shared/labels'
 import { matchesDefectFilter } from '@shared/defects'
-import type { Defect, DefectType, ExportDefect } from '@shared/types'
+import type { Defect, DefectType } from '@shared/types'
+import { toExportDefects } from '@shared/exportRows'
 import { DEFECT_COLORS, TYPE_ORDER } from '../defectsUi'
 import { defectCardView } from '../defectCardView'
 import { playFrom, seekTo, toggleLoopForDefect } from '../player'
@@ -183,19 +184,15 @@ export default function DefectPanel({
   const exportAs = async (format: 'csv' | 'json'): Promise<void> => {
     if (!project) return
     try {
-      const exportable = defects.filter(
-        (defect) => !defect.dismissed && !defect.candidate
+      // The same exported view the table window shows.
+      const exportDefects = toExportDefects(
+        defects,
+        playback,
+        project.duration,
+        project.cutOverrides
       )
-      const exportDefects: ExportDefect[] = exportable.map((defect) => {
-        const cut = cutDurations.get(defect.id) ?? null
-        return {
-          ...defect,
-          cutStart: cut ? cut.start : null,
-          cutEnd: cut ? cut.end : null
-        }
-      })
       const cuts = buildCutList(
-        exportable,
+        exportDefects,
         playback,
         project.duration,
         project.cutOverrides
@@ -525,6 +522,13 @@ export default function DefectPanel({
         </button>
         <button className="btn ghost small" onClick={() => void exportAs('json')}>
           JSON
+        </button>
+        <button
+          className="btn ghost small"
+          onClick={() => void window.api.openDefectTable().catch(() => undefined)}
+          title={t('table.openTitle')}
+        >
+          {t('table.open')}
         </button>
         <button className="btn ghost small panel-foot-wide" onClick={onVideoExport}>
           {t('panel.exportVideo')}

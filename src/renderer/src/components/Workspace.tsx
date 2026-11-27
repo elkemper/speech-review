@@ -14,6 +14,7 @@ import { useApp } from '../store'
 import { useT, useUiLanguage } from '../i18n'
 import { canRedo, canUndo } from '../history'
 import { useHotkeys } from '../hooks/useHotkeys'
+import { useDefectTableBridge } from '../defectTableBridge'
 import Player from './Player'
 import Timeline from './Timeline'
 import Transcript from './Transcript'
@@ -250,6 +251,7 @@ export default function Workspace() {
   ])
 
   useHotkeys(defects)
+  useDefectTableBridge(defects)
 
   // The type filter is display-only: when the active card stops matching, drop
   // it so the panel, timeline handles and transcript stay consistent.

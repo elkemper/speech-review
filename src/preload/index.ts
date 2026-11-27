@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '@shared/ipc'
 import type { AppApi } from '@shared/api'
+import type { DefectTableCommand, DefectTableState } from '@shared/defectTable'
 import type {
   EngineStatus,
   ExportRequest,
@@ -89,6 +90,20 @@ const api: AppApi = {
   cancelVideoExport: (): Promise<void> => ipcRenderer.invoke(IPC.exportVideoCancel),
   onVideoExportProgress: (callback: (progress: VideoExportProgress) => void): (() => void) =>
     subscribe(IPC.videoExportProgress, callback),
+
+  openDefectTable: (): Promise<void> => ipcRenderer.invoke(IPC.tableOpen),
+  closeDefectTable: (): Promise<void> => ipcRenderer.invoke(IPC.tableClose),
+  sendDefectTableState: (state: DefectTableState): void =>
+    ipcRenderer.send(IPC.tableSync, state),
+  requestDefectTableState: (): void => ipcRenderer.send(IPC.tableReady),
+  sendDefectTableCommand: (command: DefectTableCommand): void =>
+    ipcRenderer.send(IPC.tableCommand, command),
+  onDefectTableState: (callback: (state: DefectTableState) => void): (() => void) =>
+    subscribe(IPC.tableState, callback),
+  onDefectTableReady: (callback: () => void): (() => void) =>
+    subscribe<void>(IPC.tableReady, () => callback()),
+  onDefectTableCommand: (callback: (command: DefectTableCommand) => void): (() => void) =>
+    subscribe(IPC.tableCommand, callback),
 
   showItemInFolder: (path: string): Promise<void> =>
     ipcRenderer.invoke(IPC.shellShowItem, path)

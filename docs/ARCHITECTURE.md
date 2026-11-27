@@ -57,20 +57,21 @@ User-facing features are listed in `README.md`; the requirement index is `docs/S
 
 | Area | Modules | Responsibility |
 |---|---|---|
-| App shell | `src/main/index.ts`, `src/preload/index.ts`, `src/renderer/src/App.tsx`, `src/renderer/src/components/Welcome.tsx`, `src/renderer/src/components/Workspace.tsx` | lifecycle, window, menu, typed bridge, entry screen and main grid |
+| App shell | `src/main/index.ts`, `src/preload/index.ts`, `src/renderer/src/App.tsx`, `src/renderer/src/main.tsx`, `src/renderer/src/components/Welcome.tsx`, `src/renderer/src/components/Workspace.tsx`, `src/renderer/src/components/DefectTableApp.tsx` | lifecycle, both windows, menu, typed bridge, entry screen, main grid and the table window root |
 | IPC and persistence | `src/main/ipc.ts`, `src/main/projects.ts`, `src/main/settings.ts`, `src/main/paths.ts`, `src/main/export.ts`, `src/main/videoExport.ts` | handlers and dialogs, project files, settings normalization, paths, CSV/JSON/video export |
 | Media | `src/main/mediaServer.ts` | privileged `app-media://` scheme with Range support |
 | Engine | `src/main/engine/ffmpeg.ts`, `chunks.ts`, `wav.ts`, `models.ts`, `crisperwhisper.ts`, `proc.ts`, `audioMix.ts`, `exportJob.ts`, `exportPipeline.ts` | probe/extract/silence, chunk plan, WAV slicing/peaks, model state, CLI invocation, child processes, export validation and plan resolution, export stages behind injected ports, PCM cut/crossfade mixing |
-| Shared domain | `src/shared/types.ts`, `transcript.ts`, `defects.ts`, `marks.ts`, `settings.ts`, `models.ts`, `exportCsv.ts`, `videoExport.ts`, `format.ts`, `i18n.ts`, `locales/`, `labels.ts`, `ipc.ts`, `api.ts` | canonical types, pure rules, parsing, export and formatting, typed RU/EN catalogue and language-aware labels |
-| Renderer state | `src/renderer/src/store.ts`, `history.ts`, `settingsHistory.ts` | app state, save orchestration, undo/redo snapshots and settings labels |
-| Renderer logic | `src/renderer/src/player.ts`, `skip.ts`, `selection.ts`, `timelineView.ts`, `defectsUi.ts`, `defectCardView.ts`, `miniTimeline.ts`, `waveform.ts`, `hooks/useHotkeys.ts` | playback control, intervals, selection, timeline math, labels/cards, mini window, waveform, hotkeys |
-| UI components | `src/renderer/src/components/Player.tsx`, `Timeline.tsx`, `Transcript.tsx`, `DefectPanel.tsx`, `SettingsDialog.tsx`, `DefectRulesSection.tsx`, `SettingsRangeField.tsx`, `HistoryDialog.tsx`, `Bookmarks.tsx`, `MiniTimeline.tsx`, `VideoExportDialog.tsx` | rendering and user interaction |
+| Shared domain | `src/shared/types.ts`, `transcript.ts`, `defects.ts`, `marks.ts`, `settings.ts`, `models.ts`, `exportCsv.ts`, `exportRows.ts`, `cutEdit.ts`, `manualMarkAdd.ts`, `timeInput.ts`, `defectTable.ts`, `videoExport.ts`, `format.ts`, `i18n.ts`, `locales/`, `labels.ts`, `ipc.ts`, `api.ts` | canonical types, pure rules, parsing, export and formatting, typed RU/EN catalogue and language-aware labels |
+| Renderer state | `src/renderer/src/store.ts`, `history.ts`, `settingsHistory.ts`, `defectTableBridge.ts` | app state, save orchestration, undo/redo snapshots, settings labels and the main-window side of the defect table relay |
+| Renderer logic | `src/renderer/src/player.ts`, `skip.ts`, `selection.ts`, `timelineView.ts`, `tableSelection.ts`, `tableColumns.ts`, `defectsUi.ts`, `defectCardView.ts`, `miniTimeline.ts`, `waveform.ts`, `hooks/useHotkeys.ts` | playback control, intervals, selection, timeline math, table selection and widths, labels/cards, mini window, waveform, hotkeys |
+| UI components | `src/renderer/src/components/Player.tsx`, `Timeline.tsx`, `Transcript.tsx`, `DefectPanel.tsx`, `DefectTable.tsx`, `AddTableRowDialog.tsx`, `SettingsDialog.tsx`, `DefectRulesSection.tsx`, `SettingsRangeField.tsx`, `HistoryDialog.tsx`, `Bookmarks.tsx`, `MiniTimeline.tsx`, `VideoExportDialog.tsx` | rendering and user interaction |
 
 `AGENTS.md` contains the full repository tree; this table is the responsibility map.
 
 ## 4. Startup, security and media
 
-- `app.requestSingleInstanceLock()` prevents a second window; a second launch focuses the existing one.
+- `app.requestSingleInstanceLock()` prevents a second app instance; a second launch focuses the existing main window.
+- The defect table is a second `BrowserWindow` inside the same app instance. It loads the renderer bundle at `#/table` and never owns project state: the main window publishes a snapshot and applies its commands through the store. See §8 and §9.
 - `BrowserWindow` uses `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false`. The renderer has no direct Node access.
 - Preload exposes only `window.api`, described in `src/shared/api.ts`.
 - External links open through `shell.openExternal`; navigation to `http(s)` inside the window is blocked.
@@ -154,6 +155,7 @@ The rules themselves — thresholds, enable flags, grouping conditions, candidat
 - `DefectPanel` renders computed `Defect` objects; `defectCardView.ts` derives card layout from the defect and skip state. The mini timeline reuses the shared playhead and the same `setCutBounds` action as the main timeline.
 - `SettingsDialog` owns the tabbed settings UI. While a recognition job runs, the tabs and body sit inside an `inert` flex container; the scroll body keeps its constrained layout.
 - `useHotkeys` matches `event.code` first, so hotkeys keep working on the Russian keyboard layout. They are disabled in text fields.
+- The `#/table` window mounts `DefectTableApp` instead of `App`; it does not initialize the main store. `defectTableBridge.ts`, mounted inside `Workspace`, publishes `toExportDefects` rows and applies table commands through `removeDefects`, `setNote`, `setCutBounds` and `addMarkRange`; add and delete carry a token echoed back in `lastCommand` so the toast reports success only after the command applied. Column widths stay in `localStorage` (`sr.tableColumns`) and never enter the project or history. The table window's own light/dark choice lives in `localStorage` (`sr.tableTheme`, `tableTheme.ts`) and is applied as `data-theme` on the table document only, so the main window stays dark.
 
 Interaction details, acceptance criteria and statuses are defined in the spec files below; this section only names the implementation boundary of each component.
 
@@ -171,6 +173,12 @@ Main IPC groups:
 | Transcription | `transcribe:start`, `transcribe:cancel`; events: `transcribe:progress`, `transcribe:partial`, `transcribe:done`, `transcribe:error` |
 | Models | `models:download`, `models:state`, `models:delete`, `models:check-updates`; event: `models:progress` |
 | Export/shell | `export:project`, `export:video`, `export:video:cancel`, `shell:show-item`; event: `export:video:progress` |
+| Defect table | `table:open`, `table:close`, `table:sync` (main window → main process); events: `table:state` (main process → table), `table:ready` and `table:command` (table → main window) |
+
+The main process relays table messages between the two windows and checks the
+sender; it never stores a copy of the project. Rendering, selection, cell
+editing and the add-row dialog live in the table window, while every project
+change is executed by the main window's store.
 
 `invoke` channels return a result and fail through a rejected promise. Progress, partial, done, error and model-progress channels are main→renderer events and are subscribed to through preload.
 
@@ -187,6 +195,7 @@ Main IPC groups:
 | Layout, undo/redo, visual language | [`07-layout-history-visual.md`](spec/07-layout-history-visual.md), [`07a`](spec/07a-visual-refresh.md) |
 | Progress, chunk length, streaming ASR | [`08-processing-progress.md`](spec/08-processing-progress.md), [`08a`](spec/08a-streaming-asr.md) |
 | CSV, JSON and video export | [`09-export.md`](spec/09-export.md) |
+| Review panel filter and the defect table window | [`13-defect-panel.md`](spec/13-defect-panel.md), [`14-defect-table.md`](spec/14-defect-table.md) |
 
 Status triage and cross-cutting product invariants are in [`SPEC.md`](SPEC.md).
 
@@ -197,6 +206,7 @@ Status triage and cross-cutting product invariants are in [`SPEC.md`](SPEC.md).
 - No diarization, transcript search, SRT/VTT or light theme.
 - Video export always re-encodes; there is no fast stream-copy mode, and
   audio-only export is not implemented.
-- No e2e tests; Electron, real media playback, the engine and packaging require a macOS run.
+- No e2e tests; Electron, real media playback, the engine, packaging and the
+  defect table's two-window IPC relay require a macOS run.
 
 Full deferred list — `docs/BACKLOG.md`; platform and test limits — `docs/TESTING.md` and `docs/DEVELOPMENT.md`.

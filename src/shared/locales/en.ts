@@ -355,6 +355,53 @@ export const en: Record<MessageKey, string> = {
   'panel.exportJson': 'Export JSON',
   'panel.exportVideo': 'Export video…',
 
+  // Defect table window
+  'table.title': 'Defect table',
+  'table.windowTitle': 'Defect table — {name}',
+  'table.open': 'Table…',
+  'table.openTitle': 'Open the defects in a separate table window',
+  'table.addRow': 'Add row',
+  'table.deleteSelected': 'Delete ({count})',
+  'table.deleteTitle': 'Delete the selected rows',
+  'table.rows': 'Rows: {count}',
+  'table.selected': 'Selected: {count}',
+  'table.themeLight': 'Light theme',
+  'table.themeDark': 'Dark theme',
+  'table.fieldsHint':
+    'Columns and their order come from the export settings; these are the CSV rows, and the panel type filter does not apply. Double-click a time or note cell to edit it; click a note cell and use ⌘C/⌘V to copy it between rows.',
+  'table.resizeColumn': 'Drag to resize the column; double-click to reset.',
+  'table.empty': 'No rows. Add a row or start recognition in the main window.',
+  'table.emptyNoTranscript':
+    'There is no transcript yet. You can add a manual mark; the detected defects will appear after recognition.',
+  'table.loading': 'Loading the table…',
+  'table.rowNumber': 'No.',
+  'table.deleted': 'Deleted: {count}',
+  'table.deletedUndoHint': 'Undo is available in the main window (⌘Z / Ctrl+Z).',
+  'table.added': 'Row added',
+  'table.commandFailed':
+    'The change was not applied: the main window data changed. Try again.',
+  'table.add.title': 'New row',
+  'table.add.start': 'Start',
+  'table.add.end': 'End',
+  'table.add.note': 'Note',
+  'table.add.hint':
+    'Time: 00:12:34.500, 12:34 or 754.5. The entered bounds become the exact cut.',
+  'table.add.draftHint':
+    'Type the time and note; the row is saved when you move to another row. Esc cancels.',
+  'table.add.mergeHint':
+    'If the mark touches a neighbour, they merge and the cut follows the group padding.',
+  'table.add.invalidStart': 'Check the start time (allowed: 0 to {duration}).',
+  'table.add.invalidEnd': 'Check the end time.',
+  'table.add.tooShort': 'A row must be at least 0.05 s long.',
+  'table.add.outOfRange': 'The time is outside the recording (up to {duration}).',
+  'table.add.submit': 'Add',
+  'table.edit.invalidTime': 'Could not read the time. Example: 00:12:34.500 or 754.5.',
+  'table.edit.invalidCut':
+    'This cut is not possible: the start must be before the end, and both bounds must be inside the recording.',
+  'table.edit.readOnly': 'Read only',
+  'table.defectBoundsHint':
+    'Defect bounds come from detection or the mark; the cut columns are editable.',
+
   // Transcript
   'transcript.copied': 'Transcript copied',
   'transcript.copyFailed': 'Could not copy the text',

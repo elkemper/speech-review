@@ -5,12 +5,11 @@ import { adoptFillerLanguage } from '@shared/defects'
 import { formatTimecode } from '@shared/format'
 import {
   markIdsForDefectId,
-  manualDefectIdForMark,
-  mergeMarkNeighbours,
   mergeMarksAtSpan,
   reconcileConfirmedIds
 } from '@shared/marks'
 import { pinCutFor, withoutPinnedCuts } from '@shared/cuts'
+import { addManualMark } from '@shared/manualMarkAdd'
 import { reconcileManualPins } from '@shared/pinnedCuts'
 import type {
   Bookmark,
@@ -18,7 +17,6 @@ import type {
   DefectRules,
   EngineStatus,
   ExportSettings,
-  ManualMark,
   ModelDownloadProgress,
   ModelId,
   ModelUpdateCheckResult,
@@ -150,6 +148,12 @@ interface AppStore {
   restoreDefect: (defectId: string, relatedIds?: string[]) => void
   setNote: (defectId: string, note: string) => void
   addMark: () => void
+  /**
+   * Add a manual mark with exact bounds and an optional note. Used by the
+   * defect table, where the user types the time instead of selecting words.
+   * The typed range also becomes the cut, unless the mark merged into a group.
+   */
+  addMarkRange: (start: number, end: number, note: string) => boolean
   addBookmark: (time?: number) => void
   removeBookmark: (id: string) => void
   setBookmarkNote: (id: string, note: string) => void
@@ -774,50 +778,22 @@ export const useApp = create<AppStore>((set, get) => ({
     const range =
       timeRange ??
       markRangeForSelection(words, get().selection, get().currentTime, project.duration)
-    const mark: ManualMark = {
-      id: crypto.randomUUID(),
-      type: 'manual',
-      start: range.start,
-      end: range.end,
-      wordIds: range.wordIds,
-      note: '',
-      createdAt: new Date().toISOString()
-    }
-    const marks = mergeMarkNeighbours([...project.marks, mark], [mark.id])
-    const activeDefectId = manualDefectIdForMark(marks, mark.id) ?? `manual-${mark.id}`
-    // Adding a mark can rebuild a logical group. The group's fill changed, so
-    // every nested cut override is dropped and the cut is derived again. A
-    // frozen (confirmed) cut is re-pinned by `reconcileManualPins` below.
-    const cutOverrides = { ...(project.cutOverrides ?? {}) }
-    const affectedMarkIds = markIdsForDefectId(activeDefectId, marks)
-    for (const markId of affectedMarkIds) delete cutOverrides[`manual-${markId}`]
-    for (const item of marks) {
-      if (!affectedMarkIds.includes(item.id)) continue
-      const previous = project.marks.find((mark) => mark.id === item.id)
-      if (previous?.groupId) {
-        delete cutOverrides[`manual-group-${previous.groupId}`]
-      }
-    }
-    const confirmed = reconcileConfirmedIds(
-      project.marks,
-      marks,
-      project.confirmedDefectIds
+    const markId = crypto.randomUUID()
+    const result = addManualMark(
+      project,
+      {
+        id: markId,
+        start: range.start,
+        end: range.end,
+        wordIds: range.wordIds,
+        note: '',
+        createdAt: new Date().toISOString()
+      },
+      get().settings.playback
     )
     set({
-      project: {
-        ...project,
-        marks,
-        cutOverrides: reconcileManualPins(
-          marks,
-          confirmed,
-          cutOverrides,
-          get().settings.playback,
-          project.duration,
-          markIdsForDefectId(activeDefectId, marks).map((markId) => `manual-${markId}`).concat(activeDefectId)
-        ),
-        confirmedDefectIds: confirmed
-      },
-      activeDefectId,
+      project: result.project,
+      activeDefectId: result.activeDefectId,
       filter: 'all',
       selection: null,
       selectedWordId: null,
@@ -826,7 +802,8 @@ export const useApp = create<AppStore>((set, get) => ({
     recordProjectChange(set, get, before, tr(get, 'history.label.markAdded'))
     get().scheduleSave()
 
-    const changed = marks.find((item) => item.id === mark.id)
+    const marks = result.project.marks
+    const changed = marks.find((item) => item.id === markId)
     const groupSize = changed?.groupId
       ? marks.filter((item) => item.groupId === changed.groupId).length
       : 1
@@ -840,6 +817,44 @@ export const useApp = create<AppStore>((set, get) => ({
           : tr(get, 'toast.markAdded')
       )
     }
+  },
+
+  addMarkRange: (start, end, note) => {
+    const project = get().project
+    if (!project) return false
+    const duration = Math.max(0, project.duration)
+    const from = Math.min(Math.max(0, start), duration)
+    const to = Math.min(Math.max(0, end), duration)
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return false
+    // The same minimum the store's `clampBounds` enforces for cut handles.
+    if (to - from < 0.05) return false
+    const range = markRangeForTimeSelection(
+      project.transcript?.words ?? [],
+      { start: from, end: to },
+      duration
+    )
+    if (!range) return false
+
+    const before = snapshotEditable(project, get().settings)
+    const result = addManualMark(
+      project,
+      {
+        id: crypto.randomUUID(),
+        start: range.start,
+        end: range.end,
+        wordIds: range.wordIds,
+        note,
+        createdAt: new Date().toISOString()
+      },
+      get().settings.playback,
+      // The typed range is also the cut, so the table shows exactly what was
+      // entered. A mark that merged into a group keeps the group's padding.
+      { cut: { start: range.start, end: range.end } }
+    )
+    set({ project: result.project, activeDefectId: result.activeDefectId })
+    recordProjectChange(set, get, before, tr(get, 'history.label.markAdded'))
+    get().scheduleSave()
+    return true
   },
 
   removeDefect: (defectId, relatedIds = []) => {

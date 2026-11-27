@@ -25,6 +25,7 @@ Where each panel behaviour is specified; do not duplicate it here.
 | Bulk confirm/delete of a selection | [Story 11](03-marks.md) |
 | Panel width drag and hide/show | [Story 31](07-layout-history-visual.md) |
 | CSV / JSON / video export buttons | [Stories 38, 39, 48](09-export.md) |
+| Excel-like table of the exported rows in a separate window | [Story 56](14-defect-table.md) |
 | In-panel snippet with editable cut handles | [Story 40](10-mini-timeline.md) |
 | Card confirm/delete actions and compact rows | [Story 45](03-marks.md) |
 | Revealed minimum-duration candidate card | [Story 46](02-defects.md) |

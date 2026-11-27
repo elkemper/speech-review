@@ -4,6 +4,7 @@ import { constants } from 'node:fs'
 import { basename, extname, resolve } from 'node:path'
 import { translate, type UiLanguage } from '@shared/i18n'
 import { IPC } from '@shared/ipc'
+import type { DefectTableCommand, DefectTableState } from '@shared/defectTable'
 import type {
   EngineStatus,
   ExportRequest,
@@ -75,18 +76,33 @@ async function mediaInfo(path: string): Promise<MediaInfo> {
 
 export interface IpcDependencies {
   getWindow: () => BrowserWindow | null
+  /** The defect table mirror window, when it is open. */
+  getTableWindow: () => BrowserWindow | null
+  openTableWindow: () => void
+  closeTableWindow: () => void
   /** Rebuilds the native menu and other main-process chrome after a switch. */
   onUiLanguageChange?: (lang: UiLanguage) => void
 }
 
 export function registerIpc(dependencies: IpcDependencies): TranscriptionManager {
-  const { getWindow, onUiLanguageChange } = dependencies
+  const { getWindow, getTableWindow, openTableWindow, closeTableWindow, onUiLanguageChange } =
+    dependencies
   const t = (key: Parameters<typeof translate>[1]): string =>
     translate(currentUiLanguage(), key)
 
   const send = (channel: string, payload: unknown): void => {
     const window = getWindow()
     if (window && !window.isDestroyed()) window.webContents.send(channel, payload)
+  }
+
+  const isMainSender = (event: Electron.IpcMainEvent): boolean => {
+    const window = getWindow()
+    return Boolean(window && !window.isDestroyed() && event.sender === window.webContents)
+  }
+
+  const isTableSender = (event: Electron.IpcMainEvent): boolean => {
+    const window = getTableWindow()
+    return Boolean(window && !window.isDestroyed() && event.sender === window.webContents)
   }
 
   const manager = new TranscriptionManager({
@@ -222,6 +238,30 @@ export function registerIpc(dependencies: IpcDependencies): TranscriptionManager
   })
   ipcMain.handle(IPC.exportVideoCancel, async () => {
     cancelVideoExport()
+  })
+
+  ipcMain.handle(IPC.tableOpen, async () => {
+    openTableWindow()
+  })
+  ipcMain.handle(IPC.tableClose, async () => {
+    closeTableWindow()
+  })
+
+  // The main window owns the project; the table window is a passive mirror.
+  // Both directions cross the main process, so neither renderer receives the
+  // other's webContents and the preload surface stays a narrow typed API.
+  ipcMain.on(IPC.tableSync, (event, state: DefectTableState) => {
+    if (!isMainSender(event)) return
+    const table = getTableWindow()
+    if (table && !table.isDestroyed()) table.webContents.send(IPC.tableState, state)
+  })
+  ipcMain.on(IPC.tableReady, (event) => {
+    if (!isTableSender(event)) return
+    send(IPC.tableReady, undefined)
+  })
+  ipcMain.on(IPC.tableCommand, (event, command: DefectTableCommand) => {
+    if (!isTableSender(event)) return
+    send(IPC.tableCommand, command)
   })
 
   ipcMain.handle(IPC.shellShowItem, async (_event, path: string) => {
